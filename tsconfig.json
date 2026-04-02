@@ -1,0 +1,6 @@
+{
+  // Extends Nuxt's generated types so VS Code knows about all auto-imports
+  // (defineEventHandler, readBody, $fetch, etc.)
+  // Run `npm run dev` first — Nuxt generates .nuxt/tsconfig.json on startup
+  "extends": "./.nuxt/tsconfig.json"
+}

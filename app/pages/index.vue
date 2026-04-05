@@ -69,42 +69,46 @@
           />
         </div>
 
-        <!-- Mobile stats — simple 2 row layout -->
-        <div v-if="selectedFiring" class="sm:hidden shrink-0 px-3 pt-3 flex gap-2">
-          <!-- Current temp — tappable -->
+        <!-- Mobile stats — compact single row -->
+        <div v-if="selectedFiring" class="sm:hidden shrink-0 px-2 pt-2 flex gap-1.5">
           <button
-            class="flex-1 bg-white border border-stone-200 rounded-xl p-3 flex flex-col items-center active:bg-orange-50"
+            class="flex-1 bg-white border border-stone-200 rounded-lg py-1.5 px-2 flex flex-col items-center active:bg-orange-50"
             @click="showTempModal = true"
           >
-            <span class="text-xs text-stone-400 uppercase tracking-wide">Current</span>
-            <span class="text-4xl font-bold tabular-nums" :class="currentTemp !== null ? 'text-orange-500' : 'text-stone-300'">
+            <span class="text-[10px] text-stone-400 uppercase tracking-wide leading-none mb-0.5">Now</span>
+            <span class="text-xl font-bold tabular-nums leading-none" :class="currentTemp !== null ? 'text-orange-500' : 'text-stone-300'">
               {{ currentTemp !== null ? Math.round(currentTemp) : '—' }}
             </span>
-            <span class="text-sm text-orange-400">°C</span>
+            <span class="text-[10px] text-orange-400">°C</span>
           </button>
-          <!-- Peak -->
-          <div class="flex-1 bg-white border border-stone-200 rounded-xl p-3 flex flex-col items-center">
-            <span class="text-xs text-stone-400 uppercase tracking-wide">Peak</span>
-            <span class="text-4xl font-bold tabular-nums text-stone-700">{{ peakTemp !== null ? Math.round(peakTemp) : '—' }}</span>
-            <span class="text-sm text-stone-400">°C</span>
+
+          <div class="flex-1 bg-white border border-stone-200 rounded-lg py-1.5 px-2 flex flex-col items-center">
+            <span class="text-[10px] text-stone-400 uppercase tracking-wide leading-none mb-0.5">Peak</span>
+            <span class="text-xl font-bold tabular-nums leading-none text-stone-700">{{ peakTemp !== null ? Math.round(peakTemp) : '—' }}</span>
+            <span class="text-[10px] text-stone-400">°C</span>
           </div>
-          <!-- Elapsed or Readings -->
-          <div class="flex-1 bg-white border border-stone-200 rounded-xl p-3 flex flex-col items-center">
-            <span class="text-xs text-stone-400 uppercase tracking-wide">{{ isLive && !isManual ? 'Elapsed' : 'Readings' }}</span>
-            <span class="text-4xl font-bold tabular-nums text-stone-700">{{ isLive && !isManual ? elapsed : readingCount }}</span>
+
+          <div class="flex-1 bg-white border border-stone-200 rounded-lg py-1.5 px-2 flex flex-col items-center">
+            <span class="text-[10px] text-stone-400 uppercase tracking-wide leading-none mb-0.5">{{ isLive && !isManual ? 'Elapsed' : 'Readings' }}</span>
+            <span class="text-xl font-bold tabular-nums leading-none text-stone-700">{{ isLive && !isManual ? elapsed : readingCount }}</span>
+          </div>
+
+          <div v-if="isLive && !isManual" class="flex-1 bg-white border border-stone-200 rounded-lg py-1.5 px-2 flex flex-col items-center">
+            <span class="text-[10px] text-stone-400 uppercase tracking-wide leading-none mb-0.5">Rate</span>
+            <span class="text-sm font-bold tabular-nums leading-none text-stone-700 mt-1">{{ rateOfChange }}</span>
           </div>
         </div>
 
         <!-- Chart -->
         <div
           class="flex-1 bg-white rounded-xl border border-stone-200 shadow-sm relative flex items-center justify-center min-h-0"
-          :class="selectedFiring ? 'sm:m-5 sm:mt-4 m-3 mt-2' : 'sm:m-5 m-3'"
+          :class="selectedFiring ? 'sm:m-5 sm:mt-4 m-2 mt-1.5' : 'sm:m-5 m-2'"
         >
           <canvas ref="chartCanvas" class="w-full h-full"></canvas>
 
           <button
             v-if="selectedFiring"
-            class="absolute bottom-3 right-3 px-2.5 py-1 text-xs font-medium border border-stone-200 rounded-lg bg-white text-stone-500 shadow-sm"
+            class="absolute bottom-2 right-2 px-2 py-1 text-[10px] font-medium border border-stone-200 rounded-md bg-white text-stone-400 shadow-sm"
             @click="resetZoom"
           >Reset zoom</button>
 
@@ -121,18 +125,23 @@
         </div>
 
         <!-- Mobile action bar -->
-        <div class="sm:hidden shrink-0 px-3 pb-4 pt-2 flex gap-2">
+        <div class="sm:hidden shrink-0 px-2 pb-2 pt-1 flex gap-1.5">
           <button
             v-if="isLive && isManual"
-            class="flex-1 py-3 bg-orange-500 text-white text-sm font-bold rounded-xl active:bg-orange-600"
+            class="flex-1 py-2 bg-orange-500 text-white text-xs font-bold rounded-lg active:bg-orange-600"
             @click="openLogReading"
           >+ Log Reading</button>
           <button
             v-if="isLive"
-            class="py-3 px-4 border rounded-xl text-xs font-semibold transition-colors"
+            class="py-2 px-3 border rounded-lg text-xs font-semibold shrink-0"
             :class="isManual ? 'border-blue-200 bg-blue-50 text-blue-600' : 'border-stone-200 bg-stone-50 text-stone-500'"
             @click="toggleMode"
           >{{ isManual ? '✏️ Manual' : '📡 Connected' }}</button>
+          <button
+            v-if="!selectedFiring || (!isLive && !activeFiring)"
+            class="flex-1 py-2 bg-orange-500 text-white text-xs font-bold rounded-lg active:bg-orange-600"
+            @click="openStartModal"
+          >+ Start Firing</button>
         </div>
 
       </main>
@@ -166,7 +175,7 @@
                 :class="selectedFiring?.id === activeFiring.id ? 'bg-orange-50' : ''"
                 @click="selectFiring(activeFiring); showFiringSheet = false"
               >
-                <div class="w-2 h-2 rounded-full bg-green-500 shrink-0 mt-0.5"></div>
+                <div class="w-2 h-2 rounded-full bg-green-500 shrink-0"></div>
                 <div>
                   <p class="text-sm font-semibold text-stone-700">{{ activeFiring.name }}</p>
                   <p class="text-xs text-green-600 mt-0.5">● Live</p>
@@ -182,7 +191,7 @@
                 :class="selectedFiring?.id === f.id ? 'bg-orange-50' : ''"
                 @click="selectFiring(f); showFiringSheet = false"
               >
-                <div class="w-2 h-2 rounded-full bg-stone-300 shrink-0 mt-0.5"></div>
+                <div class="w-2 h-2 rounded-full bg-stone-300 shrink-0"></div>
                 <div>
                   <p class="text-sm font-medium text-stone-700">{{ f.name }}</p>
                   <p class="text-xs text-stone-400 mt-0.5">{{ formatDate(f.created_at) }}</p>
@@ -207,7 +216,7 @@
             </li>
           </ul>
 
-          <div class="p-4 border-t border-stone-100 shrink-0">
+          <div class="p-3 border-t border-stone-100 shrink-0">
             <button class="btn-primary w-full py-3" @click="openStartModal(); showFiringSheet = false">
               + Start Firing
             </button>
@@ -256,9 +265,9 @@ import { useKilnChart } from '~/composables/useKilnChart'
 
 const chartCanvas = ref<HTMLCanvasElement | null>(null)
 
-const editingReading      = ref<any>(null)
-const showReadingModal    = ref(false)
-const showFiringSheet     = ref(false)
+const editingReading       = ref<any>(null)
+const showReadingModal     = ref(false)
+const showFiringSheet      = ref(false)
 const sheetConfirmDeleteId = ref<number | null>(null)
 
 const { init, setSchedule, setReadings, setManualMode, setSignalLost, clearSignalLost, resetZoom, destroy } = useKilnChart(chartCanvas, {
@@ -459,9 +468,7 @@ onMounted(async () => {
   console.log('[KilnMonitor] mounted')
   await init()
   await refreshFirings()
-  if (activeFiring.value) {
-    await selectFiring(activeFiring.value)
-  }
+  if (activeFiring.value) await selectFiring(activeFiring.value)
 })
 
 onUnmounted(() => {

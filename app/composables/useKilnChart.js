@@ -40,7 +40,7 @@ export function useKilnChart(canvasRef, { onPointClick } = {}) {
             borderColor: '#f97316',
             backgroundColor: 'rgba(249,115,22,0.08)',
             borderWidth: 2.5,
-            pointRadius: 0,         // default — manual mode sets this to 6
+            pointRadius: 0,
             pointHoverRadius: 8,
             pointBackgroundColor: '#f97316',
             pointBorderColor: '#fff',
@@ -69,7 +69,6 @@ export function useKilnChart(canvasRef, { onPointClick } = {}) {
         interaction: { mode: 'index', intersect: false },
         onClick: (event, elements) => {
           if (!onPointClick) return
-          // Only respond to clicks on the Actual dataset (index 1)
           const hit = elements.find(el => el.datasetIndex === 1)
           if (!hit) return
           const point = chart.data.datasets[1].data[hit.index]
@@ -143,6 +142,7 @@ export function useKilnChart(canvasRef, { onPointClick } = {}) {
       const maxX = Math.max(...points.map(p => p.offset_minutes))
       const maxY = Math.max(...points.map(p => p.target_temp))
       chart.options.scales.x.max          = maxX
+      chart.options.scales.x.min          = 0
       chart.options.scales.y.suggestedMax = maxY + 50
     }
     chart.update('none')
@@ -151,20 +151,18 @@ export function useKilnChart(canvasRef, { onPointClick } = {}) {
   function setReadings(rows, startedAt) {
     if (!chart) return
     chart.data.datasets[1].data = rows.map(r => ({
-      x:   Math.round((r.timestamp - startedAt) / 60),
-      y:   r.temperature,
-      id:  r.id,
-      ts:  r.timestamp,
+      x:  Math.round((r.timestamp - startedAt) / 60),
+      y:  r.temperature,
+      id: r.id,
+      ts: r.timestamp,
     }))
     chart.update('none')
   }
 
-  // Switch point visibility for manual vs connected mode
   function setManualMode(enabled) {
     if (!chart) return
     chart.data.datasets[1].pointRadius      = enabled ? 6 : 0
     chart.data.datasets[1].pointHoverRadius = enabled ? 10 : 4
-    // In manual mode, cursor should indicate clickability
     canvasRef.value.style.cursor = enabled ? 'pointer' : 'default'
     chart.update('none')
   }
@@ -210,6 +208,7 @@ export function useKilnChart(canvasRef, { onPointClick } = {}) {
 
   function clearSignalLost() {
     if (!chart) return
+    console.log('[KilnChart] clearSignalLost')
     chart.data.datasets[2].data = []
     chart.update('none')
   }

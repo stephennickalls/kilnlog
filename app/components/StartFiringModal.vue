@@ -14,6 +14,43 @@
           <textarea v-model="form.notes" class="input resize-none" placeholder="Clay body, glazes, weather..." rows="2" />
         </div>
 
+        <!-- Mode toggle -->
+        <div class="flex flex-col gap-2">
+          <label class="label">Mode</label>
+          <div class="flex rounded-lg border border-stone-200 overflow-hidden">
+            <button
+              class="flex-1 py-2 text-sm font-medium transition-colors flex items-center justify-center gap-2"
+              :class="form.mode === 'connected'
+                ? 'bg-orange-500 text-white'
+                : 'bg-white text-stone-500 hover:bg-stone-50'"
+              @click="form.mode = 'connected'"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/>
+                <path d="M8 12h8M12 8v8"/>
+              </svg>
+              Connected (ESP32)
+            </button>
+            <button
+              class="flex-1 py-2 text-sm font-medium transition-colors flex items-center justify-center gap-2"
+              :class="form.mode === 'manual'
+                ? 'bg-orange-500 text-white'
+                : 'bg-white text-stone-500 hover:bg-stone-50'"
+              @click="form.mode = 'manual'"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+              Manual Log
+            </button>
+          </div>
+          <p class="text-xs text-stone-400">
+            <template v-if="form.mode === 'connected'">Readings are sent automatically from the ESP32 over WiFi.</template>
+            <template v-else>You enter temperature readings manually at your own intervals.</template>
+          </p>
+        </div>
+
         <!-- Library picker -->
         <div class="flex flex-col gap-2">
           <label class="label">Schedule Library</label>
@@ -93,7 +130,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close:  []
-  create: [payload: { name: string; notes: string; schedulePoints: any[] }]
+  create: [payload: { name: string; notes: string; schedulePoints: any[]; mode: string }]
 }>()
 
 const libraryFilter     = ref('all')
@@ -122,14 +159,15 @@ const defaultPoints = () => [
 const form = reactive({
   name:           '',
   notes:          '',
+  mode:           'connected' as 'connected' | 'manual',
   schedulePoints: defaultPoints() as { offsetMinutes: number; targetTemp: number }[],
 })
 
-// Reset form when modal opens
 watch(() => props.open, (val) => {
   if (val) {
     form.name           = ''
     form.notes          = ''
+    form.mode           = 'connected'
     form.schedulePoints = defaultPoints()
     selectedLibraryId.value = null
     libraryFilter.value     = 'all'
@@ -154,6 +192,6 @@ function removePoint(i: number) { form.schedulePoints.splice(i, 1) }
 
 function submit() {
   if (!form.name.trim()) return
-  emit('create', { name: form.name, notes: form.notes, schedulePoints: form.schedulePoints })
+  emit('create', { name: form.name, notes: form.notes, schedulePoints: form.schedulePoints, mode: form.mode })
 }
 </script>

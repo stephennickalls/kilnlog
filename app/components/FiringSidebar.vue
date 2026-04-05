@@ -31,17 +31,41 @@
           <span class="text-xs text-green-600 mt-0.5 font-medium">● Live</span>
         </button>
       </li>
+
       <li v-if="!pastFirings.length && !activeFiring" class="px-4 py-3 text-sm text-stone-400">
         No firings yet
       </li>
-      <li v-for="f in pastFirings" :key="f.id">
+
+      <li v-for="f in pastFirings" :key="f.id" class="group relative">
         <button
-          class="w-full flex flex-col px-4 py-3 text-left transition-colors"
+          class="w-full flex flex-col px-4 py-3 text-left transition-colors pr-10"
           :class="selectedId === f.id ? 'bg-orange-50 border-l-2 border-orange-400' : 'hover:bg-stone-50'"
           @click="$emit('select', f)"
         >
           <span class="text-sm font-medium text-stone-700 truncate">{{ f.name }}</span>
           <span class="text-xs text-stone-400 mt-0.5">{{ formatDate(f.created_at) }}</span>
+        </button>
+
+        <!-- Delete button — revealed on hover -->
+        <button
+          v-if="confirmDeleteId !== f.id"
+          class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-stone-300 hover:text-red-400 hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
+          title="Delete firing"
+          @click.stop="confirmDeleteId = f.id"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
+          </svg>
+        </button>
+
+        <!-- Confirm state -->
+        <button
+          v-else
+          class="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 rounded-md text-xs font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors"
+          title="Click to confirm delete"
+          @click.stop="confirmDelete(f)"
+        >
+          Delete?
         </button>
       </li>
     </ul>
@@ -85,7 +109,7 @@
 </template>
 
 <script setup lang="ts">
-defineProps<{
+const props = defineProps<{
   open:         boolean
   width:        number
   selectedId:   number | null
@@ -93,12 +117,26 @@ defineProps<{
   pastFirings:  any[]
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   toggle: []
   select: [firing: any]
   start:  []
   drag:   [event: MouseEvent]
+  delete: [firing: any]
 }>()
+
+const confirmDeleteId = ref<number | null>(null)
+
+// Cancel confirm if user clicks away
+function confirmDelete(f: any) {
+  confirmDeleteId.value = null
+  emit('delete', f)
+}
+
+// Reset confirm state whenever the list changes
+watch(() => props.pastFirings, () => {
+  confirmDeleteId.value = null
+})
 
 function formatDate(unix: number) {
   if (!unix) return ''

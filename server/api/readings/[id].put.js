@@ -3,17 +3,14 @@ export default defineEventHandler(async (event) => {
   const body = await readBody(event)
   if (isNaN(id)) throw createError({ statusCode: 400, statusMessage: 'Invalid id' })
 
+  if (typeof body.temperature !== 'number' || body.temperature < -200 || body.temperature > 1400) {
+    throw createError({ statusCode: 400, statusMessage: 'Invalid temperature value' })
+  }
+
   const db = useSupabase()
-
-  const updates = {}
-  if (body.startedAt  !== undefined) updates.started_at = body.startedAt
-  if (body.endedAt    !== undefined) updates.ended_at   = body.endedAt
-  if (body.notes      !== undefined) updates.notes      = body.notes
-  if (body.mode       !== undefined) updates.mode       = body.mode
-
   const { data, error } = await db
-    .from('firings')
-    .update(updates)
+    .from('readings')
+    .update({ temperature: body.temperature })
     .eq('id', id)
     .select()
     .single()

@@ -22,36 +22,28 @@
       <span class="text-base font-medium text-stone-400 mt-1">°C</span>
     </div>
 
-    <!-- Rate — live only -->
-    <div v-if="isLive" class="bg-white border border-stone-200 rounded-xl shadow-sm flex flex-col items-center justify-center px-6 py-3 min-w-[120px]">
+    <!-- Rate — connected live only -->
+    <div v-if="isLive && !isManual" class="bg-white border border-stone-200 rounded-xl shadow-sm flex flex-col items-center justify-center px-6 py-3 min-w-[120px]">
       <span class="text-xs font-semibold uppercase tracking-widest text-stone-400 mb-1">Rate</span>
-      <span class="text-4xl font-bold tabular-nums leading-none text-stone-700">
-        {{ rateOfChange }}
-      </span>
+      <span class="text-4xl font-bold tabular-nums leading-none text-stone-700">{{ rateOfChange }}</span>
     </div>
 
-    <!-- Elapsed — live only -->
-    <div v-if="isLive" class="bg-white border border-stone-200 rounded-xl shadow-sm flex flex-col items-center justify-center px-6 py-3 min-w-[120px]">
+    <!-- Elapsed — connected live only -->
+    <div v-if="isLive && !isManual" class="bg-white border border-stone-200 rounded-xl shadow-sm flex flex-col items-center justify-center px-6 py-3 min-w-[120px]">
       <span class="text-xs font-semibold uppercase tracking-widest text-stone-400 mb-1">Elapsed</span>
-      <span class="text-4xl font-bold tabular-nums leading-none text-stone-700">
-        {{ elapsed }}
-      </span>
+      <span class="text-4xl font-bold tabular-nums leading-none text-stone-700">{{ elapsed }}</span>
     </div>
 
     <!-- Duration — past firings -->
     <div v-if="duration" class="bg-white border border-stone-200 rounded-xl shadow-sm flex flex-col items-center justify-center px-6 py-3 min-w-[120px]">
       <span class="text-xs font-semibold uppercase tracking-widest text-stone-400 mb-1">Duration</span>
-      <span class="text-4xl font-bold tabular-nums leading-none text-stone-700">
-        {{ duration }}
-      </span>
+      <span class="text-4xl font-bold tabular-nums leading-none text-stone-700">{{ duration }}</span>
     </div>
 
     <!-- Readings -->
     <div class="bg-white border border-stone-200 rounded-xl shadow-sm flex flex-col items-center justify-center px-6 py-3 min-w-[100px]">
       <span class="text-xs font-semibold uppercase tracking-widest text-stone-400 mb-1">Readings</span>
-      <span class="text-5xl font-bold tabular-nums leading-none text-stone-700">
-        {{ readingCount }}
-      </span>
+      <span class="text-5xl font-bold tabular-nums leading-none text-stone-700">{{ readingCount }}</span>
     </div>
 
     <!-- Notes — fills remaining space -->
@@ -59,6 +51,18 @@
       <span class="text-xs font-semibold uppercase tracking-widest text-stone-400 mb-1">Notes</span>
       <span class="text-sm font-medium text-stone-700 truncate">{{ notes }}</span>
     </div>
+
+    <!-- Log reading button — manual mode, active firing only -->
+    <button
+      v-if="isManual && isLive"
+      class="bg-orange-500 hover:bg-orange-600 text-white rounded-xl shadow-sm flex flex-col items-center justify-center px-6 py-3 min-w-[130px] transition-colors"
+      @click="$emit('logReading')"
+    >
+      <svg class="w-5 h-5 mb-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <path d="M12 5v14M5 12h14"/>
+      </svg>
+      <span class="text-xs font-semibold uppercase tracking-widest">Log Reading</span>
+    </button>
 
   </div>
 </template>
@@ -72,8 +76,12 @@ defineProps<{
   readingCount: number
   notes?:       string
   isLive:       boolean
+  isManual:     boolean
   currentTemp:  number | null
 }>()
 
-defineEmits<{ openTemp: [] }>()
+defineEmits<{
+  openTemp:   []
+  logReading: []
+}>()
 </script>

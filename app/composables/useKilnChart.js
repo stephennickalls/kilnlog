@@ -10,7 +10,7 @@ async function ensureZoomPlugin() {
   zoomPluginRegistered = true
 }
 
-export function useKilnChart(canvasRef, { onPointClick } = {}) {
+export function useKilnChart(canvasRef, { onPointClick, enableZoom = true } = {}) {
   let chart = null
 
   async function init() {
@@ -64,7 +64,7 @@ export function useKilnChart(canvasRef, { onPointClick } = {}) {
       },
       options: {
         responsive: true,
-        maintainAspectRatio: true,
+        maintainAspectRatio: false,
         animation: false,
         interaction: { mode: 'index', intersect: false },
         onClick: (event, elements) => {
@@ -97,7 +97,7 @@ export function useKilnChart(canvasRef, { onPointClick } = {}) {
               },
             },
           },
-          zoom: {
+          zoom: enableZoom ? {
             pan: { enabled: true, mode: 'xy' },
             zoom: {
               wheel: { enabled: true },
@@ -108,19 +108,25 @@ export function useKilnChart(canvasRef, { onPointClick } = {}) {
               x: { min: 0 },
               y: { min: 0 },
             },
+          } : {
+            pan: { enabled: false },
+            zoom: {
+              wheel: { enabled: false },
+              pinch: { enabled: false },
+            },
           },
         },
         scales: {
           x: {
             type: 'linear',
             title: { display: true, text: 'Minutes from start', color: '#78716c' },
-            ticks: { color: '#a8a29e' },
+            ticks: { color: '#a8a29e', maxTicksLimit: 8 },
             grid:  { color: '#f5f5f4' },
             min: 0,
           },
           y: {
             title: { display: true, text: 'Temperature (°C)', color: '#78716c' },
-            ticks: { color: '#a8a29e' },
+            ticks: { color: '#a8a29e', maxTicksLimit: 6 },
             grid:  { color: '#f5f5f4' },
             min: 0,
             suggestedMax: 100,
@@ -163,20 +169,18 @@ export function useKilnChart(canvasRef, { onPointClick } = {}) {
     if (!chart) return
     chart.data.datasets[1].pointRadius      = enabled ? 6 : 0
     chart.data.datasets[1].pointHoverRadius = enabled ? 10 : 4
-    canvasRef.value.style.cursor = enabled ? 'pointer' : 'default'
+    if (canvasRef.value) canvasRef.value.style.cursor = enabled ? 'pointer' : 'default'
     chart.update('none')
   }
 
   function setSignalLost(startedAt, lastReadingTimestamp) {
     if (!chart) return
-
     const nowMinutes = (Date.now() / 1000 - startedAt) / 60
     let anchorX, anchorY
 
     if (lastReadingTimestamp === null) {
       anchorX = 0
       anchorY = 20
-      console.log(`[KilnChart] setSignalLost — no readings, drawing from (0, 20°C) to (${nowMinutes.toFixed(1)}min, 20°C)`)
     } else {
       const actualData = chart.data.datasets[1].data
       if (!actualData.length) {
@@ -186,12 +190,10 @@ export function useKilnChart(canvasRef, { onPointClick } = {}) {
         const lastPoint = actualData[actualData.length - 1]
         anchorX = lastPoint.x
         anchorY = lastPoint.y
-        console.log(`[KilnChart] setSignalLost — last reading at (${anchorX}min, ${anchorY}°C), extending to ${nowMinutes.toFixed(1)}min`)
       }
     }
 
     const endX = Math.max(nowMinutes, anchorX + 0.5)
-
     chart.data.datasets[2].data = [
       { x: anchorX, y: anchorY },
       { x: endX,    y: anchorY },
@@ -208,7 +210,6 @@ export function useKilnChart(canvasRef, { onPointClick } = {}) {
 
   function clearSignalLost() {
     if (!chart) return
-    console.log('[KilnChart] clearSignalLost')
     chart.data.datasets[2].data = []
     chart.update('none')
   }

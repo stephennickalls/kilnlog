@@ -69,111 +69,126 @@
           />
         </div>
 
-        <!-- Mobile stats — compact single row -->
-        <div v-if="selectedFiring" class="sm:hidden shrink-0 px-2 pt-2 flex gap-1.5">
-          <button
-            class="flex-1 bg-white border border-stone-200 rounded-lg py-1.5 px-2 flex flex-col items-center active:bg-orange-50"
-            @click="showTempModal = true"
-          >
-            <span class="text-[10px] text-stone-400 uppercase tracking-wide leading-none mb-0.5">Now</span>
-            <span class="text-xl font-bold tabular-nums leading-none" :class="currentTemp !== null ? 'text-orange-500' : 'text-stone-300'">
-              {{ currentTemp !== null ? Math.round(currentTemp) : '—' }}
-            </span>
-            <span class="text-[10px] text-orange-400">°C</span>
-          </button>
-
-          <div class="flex-1 bg-white border border-stone-200 rounded-lg py-1.5 px-2 flex flex-col items-center">
-            <span class="text-[10px] text-stone-400 uppercase tracking-wide leading-none mb-0.5">Peak</span>
-            <span class="text-xl font-bold tabular-nums leading-none text-stone-700">{{ peakTemp !== null ? Math.round(peakTemp) : '—' }}</span>
-            <span class="text-[10px] text-stone-400">°C</span>
-          </div>
-
-          <div class="flex-1 bg-white border border-stone-200 rounded-lg py-1.5 px-2 flex flex-col items-center">
-            <span class="text-[10px] text-stone-400 uppercase tracking-wide leading-none mb-0.5">{{ isLive && !isManual ? 'Elapsed' : 'Readings' }}</span>
-            <span class="text-xl font-bold tabular-nums leading-none text-stone-700">{{ isLive && !isManual ? elapsed : readingCount }}</span>
-          </div>
-
-          <div v-if="isLive && !isManual" class="flex-1 bg-white border border-stone-200 rounded-lg py-1.5 px-2 flex flex-col items-center">
-            <span class="text-[10px] text-stone-400 uppercase tracking-wide leading-none mb-0.5">Rate</span>
-            <span class="text-sm font-bold tabular-nums leading-none text-stone-700 mt-1">{{ rateOfChange }}</span>
-          </div>
-        </div>
-
-        <!-- Chart -->
+        <!-- Desktop chart -->
         <div
-          class="flex-1 bg-white rounded-xl border border-stone-200 shadow-sm relative flex items-center justify-center min-h-0"
-          :class="selectedFiring ? 'sm:m-5 sm:mt-4 m-2 mt-1.5' : 'sm:m-5 m-2'"
+          class="hidden sm:flex flex-1 bg-white rounded-xl border border-stone-200 shadow-sm relative items-center justify-center min-h-0 sm:m-5 sm:mt-4"
         >
-          <canvas
-            ref="chartCanvas"
-            class="w-full h-full"
-            :class="selectedFiring ? 'sm:cursor-default cursor-pointer' : ''"
-            @click.self="openFullscreenChart"
-          ></canvas>
-
-          <div
-            v-if="selectedFiring && !chartFullscreen"
-            class="sm:hidden absolute bottom-8 left-1/2 -translate-x-1/2 pointer-events-none"
-          >
-            <span class="text-[10px] text-stone-300 bg-white/80 px-2 py-0.5 rounded-full">Tap to expand</span>
-          </div>
-
+          <canvas ref="chartCanvas" class="w-full h-full"></canvas>
           <button
             v-if="selectedFiring"
-            class="absolute bottom-2 right-2 px-2 py-1 text-[10px] font-medium border border-stone-200 rounded-md bg-white text-stone-400 shadow-sm"
+            class="absolute bottom-4 right-4 px-3 py-1.5 text-xs font-medium border border-stone-200 rounded-lg bg-white text-stone-500 hover:bg-stone-50 transition-colors shadow-sm"
             @click="resetZoom"
           >Reset zoom</button>
-
-          <div
-            v-if="isManual && isLive && !selectedFiring?.readings?.length"
-            class="absolute flex flex-col items-center gap-2 text-stone-400 pointer-events-none text-center px-8"
-          >
+          <div v-if="isManual && isLive && !selectedFiring?.readings?.length" class="absolute flex flex-col items-center gap-2 text-stone-400 pointer-events-none">
             <p class="text-sm">Use <strong>Log Reading</strong> to record your first temperature</p>
           </div>
-
           <div v-else-if="!selectedFiring" class="absolute flex flex-col items-center gap-3 text-stone-400">
-            <p class="text-sm text-center px-8">Select a firing or start a new one</p>
+            <p class="text-sm">Select a firing from the sidebar or start a new one</p>
           </div>
         </div>
 
-        <!-- Mobile action bar -->
-        <div class="sm:hidden shrink-0 px-2 pb-2 pt-1 flex gap-1.5">
-          <button
-            v-if="isLive && isManual"
-            class="flex-1 py-2 bg-orange-500 text-white text-xs font-bold rounded-lg active:bg-orange-600"
-            @click="openLogReading"
-          >+ Log Reading</button>
-          <button
-            v-if="isLive"
-            class="py-2 px-3 border rounded-lg text-xs font-semibold shrink-0"
-            :class="isManual ? 'border-blue-200 bg-blue-50 text-blue-600' : 'border-stone-200 bg-stone-50 text-stone-500'"
-            @click="toggleMode"
-          >{{ isManual ? '✏️ Manual' : '📡 Connected' }}</button>
-          <button
-            v-if="!selectedFiring || (!isLive && !activeFiring)"
-            class="flex-1 py-2 bg-orange-500 text-white text-xs font-bold rounded-lg active:bg-orange-600"
-            @click="openStartModal"
-          >+ Start Firing</button>
+        <!-- Mobile view -->
+        <div class="flex flex-col flex-1 sm:hidden overflow-hidden">
+
+          <!-- No firing -->
+          <div v-if="!selectedFiring" class="flex-1 flex flex-col items-center justify-center gap-4 px-8 text-center">
+            <p class="text-stone-400 text-sm">No firing selected</p>
+            <button class="btn-primary px-6 py-3" @click="openStartModal">+ Start Firing</button>
+            <button class="text-sm text-orange-500" @click="showFiringSheet = true">View past firings</button>
+          </div>
+
+          <!-- Firing selected — compact overview -->
+          <template v-else>
+            <!-- Compact stats row -->
+            <div class="shrink-0 px-2 pt-2 flex gap-1.5">
+              <button
+                class="flex-1 bg-white border border-stone-200 rounded-lg py-1.5 px-2 flex flex-col items-center active:bg-orange-50"
+                @click="showTempModal = true"
+              >
+                <span class="text-[10px] text-stone-400 uppercase tracking-wide leading-none mb-0.5">Now</span>
+                <span class="text-xl font-bold tabular-nums leading-none" :class="currentTemp !== null ? 'text-orange-500' : 'text-stone-300'">
+                  {{ currentTemp !== null ? Math.round(currentTemp) : '—' }}
+                </span>
+                <span class="text-[10px] text-orange-400">°C</span>
+              </button>
+              <div class="flex-1 bg-white border border-stone-200 rounded-lg py-1.5 px-2 flex flex-col items-center">
+                <span class="text-[10px] text-stone-400 uppercase tracking-wide leading-none mb-0.5">Peak</span>
+                <span class="text-xl font-bold tabular-nums leading-none text-stone-700">{{ peakTemp !== null ? Math.round(peakTemp) : '—' }}</span>
+                <span class="text-[10px] text-stone-400">°C</span>
+              </div>
+              <div class="flex-1 bg-white border border-stone-200 rounded-lg py-1.5 px-2 flex flex-col items-center">
+                <span class="text-[10px] text-stone-400 uppercase tracking-wide leading-none mb-0.5">{{ isLive && !isManual ? 'Elapsed' : 'Readings' }}</span>
+                <span class="text-xl font-bold tabular-nums leading-none text-stone-700">{{ isLive && !isManual ? elapsed : readingCount }}</span>
+              </div>
+              <div v-if="isLive && !isManual" class="flex-1 bg-white border border-stone-200 rounded-lg py-1.5 px-2 flex flex-col items-center">
+                <span class="text-[10px] text-stone-400 uppercase tracking-wide leading-none mb-0.5">Rate</span>
+                <span class="text-sm font-bold tabular-nums leading-none text-stone-700 mt-1">{{ rateOfChange }}</span>
+              </div>
+            </div>
+
+            <!-- Thumbnail chart — tap anywhere to go fullscreen -->
+            <div
+              class="flex-1 m-2 mt-1.5 bg-white rounded-xl border border-stone-200 shadow-sm relative overflow-hidden"
+              @click="chartFullscreen = true"
+            >
+              <canvas ref="chartCanvasMobile" class="w-full h-full"></canvas>
+              <!-- Fullscreen tap target overlay -->
+              <div class="absolute inset-0 flex items-center justify-center">
+                <div class="bg-black/20 rounded-full p-3">
+                  <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4"/>
+                  </svg>
+                </div>
+              </div>
+              <div
+                v-if="isManual && isLive && !selectedFiring?.readings?.length"
+                class="absolute inset-0 flex items-center justify-center pointer-events-none"
+              >
+                <p class="text-xs text-stone-400 text-center px-6">Tap to open chart and log readings</p>
+              </div>
+            </div>
+
+            <!-- Action bar -->
+            <div class="shrink-0 px-2 pb-2 pt-1 flex gap-1.5">
+              <button
+                v-if="isLive && isManual"
+                class="flex-1 py-2 bg-orange-500 text-white text-xs font-bold rounded-lg active:bg-orange-600"
+                @click="openLogReading"
+              >+ Log Reading</button>
+              <button
+                v-if="isLive"
+                class="py-2 px-3 border rounded-lg text-xs font-semibold shrink-0"
+                :class="isManual ? 'border-blue-200 bg-blue-50 text-blue-600' : 'border-stone-200 bg-stone-50 text-stone-500'"
+                @click="toggleMode"
+              >{{ isManual ? '✏️ Manual' : '📡 Connected' }}</button>
+              <button
+                v-if="!isLive && !activeFiring"
+                class="flex-1 py-2 bg-orange-500 text-white text-xs font-bold rounded-lg active:bg-orange-600"
+                @click="openStartModal"
+              >+ Start Firing</button>
+            </div>
+          </template>
         </div>
 
       </main>
     </div>
 
-    <!-- Mobile fullscreen chart -->
+    <!-- ===== MOBILE FULLSCREEN CHART ===== -->
     <Teleport to="body">
       <div
         v-if="chartFullscreen"
         class="sm:hidden fixed inset-0 z-50 bg-white flex flex-col"
       >
-        <div class="shrink-0 flex items-center justify-between px-4 py-3 border-b border-stone-100">
-          <div class="flex items-center gap-2">
-            <span v-if="isLive && signalLost && !isManual" class="px-2 py-0.5 text-xs font-bold rounded-full bg-yellow-100 text-yellow-700 border border-yellow-200">⚠️ NO SIGNAL</span>
-            <span v-else-if="isLive && !isManual" class="px-2 py-0.5 text-xs font-bold rounded-full bg-green-100 text-green-700 border border-green-200">● LIVE</span>
-            <span v-else-if="isLive && isManual" class="px-2 py-0.5 text-xs font-bold rounded-full bg-green-100 text-green-700 border border-green-200">● ACTIVE</span>
-            <span class="text-sm font-medium text-stone-600 truncate max-w-[200px]">{{ selectedFiring?.name }}</span>
+        <!-- Fullscreen header -->
+        <div class="shrink-0 flex items-center justify-between px-4 py-2 border-b border-stone-100">
+          <div class="flex items-center gap-2 min-w-0">
+            <span v-if="isLive && signalLost && !isManual" class="px-2 py-0.5 text-xs font-bold rounded-full bg-yellow-100 text-yellow-700 border border-yellow-200 shrink-0">⚠️</span>
+            <span v-else-if="isLive && !isManual" class="px-2 py-0.5 text-xs font-bold rounded-full bg-green-100 text-green-700 border border-green-200 shrink-0">● LIVE</span>
+            <span v-else-if="isLive && isManual" class="px-2 py-0.5 text-xs font-bold rounded-full bg-green-100 text-green-700 border border-green-200 shrink-0">● ACTIVE</span>
+            <span class="text-sm font-medium text-stone-600 truncate">{{ selectedFiring?.name }}</span>
           </div>
           <button
-            class="p-2 rounded-full bg-stone-100 text-stone-500 active:bg-stone-200"
+            class="ml-2 shrink-0 p-2 rounded-full bg-stone-100 text-stone-600 active:bg-stone-200"
             @click="chartFullscreen = false"
           >
             <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -182,6 +197,7 @@
           </button>
         </div>
 
+        <!-- Stats strip -->
         <div class="shrink-0 flex gap-1.5 px-3 py-2 border-b border-stone-100">
           <div class="flex-1 flex flex-col items-center">
             <span class="text-[10px] text-stone-400 uppercase tracking-wide">Now</span>
@@ -203,12 +219,27 @@
           </div>
         </div>
 
-        <div class="flex-1 relative p-3 min-h-0">
-          <canvas ref="chartCanvasFullscreen" class="w-full h-full"></canvas>
+        <!-- Fullscreen canvas — gets all remaining space -->
+        <div class="flex-1 relative min-h-0 p-2">
+          <canvas ref="chartCanvasFullscreen" class="w-full h-full touch-none"></canvas>
           <button
-            class="absolute bottom-5 right-5 px-2.5 py-1 text-xs font-medium border border-stone-200 rounded-lg bg-white text-stone-400 shadow-sm"
+            class="absolute bottom-4 right-4 px-2.5 py-1 text-xs font-medium border border-stone-200 rounded-lg bg-white text-stone-400 shadow-sm"
             @click="resetZoomFullscreen"
           >Reset zoom</button>
+        </div>
+
+        <!-- Fullscreen action bar -->
+        <div v-if="isLive" class="shrink-0 px-3 pb-4 pt-2 flex gap-2 border-t border-stone-100">
+          <button
+            v-if="isManual"
+            class="flex-1 py-3 bg-orange-500 text-white text-sm font-bold rounded-xl active:bg-orange-600"
+            @click="openLogReading"
+          >+ Log Reading</button>
+          <button
+            class="py-3 px-4 border rounded-xl text-sm font-semibold shrink-0"
+            :class="isManual ? 'border-blue-200 bg-blue-50 text-blue-600' : 'border-stone-200 bg-stone-50 text-stone-500'"
+            @click="toggleMode"
+          >{{ isManual ? '✏️ Manual' : '📡 Connected' }}</button>
         </div>
       </div>
     </Teleport>
@@ -233,7 +264,6 @@
               </svg>
             </button>
           </div>
-
           <ul class="overflow-y-auto flex-1 divide-y divide-stone-100">
             <li v-if="activeFiring">
               <button
@@ -281,7 +311,6 @@
               </div>
             </li>
           </ul>
-
           <div class="p-3 border-t border-stone-100 shrink-0">
             <button class="btn-primary w-full py-3" @click="openStartModal(); showFiringSheet = false">
               + Start Firing
@@ -330,6 +359,7 @@
 import { useKilnChart } from '~/composables/useKilnChart'
 
 const chartCanvas           = ref<HTMLCanvasElement | null>(null)
+const chartCanvasMobile     = ref<HTMLCanvasElement | null>(null)
 const chartCanvasFullscreen = ref<HTMLCanvasElement | null>(null)
 const chartFullscreen       = ref(false)
 
@@ -349,11 +379,9 @@ const signalLost      = ref(false)
 const lastReadingTime = ref<number | null>(null)
 const library         = ref<any[]>([])
 
-// Declared AFTER isManual and isLive to avoid SSR initialisation error
-const {
-  init, setSchedule, setReadings, setManualMode,
-  setSignalLost, clearSignalLost, resetZoom, destroy,
-} = useKilnChart(chartCanvas, {
+// Desktop chart — zoom enabled
+const { init, setSchedule, setReadings, setManualMode, setSignalLost, clearSignalLost, resetZoom, destroy } = useKilnChart(chartCanvas, {
+  enableZoom: true,
   onPointClick: (point: any) => {
     if (!isManual.value || !isLive.value) return
     editingReading.value = {
@@ -366,6 +394,10 @@ const {
   },
 })
 
+// Mobile thumbnail — no zoom, no interaction
+const { init: initMobile, setSchedule: setScheduleMobile, setReadings: setReadingsMobile, destroy: destroyMobile } = useKilnChart(chartCanvasMobile, { enableZoom: false })
+
+// Mobile fullscreen — zoom enabled, point click enabled
 const {
   init:          initFs,
   setSchedule:   setScheduleFs,
@@ -373,9 +405,21 @@ const {
   setManualMode: setManualModeFs,
   resetZoom:     resetZoomFullscreen,
   destroy:       destroyFs,
-} = useKilnChart(chartCanvasFullscreen)
+} = useKilnChart(chartCanvasFullscreen, {
+  enableZoom: true,
+  onPointClick: (point: any) => {
+    if (!isManual.value || !isLive.value) return
+    editingReading.value = {
+      id: point.raw?.id ?? point.id,
+      ts: point.raw?.ts ?? point.ts,
+      y:  point.y,
+      x:  point.x,
+    }
+    showReadingModal.value = true
+  },
+})
 
-// When fullscreen opens, init and mirror data into it
+// Open fullscreen chart and init it
 watch(chartFullscreen, async (open) => {
   if (open) {
     await nextTick()
@@ -390,7 +434,7 @@ watch(chartFullscreen, async (open) => {
   }
 })
 
-// Keep fullscreen chart in sync when readings update
+// Keep fullscreen in sync with new readings
 watch(
   () => selectedFiring.value?.readings,
   (readings) => {
@@ -400,12 +444,6 @@ watch(
   },
   { deep: true }
 )
-
-function openFullscreenChart() {
-  if (!selectedFiring.value) return
-  if (window.innerWidth >= 640) return
-  chartFullscreen.value = true
-}
 
 const SIGNAL_TIMEOUT = 30
 
@@ -475,13 +513,9 @@ function startDrag(e: MouseEvent) {
   const startX     = e.clientX
   const startWidth = sidebarWidth.value
   const maxWidth   = () => Math.floor(window.innerWidth / 3)
-
   function onMove(e: MouseEvent) {
-    const delta    = e.clientX - startX
-    const newWidth = Math.min(Math.max(startWidth + delta, MIN_WIDTH), maxWidth())
-    sidebarWidth.value = newWidth
+    sidebarWidth.value = Math.min(Math.max(startWidth + e.clientX - startX, MIN_WIDTH), maxWidth())
   }
-
   function onUp() {
     isDragging.value = false
     window.removeEventListener('mousemove', onMove)
@@ -489,7 +523,6 @@ function startDrag(e: MouseEvent) {
     document.body.style.cursor     = ''
     document.body.style.userSelect = ''
   }
-
   document.body.style.cursor     = 'col-resize'
   document.body.style.userSelect = 'none'
   window.addEventListener('mousemove', onMove)
@@ -497,9 +530,7 @@ function startDrag(e: MouseEvent) {
 }
 
 async function openStartModal() {
-  if (!library.value.length) {
-    library.value = await $fetch<any[]>('/api/library')
-  }
+  if (!library.value.length) library.value = await $fetch<any[]>('/api/library')
   showStartModal.value = true
 }
 
@@ -517,18 +548,11 @@ async function saveReading(payload: { temperature: number; timestamp: number }) 
   if (!selectedFiring.value) return
   if (editingReading.value) {
     const id = editingReading.value.id ?? editingReading.value.raw?.id
-    await $fetch(`/api/readings/${id}`, {
-      method: 'PUT',
-      body: { temperature: payload.temperature },
-    })
+    await $fetch(`/api/readings/${id}`, { method: 'PUT', body: { temperature: payload.temperature } })
   } else {
     await $fetch('/api/readings', {
       method: 'POST',
-      body: {
-        firingId:    selectedFiring.value.id,
-        temperature: payload.temperature,
-        timestamp:   payload.timestamp,
-      },
+      body: { firingId: selectedFiring.value.id, temperature: payload.temperature, timestamp: payload.timestamp },
     })
   }
   closeReadingModal()
@@ -548,6 +572,7 @@ async function reloadReadings() {
   const data = await $fetch<any>(`/api/firings/${selectedFiring.value.id}`)
   selectedFiring.value.readings = data.readings
   setReadings(data.readings, selectedFiring.value.started_at)
+  setReadingsMobile(data.readings, selectedFiring.value.started_at)
   if (data.readings?.length) {
     currentTemp.value     = data.readings.at(-1).temperature
     lastReadingTime.value = data.readings.at(-1).timestamp
@@ -557,10 +582,7 @@ async function reloadReadings() {
 async function toggleMode() {
   if (!selectedFiring.value || !isLive.value) return
   const newMode = isManual.value ? 'connected' : 'manual'
-  await $fetch(`/api/firings/${selectedFiring.value.id}`, {
-    method: 'PUT',
-    body: { mode: newMode },
-  })
+  await $fetch(`/api/firings/${selectedFiring.value.id}`, { method: 'PUT', body: { mode: newMode } })
   selectedFiring.value.mode = newMode
   applyMode(newMode)
 }
@@ -587,6 +609,7 @@ async function sheetDeleteFiring(f: any) {
 onMounted(async () => {
   console.log('[KilnMonitor] mounted')
   await init()
+  await initMobile()
   await refreshFirings()
   if (activeFiring.value) await selectFiring(activeFiring.value)
 })
@@ -594,6 +617,7 @@ onMounted(async () => {
 onUnmounted(() => {
   stopAllIntervals()
   destroy()
+  destroyMobile()
   destroyFs()
 })
 
@@ -615,6 +639,8 @@ async function selectFiring(f: any) {
 
   setSchedule(data.schedule ?? [])
   setReadings(data.readings ?? [], data.started_at)
+  setScheduleMobile(data.schedule ?? [])
+  setReadingsMobile(data.readings ?? [], data.started_at)
 
   if (data.readings?.length) {
     const last = data.readings.at(-1)
@@ -630,9 +656,7 @@ async function selectFiring(f: any) {
     isManual.value = mode === 'manual'
     setManualMode(isManual.value)
 
-    elapsedTickInterval = setInterval(() => {
-      nowUnix.value = Math.floor(Date.now() / 1000)
-    }, 1000)
+    elapsedTickInterval = setInterval(() => { nowUnix.value = Math.floor(Date.now() / 1000) }, 1000)
 
     if (!isManual.value) {
       if (!data.readings?.length) {
@@ -655,14 +679,8 @@ async function selectFiring(f: any) {
 }
 
 async function createFiring(payload: { name: string; notes: string; schedulePoints: any[]; mode: string }) {
-  const firing = await $fetch<any>('/api/firings', {
-    method: 'POST',
-    body: payload,
-  })
-  await $fetch(`/api/firings/${firing.id}`, {
-    method: 'PUT',
-    body: { startedAt: Math.floor(Date.now() / 1000) },
-  })
+  const firing = await $fetch<any>('/api/firings', { method: 'POST', body: payload })
+  await $fetch(`/api/firings/${firing.id}`, { method: 'PUT', body: { startedAt: Math.floor(Date.now() / 1000) } })
   showStartModal.value = false
   await refreshFirings()
   const fresh = allFirings.value.find(f => f.id === firing.id)
@@ -672,10 +690,7 @@ async function createFiring(payload: { name: string; notes: string; schedulePoin
 async function endFiring() {
   if (!activeFiring.value) return
   const id = activeFiring.value.id
-  await $fetch(`/api/firings/${id}`, {
-    method: 'PUT',
-    body: { endedAt: Math.floor(Date.now() / 1000) },
-  })
+  await $fetch(`/api/firings/${id}`, { method: 'PUT', body: { endedAt: Math.floor(Date.now() / 1000) } })
   stopAllIntervals()
   signalLost.value  = false
   isLive.value      = false
@@ -686,6 +701,8 @@ async function endFiring() {
     selectedFiring.value = data
     setSchedule(data.schedule ?? [])
     setReadings(data.readings ?? [], data.started_at)
+    setScheduleMobile(data.schedule ?? [])
+    setReadingsMobile(data.readings ?? [], data.started_at)
   }
 }
 
@@ -712,6 +729,7 @@ function startPolling() {
     const rows = await $fetch<any[]>(`/api/readings?firingId=${selectedFiring.value.id}`)
     selectedFiring.value.readings = rows
     setReadings(rows, selectedFiring.value.started_at)
+    setReadingsMobile(rows, selectedFiring.value.started_at)
     if (rows.length) {
       const last = rows.at(-1)
       currentTemp.value     = last.temperature

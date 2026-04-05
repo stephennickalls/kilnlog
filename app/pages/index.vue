@@ -104,7 +104,19 @@
           class="flex-1 bg-white rounded-xl border border-stone-200 shadow-sm relative flex items-center justify-center min-h-0"
           :class="selectedFiring ? 'sm:m-5 sm:mt-4 m-2 mt-1.5' : 'sm:m-5 m-2'"
         >
-          <canvas ref="chartCanvas" class="w-full h-full"></canvas>
+          <canvas
+            ref="chartCanvas"
+            class="w-full h-full"
+            :class="selectedFiring ? 'sm:cursor-default cursor-pointer' : ''"
+            @click.self="openFullscreenChart"
+          ></canvas>
+
+          <div
+            v-if="selectedFiring && !chartFullscreen"
+            class="sm:hidden absolute bottom-8 left-1/2 -translate-x-1/2 pointer-events-none"
+          >
+            <span class="text-[10px] text-stone-300 bg-white/80 px-2 py-0.5 rounded-full">Tap to expand</span>
+          </div>
 
           <button
             v-if="selectedFiring"
@@ -146,6 +158,60 @@
 
       </main>
     </div>
+
+    <!-- Mobile fullscreen chart -->
+    <Teleport to="body">
+      <div
+        v-if="chartFullscreen"
+        class="sm:hidden fixed inset-0 z-50 bg-white flex flex-col"
+      >
+        <div class="shrink-0 flex items-center justify-between px-4 py-3 border-b border-stone-100">
+          <div class="flex items-center gap-2">
+            <span v-if="isLive && signalLost && !isManual" class="px-2 py-0.5 text-xs font-bold rounded-full bg-yellow-100 text-yellow-700 border border-yellow-200">⚠️ NO SIGNAL</span>
+            <span v-else-if="isLive && !isManual" class="px-2 py-0.5 text-xs font-bold rounded-full bg-green-100 text-green-700 border border-green-200">● LIVE</span>
+            <span v-else-if="isLive && isManual" class="px-2 py-0.5 text-xs font-bold rounded-full bg-green-100 text-green-700 border border-green-200">● ACTIVE</span>
+            <span class="text-sm font-medium text-stone-600 truncate max-w-[200px]">{{ selectedFiring?.name }}</span>
+          </div>
+          <button
+            class="p-2 rounded-full bg-stone-100 text-stone-500 active:bg-stone-200"
+            @click="chartFullscreen = false"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M18 6L6 18M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+
+        <div class="shrink-0 flex gap-1.5 px-3 py-2 border-b border-stone-100">
+          <div class="flex-1 flex flex-col items-center">
+            <span class="text-[10px] text-stone-400 uppercase tracking-wide">Now</span>
+            <span class="text-base font-bold tabular-nums" :class="currentTemp !== null ? 'text-orange-500' : 'text-stone-300'">
+              {{ currentTemp !== null ? Math.round(currentTemp) : '—' }}°C
+            </span>
+          </div>
+          <div class="flex-1 flex flex-col items-center">
+            <span class="text-[10px] text-stone-400 uppercase tracking-wide">Peak</span>
+            <span class="text-base font-bold tabular-nums text-stone-700">{{ peakTemp !== null ? Math.round(peakTemp) : '—' }}°C</span>
+          </div>
+          <div class="flex-1 flex flex-col items-center">
+            <span class="text-[10px] text-stone-400 uppercase tracking-wide">{{ isLive && !isManual ? 'Elapsed' : 'Readings' }}</span>
+            <span class="text-base font-bold tabular-nums text-stone-700">{{ isLive && !isManual ? elapsed : readingCount }}</span>
+          </div>
+          <div v-if="isLive && !isManual" class="flex-1 flex flex-col items-center">
+            <span class="text-[10px] text-stone-400 uppercase tracking-wide">Rate</span>
+            <span class="text-base font-bold tabular-nums text-stone-700">{{ rateOfChange }}</span>
+          </div>
+        </div>
+
+        <div class="flex-1 relative p-3 min-h-0">
+          <canvas ref="chartCanvasFullscreen" class="w-full h-full"></canvas>
+          <button
+            class="absolute bottom-5 right-5 px-2.5 py-1 text-xs font-medium border border-stone-200 rounded-lg bg-white text-stone-400 shadow-sm"
+            @click="resetZoomFullscreen"
+          >Reset zoom</button>
+        </div>
+      </div>
+    </Teleport>
 
     <!-- Mobile firing bottom sheet -->
     <Teleport to="body">
@@ -263,20 +329,14 @@
 <script setup lang="ts">
 import { useKilnChart } from '~/composables/useKilnChart'
 
-const chartCanvas = ref<HTMLCanvasElement | null>(null)
+const chartCanvas           = ref<HTMLCanvasElement | null>(null)
+const chartCanvasFullscreen = ref<HTMLCanvasElement | null>(null)
+const chartFullscreen       = ref(false)
 
 const editingReading       = ref<any>(null)
 const showReadingModal     = ref(false)
 const showFiringSheet      = ref(false)
 const sheetConfirmDeleteId = ref<number | null>(null)
-
-const { init, setSchedule, setReadings, setManualMode, setSignalLost, clearSignalLost, resetZoom, destroy } = useKilnChart(chartCanvas, {
-  onPointClick: (point: any) => {
-    if (!isManual.value || !isLive.value) return
-    editingReading.value  = point
-    showReadingModal.value = true
-  },
-})
 
 const showStartModal  = ref(false)
 const showTempModal   = ref(false)
@@ -288,6 +348,64 @@ const isManual        = ref(false)
 const signalLost      = ref(false)
 const lastReadingTime = ref<number | null>(null)
 const library         = ref<any[]>([])
+
+// Declared AFTER isManual and isLive to avoid SSR initialisation error
+const {
+  init, setSchedule, setReadings, setManualMode,
+  setSignalLost, clearSignalLost, resetZoom, destroy,
+} = useKilnChart(chartCanvas, {
+  onPointClick: (point: any) => {
+    if (!isManual.value || !isLive.value) return
+    editingReading.value = {
+      id: point.raw?.id ?? point.id,
+      ts: point.raw?.ts ?? point.ts,
+      y:  point.y,
+      x:  point.x,
+    }
+    showReadingModal.value = true
+  },
+})
+
+const {
+  init:          initFs,
+  setSchedule:   setScheduleFs,
+  setReadings:   setReadingsFs,
+  setManualMode: setManualModeFs,
+  resetZoom:     resetZoomFullscreen,
+  destroy:       destroyFs,
+} = useKilnChart(chartCanvasFullscreen)
+
+// When fullscreen opens, init and mirror data into it
+watch(chartFullscreen, async (open) => {
+  if (open) {
+    await nextTick()
+    await initFs()
+    if (selectedFiring.value) {
+      setScheduleFs(selectedFiring.value.schedule ?? [])
+      setReadingsFs(selectedFiring.value.readings ?? [], selectedFiring.value.started_at)
+      setManualModeFs(isManual.value)
+    }
+  } else {
+    destroyFs()
+  }
+})
+
+// Keep fullscreen chart in sync when readings update
+watch(
+  () => selectedFiring.value?.readings,
+  (readings) => {
+    if (chartFullscreen.value && selectedFiring.value && readings) {
+      setReadingsFs(readings, selectedFiring.value.started_at)
+    }
+  },
+  { deep: true }
+)
+
+function openFullscreenChart() {
+  if (!selectedFiring.value) return
+  if (window.innerWidth >= 640) return
+  chartFullscreen.value = true
+}
 
 const SIGNAL_TIMEOUT = 30
 
@@ -398,7 +516,8 @@ function closeReadingModal() {
 async function saveReading(payload: { temperature: number; timestamp: number }) {
   if (!selectedFiring.value) return
   if (editingReading.value) {
-    await $fetch(`/api/readings/${editingReading.value.id}`, {
+    const id = editingReading.value.id ?? editingReading.value.raw?.id
+    await $fetch(`/api/readings/${id}`, {
       method: 'PUT',
       body: { temperature: payload.temperature },
     })
@@ -418,7 +537,8 @@ async function saveReading(payload: { temperature: number; timestamp: number }) 
 
 async function deleteReading() {
   if (!editingReading.value) return
-  await $fetch(`/api/readings/${editingReading.value.id}`, { method: 'DELETE' })
+  const id = editingReading.value.id ?? editingReading.value.raw?.id
+  await $fetch(`/api/readings/${id}`, { method: 'DELETE' })
   closeReadingModal()
   await reloadReadings()
 }
@@ -474,6 +594,7 @@ onMounted(async () => {
 onUnmounted(() => {
   stopAllIntervals()
   destroy()
+  destroyFs()
 })
 
 async function refreshFirings() {

@@ -10,6 +10,14 @@ async function ensureZoomPlugin() {
   zoomPluginRegistered = true
 }
 
+/**
+ * @typedef {{ onPointClick?: (point: any) => void; enableZoom?: boolean }} KilnChartOptions
+ */
+
+/**
+ * @param {import('vue').Ref<HTMLCanvasElement | null>} canvasRef
+ * @param {KilnChartOptions} [options]
+ */
 export function useKilnChart(canvasRef, { onPointClick, enableZoom = true } = {}) {
   let chart = null
 
@@ -98,15 +106,17 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true } = {}
             },
           },
           zoom: enableZoom ? {
-            pan: { enabled: true, mode: 'xy' },
+            // X-axis only — pan/zoom slides the time window without
+            // ever distorting the temperature curve shape.
+            pan: { enabled: true, mode: 'x' },
             zoom: {
               wheel: { enabled: true },
               pinch: { enabled: true },
-              mode: 'xy',
+              mode: 'x',
             },
             limits: {
               x: { min: 0 },
-              y: { min: 0 },
+              y: { min: 'original', max: 'original' },
             },
           } : {
             pan: { enabled: false },

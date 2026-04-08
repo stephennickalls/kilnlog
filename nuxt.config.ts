@@ -4,7 +4,14 @@ export default defineNuxtConfig({
   future: { compatibilityVersion: 4 },
   modules: ['@nuxtjs/tailwindcss'],
   runtimeConfig: {
-    supabaseUrl:        process.env.SUPABASE_URL,
-    supabaseServiceKey: process.env.SUPABASE_SERVICE_KEY,
+    // Private — server only
+    stripeSecretKey:    process.env.STRIPE_SECRET_KEY,
+    stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+    supabaseServiceKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    // Public — exposed to client
+    public: {
+      supabaseUrl:     process.env.SUPABASE_URL,
+      supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
+    },
   },
 })

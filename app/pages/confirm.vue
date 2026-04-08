@@ -2,8 +2,8 @@
   <div class="min-h-screen bg-parchment font-serif flex items-center justify-center p-6">
     <div class="bg-white border border-parchment-3 rounded-2xl p-10 w-full max-w-sm shadow-lg text-center">
       <div class="text-3xl font-bold text-ink tracking-tight mb-6">Kiln.Log</div>
-      <div class="flex flex-col items-center gap-4 text-ink-muted text-sm">
-        <div class="w-8 h-8 border-[3px] border-parchment-3 border-t-flame rounded-full animate-spin"></div>
+      <div class="flex flex-col items-center gap-4 text-sm" :class="error ? 'text-red-500' : 'text-ink-muted'">
+        <div v-if="!error" class="w-8 h-8 border-[3px] border-parchment-3 border-t-flame rounded-full animate-spin"></div>
         <p>{{ message }}</p>
       </div>
     </div>
@@ -14,41 +14,39 @@
 definePageMeta({ layout: false })
 
 const message = ref('Signing you in…')
+const error   = ref(false)
 const supabase = useSupabaseClient()
 
 onMounted(async () => {
-  // Listen for auth state change first — fires when Supabase processes the URL hash
-  const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-    if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session) {
-      subscription.unsubscribe()
-      message.value = 'Signed in! Redirecting…'
-      navigateTo('/app')
-    }
-  })
+  // Wait for Supabase to process the OAuth hash from the URL
+  // It handles this automatically, we just need to poll for the session
+  let attempts = 0
 
-  // Also try to get the session from the URL hash directly
-  // This handles the case where the hash is in the URL
-  if (window.location.hash) {
-    const { data, error } = await supabase.auth.getSession()
-    if (data?.session) {
-      subscription.unsubscribe()
-      message.value = 'Signed in! Redirecting…'
-      await navigateTo('/app')
+  const tryRedirect = async () => {
+    attempts++
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        message.value = 'Signed in! Redirecting…'
+        // Use window.location for a hard redirect — avoids SSR middleware race condition
+        window.location.href = '/app'
+        return
+      }
+    } catch (e) {
+      console.error('Session check error:', e)
+    }
+
+    if (attempts >= 20) {
+      error.value   = true
+      message.value = 'Could not sign in. Please try again.'
+      setTimeout(() => { window.location.href = '/login' }, 2000)
       return
     }
+
+    setTimeout(tryRedirect, 500)
   }
 
-  // Fallback — check session after a short delay
-  setTimeout(async () => {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (session) {
-      subscription.unsubscribe()
-      message.value = 'Signed in! Redirecting…'
-      await navigateTo('/app')
-    } else {
-      message.value = 'Something went wrong. Redirecting…'
-      setTimeout(() => navigateTo('/login'), 1500)
-    }
-  }, 2000)
+  // Give Supabase a moment to process the hash token first
+  setTimeout(tryRedirect, 800)
 })
 </script>

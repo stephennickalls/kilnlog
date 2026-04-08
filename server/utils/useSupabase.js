@@ -6,9 +6,9 @@ export function useSupabase() {
   if (_client) return _client
 
   const url = process.env.SUPABASE_URL
-  const key  = process.env.SUPABASE_SERVICE_KEY
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-  if (!url || !key) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_KEY must be set in .env')
+  if (!url || !key) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set in .env')
 
   _client = createClient(url, key)
   return _client

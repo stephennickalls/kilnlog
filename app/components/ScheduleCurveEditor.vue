@@ -2,13 +2,7 @@
   <div class="flex flex-col gap-2">
     <div class="flex items-center justify-between">
       <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Schedule curve</label>
-      <div class="flex items-center gap-2">
-        <span class="text-[10px] text-ink-faint">{{ totalHours }}</span>
-        <button
-          class="text-[10px] font-semibold text-flame hover:text-flame-dark transition-colors"
-          @click="showTable = !showTable"
-        >{{ showTable ? 'Hide table' : 'Show table' }}</button>
-      </div>
+      <span class="text-[10px] text-ink-faint">{{ totalHours }}</span>
     </div>
 
     <p class="text-xs text-ink-muted -mt-1">
@@ -174,8 +168,8 @@
       </svg>
     </div>
 
-    <!-- DEBUG PANEL — remove when done -->
-    <div class="bg-ink text-green-400 font-mono text-[10px] rounded-lg p-3 leading-relaxed">
+    <!-- DEBUG PANEL — hidden, keep for future debugging -->
+    <div v-show="false" class="bg-ink text-green-400 font-mono text-[10px] rounded-lg p-3 leading-relaxed">
       <div class="text-yellow-300 font-bold mb-1">🐛 Drag Debug</div>
       <div>draggingIdx: <span class="text-white">{{ draggingIdx ?? 'null' }}</span></div>
       <div>svgRect: <span class="text-white">{{ debugSvgRect }}</span></div>
@@ -187,31 +181,39 @@
       <div class="mt-1 text-parchment-4">Log: <span class="text-green-300">{{ debugLog.slice(-3).join(' | ') }}</span></div>
     </div>
 
-    <!-- Collapsible table -->
-    <div v-if="showTable" class="flex flex-col gap-2 mt-1">
-      <div class="grid grid-cols-[1fr_1fr_28px] gap-2 text-[10px] font-bold uppercase tracking-[0.08em] text-ink-faint px-1">
-        <span>Time (mins)</span><span>Target °C</span><span></span>
+    <!-- Waypoints table — visible by default, collapsible -->
+    <div class="flex flex-col gap-2 mt-1">
+      <div class="flex items-center justify-between px-1">
+        <div class="grid grid-cols-[1fr_1fr_28px] gap-2 text-[10px] font-bold uppercase tracking-[0.08em] text-ink-faint flex-1">
+          <span>Time (mins)</span><span>Target °C</span><span></span>
+        </div>
+        <button
+          class="text-[10px] font-semibold text-ink-faint hover:text-flame transition-colors ml-4 shrink-0"
+          @click="showTable = !showTable"
+        >{{ showTable ? 'Hide' : 'Show' }}</button>
       </div>
-      <div
-        v-for="(pt, i) in sortedPoints"
-        :key="pt._id + 'row'"
-        class="grid grid-cols-[1fr_1fr_28px] gap-2 items-center"
-      >
-        <input
-          :value="pt.offsetMinutes"
-          type="number" min="0" placeholder="0"
-          class="w-full border border-parchment-3 rounded-lg px-3 py-1.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif"
-          @change="updatePoint(i, 'offsetMinutes', Number($event.target.value))"
-        />
-        <input
-          :value="pt.targetTemp"
-          type="number" min="0" max="1400" placeholder="100"
-          class="w-full border border-parchment-3 rounded-lg px-3 py-1.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif"
-          @change="updatePoint(i, 'targetTemp', Number($event.target.value))"
-        />
-        <button class="text-parchment-4 hover:text-red-400 transition-colors text-sm" @click="removePoint(i)">✕</button>
-      </div>
-      <button class="text-sm text-flame hover:text-flame-dark font-semibold text-left" @click="addPointAtEnd">+ Add waypoint</button>
+      <template v-if="showTable">
+        <div
+          v-for="(pt, i) in sortedPoints"
+          :key="pt._id + 'row'"
+          class="grid grid-cols-[1fr_1fr_28px] gap-2 items-center"
+        >
+          <input
+            :value="pt.offsetMinutes"
+            type="number" min="0" placeholder="0"
+            class="w-full border border-parchment-3 rounded-lg px-3 py-1.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif"
+            @change="updatePoint(i, 'offsetMinutes', Number($event.target.value))"
+          />
+          <input
+            :value="pt.targetTemp"
+            type="number" min="0" max="1400" placeholder="100"
+            class="w-full border border-parchment-3 rounded-lg px-3 py-1.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif"
+            @change="updatePoint(i, 'targetTemp', Number($event.target.value))"
+          />
+          <button class="text-parchment-4 hover:text-red-400 transition-colors text-sm" @click="removePoint(i)">✕</button>
+        </div>
+        <button class="text-sm text-flame hover:text-flame-dark font-semibold text-left" @click="addPointAtEnd">+ Add waypoint</button>
+      </template>
     </div>
   </div>
 </template>
@@ -335,7 +337,6 @@ const debugLog          = ref([])
 function dblog(msg) {
   debugLog.value.push(msg)
   if (debugLog.value.length > 20) debugLog.value.shift()
-  console.log('[CurveEditor]', msg)
 }
 
 // ── Dragging ──────────────────────────────────────────────────────────────────
@@ -471,7 +472,7 @@ function removePoint(sortedIdx) {
 }
 
 // ── Table helpers ─────────────────────────────────────────────────────────────
-const showTable = ref(false)
+const showTable = ref(true)
 
 function updatePoint(sortedIdx, field, val) {
   const pt = getPointById(sortedPoints.value[sortedIdx]._id)

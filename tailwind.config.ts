@@ -12,10 +12,10 @@ export default {
     extend: {
       colors: {
         parchment: {
-          DEFAULT: '#f5f0e8',
-          2:       '#ede5d5',
-          3:       '#e0d4bc',
-          4:       '#d4c9b0',
+          DEFAULT: '#fbf8f3',
+          2:       '#f2ece0',
+          3:       '#e8deca',
+          4:       '#d9cfb8',
         },
         ink: {
           DEFAULT: '#1a1208',

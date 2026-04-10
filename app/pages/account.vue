@@ -1,60 +1,117 @@
 <template>
-  <div class="account-shell">
-    <div class="account-card">
-      <div class="account-header">
-        <NuxtLink to="/app" class="back-link">← Back to Kiln.Log</NuxtLink>
-        <h1 class="account-title">Account</h1>
-      </div>
+  <div class="min-h-screen bg-parchment font-serif">
 
-      <div v-if="loading" class="loading-block">
-        <div class="spinner-lg"></div>
-      </div>
+    <!-- Header -->
+    <header class="sticky top-0 z-10 bg-parchment border-b border-parchment-3 px-4 py-3 flex items-center gap-3">
+      <NuxtLink to="/app" class="p-1.5 rounded-lg text-ink-muted hover:bg-parchment-2 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+      </NuxtLink>
+      <h1 class="text-base font-bold text-ink tracking-tight">Account</h1>
+    </header>
 
-      <template v-else>
-        <div class="section">
-          <h2 class="section-label">Profile</h2>
-          <div class="info-row">
-            <span class="info-key">Email</span>
-            <span class="info-val">{{ user?.email }}</span>
-          </div>
-          <div v-if="profile?.full_name" class="info-row">
-            <span class="info-key">Name</span>
-            <span class="info-val">{{ profile.full_name }}</span>
-          </div>
-        </div>
-
-        <div class="section">
-          <h2 class="section-label">Subscription</h2>
-
-          <template v-if="profile?.subscription_status === 'trialing'">
-            <div class="status-badge status-trial">Free Trial</div>
-            <p class="status-detail">
-              Trial ends <strong>{{ formatDate(profile.trial_ends_at) }}</strong>
-              ({{ daysLeft }} days left)
-            </p>
-            <button class="btn-primary" @click="checkout">Subscribe now — $27 NZD/yr</button>
-          </template>
-
-          <template v-else-if="profile?.subscription_status === 'active'">
-            <div class="status-badge status-active">Active</div>
-            <p class="status-detail" v-if="profile.subscription_ends_at">
-              Renews <strong>{{ formatDate(profile.subscription_ends_at) }}</strong>
-            </p>
-            <button class="btn-ghost" @click="portal">Manage billing →</button>
-          </template>
-
-          <template v-else>
-            <div class="status-badge status-expired">Inactive</div>
-            <p class="status-detail">Your subscription is not active.</p>
-            <button class="btn-primary" @click="checkout">Resubscribe — $27 NZD/yr</button>
-          </template>
-        </div>
-
-        <div class="section">
-          <button class="btn-danger" @click="signOut">Sign out</button>
-        </div>
-      </template>
+    <!-- Loading -->
+    <div v-if="loading" class="flex items-center justify-center py-20">
+      <div class="w-7 h-7 border-[3px] border-parchment-3 border-t-flame rounded-full animate-spin"></div>
     </div>
+
+    <template v-else>
+      <div class="max-w-lg mx-auto px-4 py-6 flex flex-col gap-4">
+
+        <!-- Profile -->
+        <div class="bg-white border border-parchment-3 rounded-2xl overflow-hidden" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
+          <div class="px-5 py-4 border-b border-parchment-3">
+            <p class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Profile</p>
+          </div>
+          <div class="px-5 py-4 flex flex-col gap-3">
+            <div class="flex items-center justify-between">
+              <span class="text-sm text-ink-muted">Email</span>
+              <span class="text-sm font-semibold text-ink">{{ user?.email }}</span>
+            </div>
+            <div v-if="profile?.full_name" class="flex items-center justify-between">
+              <span class="text-sm text-ink-muted">Name</span>
+              <span class="text-sm font-semibold text-ink">{{ profile.full_name }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Subscription -->
+        <div class="bg-white border border-parchment-3 rounded-2xl overflow-hidden" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
+          <div class="px-5 py-4 border-b border-parchment-3">
+            <p class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Subscription</p>
+          </div>
+          <div class="px-5 py-4 flex flex-col gap-4">
+
+            <template v-if="profile?.subscription_status === 'trialing'">
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-ink-muted">Status</span>
+                <span class="px-2.5 py-1 text-xs font-bold rounded-full bg-orange-50 text-orange-700 border border-orange-200">Free Trial</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-ink-muted">Trial ends</span>
+                <span class="text-sm font-semibold text-ink">{{ formatDate(profile.trial_ends_at) }}</span>
+              </div>
+              <p class="text-xs text-ink-faint">{{ daysLeft }} day{{ daysLeft !== 1 ? 's' : '' }} remaining</p>
+              <button class="w-full py-2.5 bg-flame text-parchment text-sm font-bold rounded-xl hover:bg-flame-dark transition-colors" @click="checkout">
+                Subscribe now — $27 NZD/yr
+              </button>
+            </template>
+
+            <template v-else-if="profile?.subscription_status === 'active'">
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-ink-muted">Status</span>
+                <span class="px-2.5 py-1 text-xs font-bold rounded-full bg-green-50 text-green-700 border border-green-200">Active</span>
+              </div>
+              <div v-if="profile.subscription_ends_at" class="flex items-center justify-between">
+                <span class="text-sm text-ink-muted">Renews</span>
+                <span class="text-sm font-semibold text-ink">{{ formatDate(profile.subscription_ends_at) }}</span>
+              </div>
+              <button class="w-full py-2.5 border border-parchment-3 text-ink-muted text-sm font-semibold rounded-xl hover:bg-parchment-2 transition-colors" @click="portal">
+                Manage billing →
+              </button>
+            </template>
+
+            <template v-else>
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-ink-muted">Status</span>
+                <span class="px-2.5 py-1 text-xs font-bold rounded-full bg-parchment-2 text-ink-faint border border-parchment-3">Inactive</span>
+              </div>
+              <p class="text-xs text-ink-muted">Your subscription is not active.</p>
+              <button class="w-full py-2.5 bg-flame text-parchment text-sm font-bold rounded-xl hover:bg-flame-dark transition-colors" @click="checkout">
+                Resubscribe — $27 NZD/yr
+              </button>
+            </template>
+
+          </div>
+        </div>
+
+        <!-- Sensor -->
+        <div class="bg-white border border-parchment-3 rounded-2xl overflow-hidden" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
+          <div class="px-5 py-4 border-b border-parchment-3">
+            <p class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Kiln Sensor</p>
+          </div>
+          <div class="px-5 py-4 flex items-center justify-between">
+            <div>
+              <p class="text-sm font-semibold text-ink">ESP32 Setup</p>
+              <p class="text-xs text-ink-muted mt-0.5">Flash firmware and configure WiFi</p>
+            </div>
+            <NuxtLink to="/sensor-setup" class="px-4 py-2 border border-parchment-3 text-ink-muted text-sm font-semibold rounded-xl hover:bg-parchment-2 transition-colors flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              Set up →
+            </NuxtLink>
+          </div>
+        </div>
+
+        <!-- Sign out -->
+        <div class="bg-white border border-parchment-3 rounded-2xl overflow-hidden" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
+          <div class="px-5 py-4">
+            <button class="w-full py-2.5 border border-red-200 text-red-500 text-sm font-semibold rounded-xl hover:bg-red-50 transition-colors" @click="signOut">
+              Sign out
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </template>
   </div>
 </template>
 
@@ -102,32 +159,3 @@ async function signOut() {
   await navigateTo('/login')
 }
 </script>
-
-<style scoped>
-.account-shell { min-height: 100vh; background: #fafaf9; display: flex; align-items: flex-start; justify-content: center; padding: 2rem 1.5rem; font-family: 'Georgia', serif; }
-.account-card { background: #fff; border: 1px solid #e7e5e4; border-radius: 1.25rem; padding: 2rem; width: 100%; max-width: 480px; box-shadow: 0 4px 24px rgba(0,0,0,0.06); }
-.account-header { margin-bottom: 1.75rem; }
-.back-link { font-size: 0.825rem; color: #f97316; text-decoration: none; font-weight: 600; }
-.back-link:hover { text-decoration: underline; }
-.account-title { font-size: 1.5rem; font-weight: 700; color: #1c1917; margin: 0.5rem 0 0; letter-spacing: -0.02em; }
-.loading-block { display: flex; justify-content: center; padding: 2rem; }
-.spinner-lg { width: 2rem; height: 2rem; border: 3px solid #fed7aa; border-top-color: #f97316; border-radius: 50%; animation: spin 0.8s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-.section { padding: 1.25rem 0; border-top: 1px solid #f5f5f4; }
-.section:first-of-type { border-top: none; }
-.section-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #a8a29e; margin: 0 0 0.875rem; }
-.info-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
-.info-key { font-size: 0.875rem; color: #78716c; }
-.info-val { font-size: 0.875rem; font-weight: 600; color: #1c1917; }
-.status-badge { display: inline-block; padding: 0.375rem 0.875rem; border-radius: 999px; font-size: 0.8rem; font-weight: 700; margin-bottom: 0.625rem; }
-.status-trial { background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa; }
-.status-active { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
-.status-expired { background: #f5f5f4; color: #78716c; border: 1px solid #e7e5e4; }
-.status-detail { font-size: 0.875rem; color: #78716c; margin: 0 0 1rem; line-height: 1.5; }
-.btn-primary { padding: 0.625rem 1.25rem; background: #f97316; color: #fff; border: none; border-radius: 0.625rem; font-size: 0.875rem; font-weight: 700; cursor: pointer; transition: background 0.15s; font-family: inherit; }
-.btn-primary:hover { background: #ea6c0a; }
-.btn-ghost { padding: 0.625rem 1.25rem; background: #fff; color: #44403c; border: 1.5px solid #e7e5e4; border-radius: 0.625rem; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: all 0.15s; font-family: inherit; }
-.btn-ghost:hover { border-color: #d6d3d1; background: #fafaf9; }
-.btn-danger { padding: 0.625rem 1.25rem; background: #fff; color: #ef4444; border: 1.5px solid #fecaca; border-radius: 0.625rem; font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: all 0.15s; font-family: inherit; }
-.btn-danger:hover { background: #fef2f2; }
-</style>

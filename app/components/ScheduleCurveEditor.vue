@@ -26,11 +26,6 @@
         :height="svgHeight"
         class="w-full block touch-none"
         :viewBox="`0 0 ${svgWidth} ${svgHeight}`"
-        @mousemove="onMouseMove"
-        @mouseup="onMouseUp"
-        @mouseleave="onMouseUp"
-        @touchmove.prevent="onTouchMove"
-        @touchend="onTouchEnd"
         @click="onSvgClick"
       >
         <!-- Grid lines -->
@@ -112,7 +107,7 @@
             :cy="tempToY(pt.targetTemp)"
             r="14"
             fill="rgba(249,115,22,0.12)"
-            :class="draggingIdx === i ? 'opacity-100' : 'opacity-0 hover:opacity-100'"
+            :class="draggingId === pt._id ? 'opacity-100' : 'opacity-0 hover:opacity-100'"
             style="transition: opacity 0.1s; cursor: grab"
             @mousedown.stop="startDrag(i, $event)"
             @touchstart.prevent.stop="startDragTouch(i, $event)"
@@ -122,10 +117,10 @@
           <circle
             :cx="minsToX(pt.offsetMinutes)"
             :cy="tempToY(pt.targetTemp)"
-            :r="draggingIdx === i ? 7 : 5.5"
+            :r="draggingId === pt._id ? 7 : 5.5"
             fill="white"
             stroke="#f97316"
-            :stroke-width="draggingIdx === i ? 2.5 : 2"
+            :stroke-width="draggingId === pt._id ? 2.5 : 2"
             style="cursor: grab; transition: r 0.1s"
             @mousedown.stop="startDrag(i, $event)"
             @touchstart.prevent.stop="startDragTouch(i, $event)"
@@ -145,7 +140,7 @@
         </g>
 
         <!-- Drag tooltip -->
-        <g v-if="draggingIdx !== null && tooltip">
+        <g v-if="draggingId !== null && tooltip">
           <rect
             :x="tooltip.x + 8"
             :y="tooltip.y - 22"
@@ -177,15 +172,19 @@
           fill="#d6d3d1"
         >Click to add points</text>
       </svg>
+    </div>
 
-      <!-- Add point hint overlay — shows only when hovering SVG with no drag -->
-      <div
-        v-if="hoverAddPos"
-        class="pointer-events-none absolute"
-        :style="{ left: hoverAddPos.x + 'px', top: hoverAddPos.y + 'px', transform: 'translate(-50%,-50%)' }"
-      >
-        <div class="w-3 h-3 rounded-full border-2 border-flame/50 bg-white/80"></div>
-      </div>
+    <!-- DEBUG PANEL — remove when done -->
+    <div class="bg-ink text-green-400 font-mono text-[10px] rounded-lg p-3 leading-relaxed">
+      <div class="text-yellow-300 font-bold mb-1">🐛 Drag Debug</div>
+      <div>draggingIdx: <span class="text-white">{{ draggingIdx ?? 'null' }}</span></div>
+      <div>svgRect: <span class="text-white">{{ debugSvgRect }}</span></div>
+      <div>lastEvent: <span class="text-white">{{ debugLastEvent }}</span></div>
+      <div>lastClientXY: <span class="text-white">{{ debugLastClientXY }}</span></div>
+      <div>lastSvgXY: <span class="text-white">{{ debugLastSvgXY }}</span></div>
+      <div>lastMinsTemp: <span class="text-white">{{ debugLastMinsTemp }}</span></div>
+      <div>docListeners: <span class="text-white">{{ debugDocListeners }}</span></div>
+      <div class="mt-1 text-parchment-4">Log: <span class="text-green-300">{{ debugLog.slice(-3).join(' | ') }}</span></div>
     </div>
 
     <!-- Collapsible table -->
@@ -232,13 +231,27 @@ const PAD_L = 38, PAD_R = 12, PAD_T = 16, PAD_B = 24
 let _nextId = 0
 const points = ref(props.modelValue.map(p => ({ ...p, _id: _nextId++ })))
 
-// Sync in when parent changes (e.g. library preset applied)
+// Guard flag — prevents the two watchers from triggering each other
+let _inboundUpdate = false
+
+// Sync IN when parent changes (e.g. library preset or bisque/glaze button)
+// We patch in-place rather than replace the array so _ids survive during drag
 watch(() => props.modelValue, (val) => {
+  // Only sync if the change came from outside (different length or values)
+  // not from our own emit during drag
+  if (draggingId.value !== null) return  // never interrupt an active drag
+
+  _inboundUpdate = true
+  // Replace array wholesale (preset loaded etc) — assign new _ids
   points.value = val.map(p => ({ ...p, _id: _nextId++ }))
+  nextTick(() => { _inboundUpdate = false })
 }, { deep: true })
 
-// Emit out on every change
+// Emit OUT when user edits the graph — but not during a drag (we emit on dragend instead)
+// and not when we just synced in from parent
 watch(points, (val) => {
+  if (_inboundUpdate) return
+  if (draggingId.value !== null) return  // suppress during drag, emit on stopDrag
   emit('update:modelValue', val.map(({ offsetMinutes, targetTemp }) => ({ offsetMinutes, targetTemp })))
 }, { deep: true })
 
@@ -249,14 +262,16 @@ const sortedPoints = computed(() =>
 
 const totalHours = computed(() => {
   if (!sortedPoints.value.length) return ''
-  const maxMins = sortedPoints.value.at(-1).offsetMinutes
+  const last = sortedPoints.value[sortedPoints.value.length - 1]
+  const maxMins = last.offsetMinutes
   const h = Math.floor(maxMins / 60), m = maxMins % 60
   return h > 0 ? `${h}h ${m > 0 ? m + 'm' : ''}` : `${m}m`
 })
 
 // ── Axis ranges ───────────────────────────────────────────────────────────────
 const maxMins = computed(() => {
-  const m = sortedPoints.value.at(-1)?.offsetMinutes ?? 0
+  const pts = sortedPoints.value
+  const m = pts.length ? pts[pts.length - 1].offsetMinutes : 0
   return Math.max(m + 60, 360)
 })
 const maxTemp = computed(() => {
@@ -309,61 +324,125 @@ const fillPath = computed(() => {
   return `${curvePath.value} L ${lastX} ${bottom} L ${firstX} ${bottom} Z`
 })
 
+// ── DEBUG ─────────────────────────────────────────────────────────────────────
+const debugLastEvent    = ref('none')
+const debugLastClientXY = ref('—')
+const debugLastSvgXY    = ref('—')
+const debugLastMinsTemp = ref('—')
+const debugSvgRect      = ref('—')
+const debugDocListeners = ref(0)
+const debugLog          = ref([])
+function dblog(msg) {
+  debugLog.value.push(msg)
+  if (debugLog.value.length > 20) debugLog.value.shift()
+  console.log('[CurveEditor]', msg)
+}
+
 // ── Dragging ──────────────────────────────────────────────────────────────────
-const svgEl       = ref(null)
-const draggingIdx = ref(null)   // index into sortedPoints
-const tooltip     = ref(null)
+const svgEl        = ref(null)
+const draggingId   = ref(null)   // track by _id, not sorted index
+const draggingIdx  = ref(null)   // kept for debug display only
+const tooltip      = ref(null)
 
 function getSvgPos(clientX, clientY) {
   const rect = svgEl.value.getBoundingClientRect()
-  return {
-    x: (clientX - rect.left) / rect.width  * svgWidth,
-    y: (clientY - rect.top)  / rect.height * svgHeight,
-  }
+  debugSvgRect.value = `${Math.round(rect.left)},${Math.round(rect.top)} ${Math.round(rect.width)}×${Math.round(rect.height)}`
+  const x = (clientX - rect.left) / rect.width  * svgWidth
+  const y = (clientY - rect.top)  / rect.height * svgHeight
+  debugLastSvgXY.value = `${x.toFixed(1)}, ${y.toFixed(1)}`
+  return { x, y }
 }
 
-// Find the matching point in points[] by _id from sortedPoints
 function getPointById(id) {
   return points.value.find(p => p._id === id)
 }
 
-function startDrag(sortedIdx, e) {
-  draggingIdx.value = sortedIdx
+function doDrag(clientX, clientY) {
+  debugLastClientXY.value = `${clientX.toFixed(0)}, ${clientY.toFixed(0)}`
+  if (draggingId.value === null) {
+    dblog('doDrag called but draggingId is null!')
+    return
+  }
+  if (!svgEl.value) {
+    dblog('doDrag: svgEl is null!')
+    return
+  }
+  const { x, y } = getSvgPos(clientX, clientY)
+  const pt = getPointById(draggingId.value)
+  if (!pt) {
+    dblog(`doDrag: no point found for _id ${draggingId.value}`)
+    return
+  }
+  pt.offsetMinutes = xToMins(x)
+  pt.targetTemp    = yToTemp(y)
+  // Update display index for debug
+  draggingIdx.value = sortedPoints.value.findIndex(p => p._id === draggingId.value)
+  debugLastMinsTemp.value = `${pt.offsetMinutes}m, ${pt.targetTemp}°C`
+  tooltip.value = { x, y, text: `${pt.offsetMinutes}m · ${pt.targetTemp}°C` }
+}
+
+function stopDrag() {
+  dblog(`stopDrag — was dragging _id ${draggingId.value}`)
+  draggingId.value  = null
+  draggingIdx.value = null
+  tooltip.value     = null
+  document.removeEventListener('mousemove', onDocMouseMove)
+  document.removeEventListener('mouseup',   onDocMouseUp)
+  document.removeEventListener('touchmove', onDocTouchMove)
+  document.removeEventListener('touchend',  onDocTouchEnd)
+  debugDocListeners.value = 0
+  // Emit final positions now that drag is complete
+  emit('update:modelValue', points.value.map(({ offsetMinutes, targetTemp }) => ({ offsetMinutes, targetTemp })))
+}
+
+function onDocMouseMove(e) {
+  debugLastEvent.value = `mousemove (doc)`
+  doDrag(e.clientX, e.clientY)
+}
+function onDocMouseUp() {
+  debugLastEvent.value = 'mouseup (doc)'
+  stopDrag()
+}
+function onDocTouchMove(e) {
+  debugLastEvent.value = `touchmove (doc) touches:${e.touches.length}`
   e.preventDefault()
+  if (e.touches.length) doDrag(e.touches[0].clientX, e.touches[0].clientY)
+}
+function onDocTouchEnd() {
+  debugLastEvent.value = 'touchend (doc)'
+  stopDrag()
+}
+
+function startDrag(sortedIdx, e) {
+  const id = sortedPoints.value[sortedIdx]?._id ?? null
+  dblog(`startDrag(mouse) idx=${sortedIdx} _id=${id}`)
+  debugLastEvent.value = `mousedown on pt ${sortedIdx}`
+  e.preventDefault()
+  e.stopPropagation()
+  draggingId.value  = id
+  draggingIdx.value = sortedIdx
+  document.addEventListener('mousemove', onDocMouseMove)
+  document.addEventListener('mouseup',   onDocMouseUp)
+  debugDocListeners.value = 2
 }
 
 function startDragTouch(sortedIdx, e) {
+  const id = sortedPoints.value[sortedIdx]?._id ?? null
+  dblog(`startDragTouch idx=${sortedIdx} _id=${id} touches=${e.touches.length}`)
+  debugLastEvent.value = `touchstart on pt ${sortedIdx}`
+  debugLastClientXY.value = e.touches.length
+    ? `${e.touches[0].clientX.toFixed(0)}, ${e.touches[0].clientY.toFixed(0)}`
+    : 'no touches'
+  e.preventDefault()
+  e.stopPropagation()
+  draggingId.value  = id
   draggingIdx.value = sortedIdx
+  document.addEventListener('touchmove', onDocTouchMove, { passive: false })
+  document.addEventListener('touchend',  onDocTouchEnd)
+  debugDocListeners.value = 2
 }
 
-function doDrag(clientX, clientY) {
-  if (draggingIdx.value === null) return
-  const { x, y } = getSvgPos(clientX, clientY)
-  const pt = getPointById(sortedPoints.value[draggingIdx.value]._id)
-  if (!pt) return
-  pt.offsetMinutes = xToMins(x)
-  pt.targetTemp    = yToTemp(y)
-  tooltip.value = {
-    x,
-    y,
-    text: `${pt.offsetMinutes}m · ${pt.targetTemp}°C`,
-  }
-}
-
-function onMouseMove(e) {
-  if (draggingIdx.value !== null) doDrag(e.clientX, e.clientY)
-}
-function onMouseUp() {
-  draggingIdx.value = null
-  tooltip.value     = null
-}
-function onTouchMove(e) {
-  if (e.touches.length) doDrag(e.touches[0].clientX, e.touches[0].clientY)
-}
-function onTouchEnd() {
-  draggingIdx.value = null
-  tooltip.value     = null
-}
+onUnmounted(() => { stopDrag() })
 
 // ── Adding points ─────────────────────────────────────────────────────────────
 const hoverAddPos = ref(null)
@@ -400,11 +479,12 @@ function updatePoint(sortedIdx, field, val) {
 }
 
 function addPointAtEnd() {
-  const last = sortedPoints.value.at(-1)
+  const pts = sortedPoints.value
+  const last = pts.length ? pts[pts.length - 1] : null
   points.value.push({
     offsetMinutes: last ? last.offsetMinutes + 60 : 60,
-    targetTemp:    last?.targetTemp ?? 100,
+    targetTemp:    last ? last.targetTemp : 100,
     _id: _nextId++,
   })
 }
-</script> 
+</script>

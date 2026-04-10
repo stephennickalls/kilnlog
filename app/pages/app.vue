@@ -56,26 +56,44 @@
 
         <!-- ── DESKTOP ── -->
         <div class="hidden sm:flex flex-col flex-1 overflow-hidden">
-          <div class="p-4 pb-0">
-            <FiringStatsBar
-              v-if="selectedFiring"
-              :peak-temp="peakTemp"
-              :duration="duration"
-              :rate-of-change="rateOfChange"
-              :elapsed="elapsed"
-              :reading-count="readingCount"
-              :notes="selectedFiring.notes"
-              :is-live="isLive"
-              :is-manual="isManual"
-              :current-temp="currentTemp"
-              @open-temp="showTempModal = true"
-              @log-reading="openLogReading"
-            />
+
+          <!-- Desktop stats bar -->
+          <div v-if="selectedFiring" class="shrink-0 px-4 pt-4 flex items-center gap-6 flex-wrap">
+            <button class="flex flex-col items-start gap-0.5 hover:opacity-70 transition-opacity" @click="showTempModal = true">
+              <span class="text-[10px] font-bold uppercase tracking-widest text-ink-faint">Now</span>
+              <span class="text-2xl font-bold tabular-nums" :class="currentTemp !== null ? 'text-flame' : 'text-parchment-3'">
+                {{ currentTemp !== null ? Math.round(currentTemp) : '—' }}<span class="text-base text-flame-light">°C</span>
+              </span>
+            </button>
+            <div class="flex flex-col items-start gap-0.5">
+              <span class="text-[10px] font-bold uppercase tracking-widest text-ink-faint">Peak</span>
+              <span class="text-2xl font-bold tabular-nums text-ink">{{ peakTemp !== null ? Math.round(peakTemp) : '—' }}<span class="text-base text-ink-faint">°C</span></span>
+            </div>
+            <div v-if="isLive && !isManual" class="flex flex-col items-start gap-0.5">
+              <span class="text-[10px] font-bold uppercase tracking-widest text-ink-faint">Rate</span>
+              <span class="text-2xl font-bold tabular-nums text-green-600">{{ rateOfChange }}</span>
+            </div>
+            <div v-if="isLive" class="flex flex-col items-start gap-0.5">
+              <span class="text-[10px] font-bold uppercase tracking-widest text-ink-faint">Elapsed</span>
+              <span class="text-2xl font-bold tabular-nums text-ink">{{ elapsed }}</span>
+            </div>
+            <div v-if="!isLive && selectedFiring.ended_at" class="flex flex-col items-start gap-0.5">
+              <span class="text-[10px] font-bold uppercase tracking-widest text-ink-faint">Duration</span>
+              <span class="text-2xl font-bold tabular-nums text-ink">{{ duration }}</span>
+            </div>
+            <div class="flex flex-col items-start gap-0.5">
+              <span class="text-[10px] font-bold uppercase tracking-widest text-ink-faint">Readings</span>
+              <span class="text-2xl font-bold tabular-nums text-ink">{{ readingCount }}</span>
+            </div>
+            <div v-if="isLive && isManual" class="ml-auto">
+              <button class="px-4 py-2 bg-flame text-parchment text-sm font-bold rounded-lg hover:bg-flame-dark transition-colors" @click="openLogReading">+ Log reading</button>
+            </div>
           </div>
+
           <div class="flex-1 m-4 mt-3 bg-white rounded-xl border border-parchment-3 relative min-h-0 flex items-center justify-center" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
             <canvas ref="chartCanvas" class="w-full h-full"></canvas>
             <button v-if="selectedFiring" class="absolute bottom-3 right-3 px-3 py-1.5 text-xs font-medium border border-parchment-3 rounded-lg bg-parchment text-ink-faint hover:bg-parchment-2 transition-colors" @click="resetZoom">Reset zoom</button>
-            <div v-if="isManual && isLive && !selectedFiring?.readings?.length" class="absolute flex flex-col items-center gap-2 text-ink-muted pointer-events-none">
+            <div v-if="isManual && isLive && !readingCount" class="absolute flex flex-col items-center gap-2 text-ink-muted pointer-events-none">
               <p class="text-sm">Use <strong class="text-ink">Log Reading</strong> to record your first temperature</p>
             </div>
             <div v-else-if="!selectedFiring" class="absolute flex flex-col items-center gap-3 text-ink-muted">
@@ -99,7 +117,7 @@
               <p class="font-bold text-ink mb-1">No firing selected</p>
               <p class="text-sm text-ink-muted">Start a new firing or tap the menu to view past ones</p>
             </div>
-            <button class="bg-flame text-parchment px-6 py-3 rounded-lg text-sm font-bold hover:bg-flame-dark transition-colors" @click="openStartModal">+ Start firing</button>
+            <button class="bg-flame text-parchment px-6 py-3 rounded-lg text-sm font-bold active:bg-flame-dark transition-colors" @click="openStartModal">+ Start firing</button>
             <button class="text-sm text-flame font-semibold" @click="showFiringSheet = true">View past firings</button>
           </div>
 
@@ -130,16 +148,15 @@
               </div>
             </div>
 
-            <!-- Chart — always visible, tap expand icon to fullscreen -->
+            <!-- Chart — always visible -->
             <div class="flex-1 mx-3 mt-3 mb-2 bg-white rounded-xl border border-parchment-3 relative overflow-hidden" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
               <canvas ref="chartCanvasMobile" class="w-full h-full"></canvas>
-              <!-- Expand button — small, unobtrusive corner button -->
-              <button class="absolute top-2 right-2 p-1.5 bg-white/80 backdrop-blur rounded-lg border border-parchment-3 text-ink-faint active:bg-parchment-2 z-10" @click="chartFullscreen = true">
+              <button class="absolute top-2 right-2 p-1.5 bg-white rounded-lg border border-parchment-3 text-ink-faint active:bg-parchment-2 z-10" @click="chartFullscreen = true">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                   <path d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4"/>
                 </svg>
               </button>
-              <div v-if="isManual && isLive && !selectedFiring?.readings?.length" class="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div v-if="isManual && isLive && !readingCount" class="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <p class="text-xs text-ink-muted text-center px-6">Log your first reading to see the curve</p>
               </div>
             </div>
@@ -147,7 +164,12 @@
             <!-- Action bar -->
             <div class="shrink-0 px-3 pb-3 pt-1 flex gap-2">
               <button v-if="isLive && isManual" class="flex-1 py-3 bg-flame text-parchment text-sm font-bold rounded-lg active:bg-flame-dark transition-colors" @click="openLogReading">+ Log reading</button>
-              <button v-if="isLive" class="py-3 px-4 border rounded-lg text-xs font-bold shrink-0 transition-colors flex items-center gap-1.5" :class="isManual ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-parchment-3 bg-parchment-2 text-ink-muted'" @click="toggleMode">
+              <button
+                v-if="isLive"
+                class="py-3 px-4 border rounded-lg text-xs font-bold shrink-0 transition-colors flex items-center gap-1.5"
+                :class="isManual ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-parchment-3 bg-parchment-2 text-ink-muted'"
+                @click="toggleMode"
+              >
                 <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>
                 {{ isManual ? 'Switch to Connected' : 'Switch to Manual' }}
               </button>
@@ -200,7 +222,11 @@
         </div>
         <div v-if="isLive" class="shrink-0 px-3 pb-4 pt-2 flex gap-2 border-t border-parchment-3">
           <button v-if="isManual" class="flex-1 py-3 bg-flame text-parchment text-sm font-bold rounded-lg" @click="openLogReading">+ Log reading</button>
-          <button class="py-3 px-4 border rounded-lg text-xs font-bold shrink-0" :class="isManual ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-parchment-3 bg-parchment-2 text-ink-muted'" @click="toggleMode">{{ isManual ? 'Manual' : 'Connected' }}</button>
+          <button
+            class="py-3 px-4 border rounded-lg text-xs font-bold shrink-0 flex items-center gap-1.5"
+            :class="isManual ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-parchment-3 bg-parchment-2 text-ink-muted'"
+            @click="toggleMode"
+          >{{ isManual ? 'Switch to Connected' : 'Switch to Manual' }}</button>
         </div>
       </div>
     </Teleport>
@@ -254,9 +280,33 @@
     </Teleport>
 
     <!-- ── MODALS ── -->
-    <KilnTempModal :open="showTempModal" :temp="currentTemp" :peak-temp="peakTemp" :rate-of-change="rateOfChange" :elapsed="elapsed" :is-live="isLive" :firing-name="selectedFiring?.name" @close="showTempModal = false" />
-    <StartFiringModal :open="showStartModal" :library="library" @close="showStartModal = false" @create="createFiring" />
-    <ManualReadingModal :open="showReadingModal" :started-at="selectedFiring?.started_at ?? 0" :is-edit="!!editingReading" :edit-temp="editingReading?.y ?? null" :edit-ts="editingReading?.ts ?? null" @close="closeReadingModal" @save="saveReading" @delete="deleteReading" />
+    <KilnTempModal
+      :open="showTempModal"
+      :temp="currentTemp"
+      :peak-temp="peakTemp"
+      :rate-of-change="rateOfChange"
+      :elapsed="elapsed"
+      :is-live="isLive"
+      :firing-name="selectedFiring?.name"
+      @close="showTempModal = false"
+    />
+    <StartFiringModal
+      :open="showStartModal"
+      :library="library"
+      :past-firings="pastFirings"
+      @close="showStartModal = false"
+      @create="createFiring"
+    />
+    <ManualReadingModal
+      :open="showReadingModal"
+      :started-at="selectedFiring?.started_at ?? 0"
+      :is-edit="!!editingReading"
+      :edit-temp="editingReading?.y ?? null"
+      :edit-ts="editingReading?.ts ?? null"
+      @close="closeReadingModal"
+      @save="saveReading"
+      @delete="deleteReading"
+    />
 
   </div>
 </template>
@@ -266,6 +316,7 @@ import { useKilnChart } from '~/composables/useKilnChart'
 
 definePageMeta({ middleware: ['auth'] })
 
+// ── Refs ──────────────────────────────────────────────────────────────────────
 const chartCanvas           = ref(null)
 const chartCanvasMobile     = ref(null)
 const chartCanvasFullscreen = ref(null)
@@ -285,6 +336,7 @@ const signalLost            = ref(false)
 const lastReadingTime       = ref(null)
 const library               = ref([])
 
+// ── Charts ────────────────────────────────────────────────────────────────────
 const { init, setSchedule, setReadings, setManualMode, setSignalLost, clearSignalLost, resetZoom, destroy } = useKilnChart(chartCanvas, {
   enableZoom: true,
   onPointClick: (point) => {
@@ -305,87 +357,28 @@ const { init: initFs, setSchedule: setScheduleFs, setReadings: setReadingsFs, se
   },
 })
 
+// ── Fullscreen chart lifecycle ────────────────────────────────────────────────
 watch(chartFullscreen, async (open) => {
   if (open) {
-    await nextTick(); await initFs()
+    await nextTick()
+    await initFs()
     if (selectedFiring.value) {
       setScheduleFs(selectedFiring.value.schedule ?? [])
       setReadingsFs(selectedFiring.value.readings ?? [], selectedFiring.value.started_at)
       setManualModeFs(isManual.value)
     }
-  } else { destroyFs() }
+  } else {
+    destroyFs()
+  }
 })
 
 watch(() => selectedFiring.value?.readings, (readings) => {
-  if (chartFullscreen.value && selectedFiring.value && readings) setReadingsFs(readings, selectedFiring.value.started_at)
+  if (chartFullscreen.value && selectedFiring.value && readings) {
+    setReadingsFs(readings, selectedFiring.value.started_at)
+  }
 }, { deep: true })
 
-const SIGNAL_TIMEOUT = 30
-const sidebarOpen    = ref(true)
-const sidebarWidth   = ref(280)
-const MIN_WIDTH      = 180
-const isDragging     = ref(false)
-let pollInterval = null, signalCheckInterval = null, elapsedTickInterval = null
-const nowUnix = ref(Math.floor(Date.now() / 1000))
-
-const activeFiring = computed(() => allFirings.value.find(f => f.started_at && !f.ended_at) ?? null)
-const pastFirings  = computed(() => allFirings.value.filter(f => f.ended_at).sort((a, b) => b.created_at - a.created_at))
-const peakTemp     = computed(() => { if (!selectedFiring.value?.readings?.length) return null; return Math.max(...selectedFiring.value.readings.map(r => r.temperature)) })
-const duration     = computed(() => { const f = selectedFiring.value; if (!f?.started_at || !f?.ended_at) return null; const mins = Math.round((f.ended_at - f.started_at) / 60), h = Math.floor(mins / 60), m = mins % 60; return h > 0 ? `${h}h ${m}m` : `${m}m` })
-const readingCount = computed(() => selectedFiring.value?.readings?.length ?? 0)
-const rateOfChange = computed(() => { const readings = selectedFiring.value?.readings; if (!readings || readings.length < 6) return '—'; const recent = readings.slice(-6), deltaTemp = recent[recent.length - 1].temperature - recent[0].temperature, deltaMins = (recent[recent.length - 1].timestamp - recent[0].timestamp) / 60; if (deltaMins === 0) return '—'; const rate = Math.round(deltaTemp / deltaMins); return rate >= 0 ? `+${rate}°/m` : `${rate}°/m` })
-const elapsed      = computed(() => { const f = selectedFiring.value; if (!f?.started_at) return '—'; const mins = Math.round((nowUnix.value - f.started_at) / 60), h = Math.floor(mins / 60), m = mins % 60; return h > 0 ? `${h}h ${m}m` : `${m}m` })
-
-function formatDate(unix) { if (!unix) return ''; return new Date(unix * 1000).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' }) }
-function stopAllIntervals() { if (pollInterval) { clearInterval(pollInterval); pollInterval = null } if (signalCheckInterval) { clearInterval(signalCheckInterval); signalCheckInterval = null } if (elapsedTickInterval) { clearInterval(elapsedTickInterval); elapsedTickInterval = null } }
-
-function startDrag(e) {
-  isDragging.value = true
-  const startX = e.clientX, startWidth = sidebarWidth.value, maxWidth = () => Math.floor(window.innerWidth / 3)
-  function onMove(e) { sidebarWidth.value = Math.min(Math.max(startWidth + e.clientX - startX, MIN_WIDTH), maxWidth()) }
-  function onUp() { isDragging.value = false; window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); document.body.style.cursor = document.body.style.userSelect = '' }
-  document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none'
-  window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp)
-}
-
-async function openStartModal() { if (!library.value.length) library.value = await $fetch('/api/library'); showStartModal.value = true }
-function openLogReading() { editingReading.value = null; showReadingModal.value = true }
-function closeReadingModal() { showReadingModal.value = false; editingReading.value = null }
-
-async function saveReading(payload) {
-  if (!selectedFiring.value) return
-  if (editingReading.value) { const id = editingReading.value.id ?? editingReading.value.raw?.id; await $fetch(`/api/readings/${id}`, { method: 'PUT', body: { temperature: payload.temperature } }) }
-  else await $fetch('/api/readings', { method: 'POST', body: { firingId: selectedFiring.value.id, temperature: payload.temperature, timestamp: payload.timestamp } })
-  closeReadingModal(); await reloadReadings()
-}
-
-async function deleteReading() { if (!editingReading.value) return; const id = editingReading.value.id ?? editingReading.value.raw?.id; await $fetch(`/api/readings/${id}`, { method: 'DELETE' }); closeReadingModal(); await reloadReadings() }
-
-async function reloadReadings() {
-  if (!selectedFiring.value) return
-  const data = await $fetch(`/api/firings/${selectedFiring.value.id}`)
-  selectedFiring.value.readings = data.readings
-  setReadings(data.readings, selectedFiring.value.started_at)
-  setReadingsMobile(data.readings, selectedFiring.value.started_at)
-  if (data.readings?.length) { currentTemp.value = data.readings.at(-1).temperature; lastReadingTime.value = data.readings.at(-1).timestamp }
-}
-
-async function toggleMode() {
-  if (!selectedFiring.value || !isLive.value) return
-  const newMode = isManual.value ? 'connected' : 'manual'
-  await $fetch(`/api/firings/${selectedFiring.value.id}`, { method: 'PUT', body: { mode: newMode } })
-  selectedFiring.value.mode = newMode; applyMode(newMode)
-}
-
-function applyMode(mode) {
-  isManual.value = mode === 'manual'; setManualMode(isManual.value)
-  if (isManual.value) { if (pollInterval) { clearInterval(pollInterval); pollInterval = null } if (signalCheckInterval) { clearInterval(signalCheckInterval); signalCheckInterval = null } signalLost.value = false; clearSignalLost() }
-  else startPolling()
-}
-
-async function sheetDeleteFiring(f) { sheetConfirmDeleteId.value = null; showFiringSheet.value = false; await deleteFiring(f) }
-
-// Re-init mobile chart whenever its canvas mounts (canvas only exists when selectedFiring is set and the v-else branch renders)
+// Re-init mobile chart when its canvas mounts (only renders when selectedFiring is set)
 watch(chartCanvasMobile, async (canvas) => {
   if (canvas) {
     await initMobile()
@@ -396,70 +389,290 @@ watch(chartCanvasMobile, async (canvas) => {
   }
 })
 
-onMounted(async () => { await init(); await refreshFirings(); if (activeFiring.value) await selectFiring(activeFiring.value) })
-onUnmounted(() => { stopAllIntervals(); destroy(); destroyMobile(); destroyFs() })
-async function refreshFirings() { allFirings.value = await $fetch('/api/firings') }
+// ── Intervals & constants ─────────────────────────────────────────────────────
+const SIGNAL_TIMEOUT = 30
+const sidebarOpen    = ref(true)
+const sidebarWidth   = ref(280)
+const MIN_WIDTH      = 180
+let pollInterval = null, signalCheckInterval = null, elapsedTickInterval = null
+const nowUnix = ref(Math.floor(Date.now() / 1000))
 
+// ── Computed ──────────────────────────────────────────────────────────────────
+const activeFiring = computed(() => allFirings.value.find(f => f.started_at && !f.ended_at) ?? null)
+const pastFirings  = computed(() => allFirings.value.filter(f => f.ended_at).sort((a, b) => b.created_at - a.created_at))
+const peakTemp     = computed(() => {
+  const readings = selectedFiring.value?.readings
+  if (!readings || !readings.length) return null
+  return Math.max(...readings.map(r => r.temperature))
+})
+const duration = computed(() => {
+  const f = selectedFiring.value
+  if (!f?.started_at || !f?.ended_at) return null
+  const mins = Math.round((f.ended_at - f.started_at) / 60)
+  const h = Math.floor(mins / 60), m = mins % 60
+  return h > 0 ? `${h}h ${m}m` : `${m}m`
+})
+const readingCount = computed(() => selectedFiring.value?.readings?.length ?? 0)
+const rateOfChange = computed(() => {
+  const readings = selectedFiring.value?.readings
+  if (!readings || readings.length < 6) return '—'
+  const recent = readings.slice(-6)
+  const deltaTemp = recent[recent.length - 1].temperature - recent[0].temperature
+  const deltaMins = (recent[recent.length - 1].timestamp - recent[0].timestamp) / 60
+  if (deltaMins === 0) return '—'
+  const rate = Math.round(deltaTemp / deltaMins)
+  return rate >= 0 ? `+${rate}°/m` : `${rate}°/m`
+})
+const elapsed = computed(() => {
+  const f = selectedFiring.value
+  if (!f?.started_at) return '—'
+  const mins = Math.round((nowUnix.value - f.started_at) / 60)
+  const h = Math.floor(mins / 60), m = mins % 60
+  return h > 0 ? `${h}h ${m}m` : `${m}m`
+})
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function formatDate(unix) {
+  if (!unix) return ''
+  return new Date(unix * 1000).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+function stopAllIntervals() {
+  if (pollInterval)        { clearInterval(pollInterval);        pollInterval = null }
+  if (signalCheckInterval) { clearInterval(signalCheckInterval); signalCheckInterval = null }
+  if (elapsedTickInterval) { clearInterval(elapsedTickInterval); elapsedTickInterval = null }
+}
+
+function lastOf(arr) {
+  // Safe alternative to Array.at(-1) for older WebKit
+  return arr && arr.length ? arr[arr.length - 1] : null
+}
+
+// ── Sidebar drag (desktop only) ───────────────────────────────────────────────
+function startDrag(e) {
+  const startX = e.clientX, startWidth = sidebarWidth.value
+  const maxWidth = () => Math.floor(window.innerWidth / 3)
+  function onMove(ev) { sidebarWidth.value = Math.min(Math.max(startWidth + ev.clientX - startX, MIN_WIDTH), maxWidth()) }
+  function onUp() { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); document.body.style.cursor = document.body.style.userSelect = '' }
+  document.body.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
+  window.addEventListener('mousemove', onMove)
+  window.addEventListener('mouseup', onUp)
+}
+
+// ── Modals ────────────────────────────────────────────────────────────────────
+async function openStartModal() {
+  if (!library.value.length) library.value = await $fetch('/api/library')
+  showStartModal.value = true
+}
+function openLogReading()   { editingReading.value = null; showReadingModal.value = true }
+function closeReadingModal() { showReadingModal.value = false; editingReading.value = null }
+
+// ── Readings ──────────────────────────────────────────────────────────────────
+async function saveReading(payload) {
+  if (!selectedFiring.value) return
+  if (editingReading.value) {
+    const id = editingReading.value.id ?? editingReading.value.raw?.id
+    await $fetch(`/api/readings/${id}`, { method: 'PUT', body: { temperature: payload.temperature } })
+  } else {
+    await $fetch('/api/readings', { method: 'POST', body: { firingId: selectedFiring.value.id, temperature: payload.temperature, timestamp: payload.timestamp } })
+  }
+  closeReadingModal()
+  await reloadReadings()
+}
+
+async function deleteReading() {
+  if (!editingReading.value) return
+  const id = editingReading.value.id ?? editingReading.value.raw?.id
+  await $fetch(`/api/readings/${id}`, { method: 'DELETE' })
+  closeReadingModal()
+  await reloadReadings()
+}
+
+async function reloadReadings() {
+  if (!selectedFiring.value) return
+  const data = await $fetch(`/api/firings/${selectedFiring.value.id}`)
+  selectedFiring.value.readings = data.readings
+  setReadings(data.readings, selectedFiring.value.started_at)
+  setReadingsMobile(data.readings, selectedFiring.value.started_at)
+  const last = lastOf(data.readings)
+  if (last) { currentTemp.value = last.temperature; lastReadingTime.value = last.timestamp }
+}
+
+// ── Mode toggle ───────────────────────────────────────────────────────────────
+async function toggleMode() {
+  if (!selectedFiring.value || !isLive.value) return
+  const newMode = isManual.value ? 'connected' : 'manual'
+  await $fetch(`/api/firings/${selectedFiring.value.id}`, { method: 'PUT', body: { mode: newMode } })
+  selectedFiring.value.mode = newMode
+  applyMode(newMode)
+}
+
+function applyMode(mode) {
+  isManual.value = mode === 'manual'
+  setManualMode(isManual.value)
+  if (isManual.value) {
+    if (pollInterval)        { clearInterval(pollInterval);        pollInterval = null }
+    if (signalCheckInterval) { clearInterval(signalCheckInterval); signalCheckInterval = null }
+    signalLost.value = false
+    clearSignalLost()
+  } else {
+    startPolling()
+  }
+}
+
+// ── Firing sheet delete ───────────────────────────────────────────────────────
+async function sheetDeleteFiring(f) {
+  sheetConfirmDeleteId.value = null
+  showFiringSheet.value = false
+  await deleteFiring(f)
+}
+
+// ── Lifecycle ─────────────────────────────────────────────────────────────────
+onMounted(async () => {
+  await init()
+  await refreshFirings()
+  if (activeFiring.value) await selectFiring(activeFiring.value)
+})
+
+onUnmounted(() => {
+  stopAllIntervals()
+  destroy()
+  destroyMobile()
+  destroyFs()
+})
+
+async function refreshFirings() {
+  allFirings.value = await $fetch('/api/firings')
+}
+
+// ── Select firing ─────────────────────────────────────────────────────────────
 async function selectFiring(f) {
-  stopAllIntervals(); isLive.value = isManual.value = signalLost.value = false; currentTemp.value = lastReadingTime.value = null
+  stopAllIntervals()
+  isLive.value = false
+  isManual.value = false
+  signalLost.value = false
+  currentTemp.value = null
+  lastReadingTime.value = null
+
   const data = await $fetch(`/api/firings/${f.id}`)
   selectedFiring.value = data
-  setSchedule(data.schedule ?? []); setReadings(data.readings ?? [], data.started_at)
-  if (chartCanvasMobile.value) { await initMobile() }
-  setScheduleMobile(data.schedule ?? []); setReadingsMobile(data.readings ?? [], data.started_at)
-  if (data.readings?.length) { const last = data.readings.at(-1); currentTemp.value = last.temperature; lastReadingTime.value = last.timestamp }
+
+  setSchedule(data.schedule ?? [])
+  setReadings(data.readings ?? [], data.started_at)
+
+  if (chartCanvasMobile.value) await initMobile()
+  setScheduleMobile(data.schedule ?? [])
+  setReadingsMobile(data.readings ?? [], data.started_at)
+
+  const last = lastOf(data.readings)
+  if (last) { currentTemp.value = last.temperature; lastReadingTime.value = last.timestamp }
+
   const isActive = !!(data.started_at && !data.ended_at)
-  const mode = data.mode ?? 'connected'; isManual.value = mode === 'manual'; setManualMode(isManual.value)
+  const mode = data.mode ?? 'connected'
+  isManual.value = mode === 'manual'
+  setManualMode(isManual.value)
+
   if (isActive) {
     isLive.value = true
     elapsedTickInterval = setInterval(() => { nowUnix.value = Math.floor(Date.now() / 1000) }, 1000)
     if (!isManual.value) {
-      if (!data.readings?.length) { signalLost.value = true; setSignalLost(data.started_at, null) }
-      else { const secs = Math.floor(Date.now() / 1000) - lastReadingTime.value; if (secs > SIGNAL_TIMEOUT) { signalLost.value = true; setSignalLost(data.started_at, lastReadingTime.value) } }
+      const now = Math.floor(Date.now() / 1000)
+      if (!data.readings || !data.readings.length) {
+        signalLost.value = true
+        setSignalLost(data.started_at, null)
+      } else if (lastReadingTime.value && (now - lastReadingTime.value) > SIGNAL_TIMEOUT) {
+        signalLost.value = true
+        setSignalLost(data.started_at, lastReadingTime.value)
+      }
       startPolling()
     }
   }
 }
 
+// ── Create firing ─────────────────────────────────────────────────────────────
 async function createFiring(payload) {
   const firing = await $fetch('/api/firings', { method: 'POST', body: payload })
   await $fetch(`/api/firings/${firing.id}`, { method: 'PUT', body: { startedAt: Math.floor(Date.now() / 1000) } })
-  showStartModal.value = false; await refreshFirings()
-  const fresh = allFirings.value.find(f => f.id === firing.id); await selectFiring(fresh ?? firing)
+  showStartModal.value = false
+  await refreshFirings()
+  const fresh = allFirings.value.find(f => f.id === firing.id)
+  await selectFiring(fresh ?? firing)
 }
 
+// ── End firing ────────────────────────────────────────────────────────────────
 async function endFiring() {
   if (!activeFiring.value) return
   const id = activeFiring.value.id
   await $fetch(`/api/firings/${id}`, { method: 'PUT', body: { endedAt: Math.floor(Date.now() / 1000) } })
-  stopAllIntervals(); signalLost.value = isLive.value = false; currentTemp.value = null
+  stopAllIntervals()
+  signalLost.value = false
+  isLive.value = false
+  currentTemp.value = null
   await refreshFirings()
   if (selectedFiring.value?.id === id) {
     const data = await $fetch(`/api/firings/${id}`)
-    selectedFiring.value = data; setSchedule(data.schedule ?? []); setReadings(data.readings ?? [], data.started_at)
-    setScheduleMobile(data.schedule ?? []); setReadingsMobile(data.readings ?? [], data.started_at)
+    selectedFiring.value = data
+    setSchedule(data.schedule ?? [])
+    setReadings(data.readings ?? [], data.started_at)
+    setScheduleMobile(data.schedule ?? [])
+    setReadingsMobile(data.readings ?? [], data.started_at)
   }
 }
 
+// ── Delete firing ─────────────────────────────────────────────────────────────
 async function deleteFiring(f) {
   await $fetch(`/api/firings/${f.id}`, { method: 'DELETE' })
-  if (selectedFiring.value?.id === f.id) { stopAllIntervals(); selectedFiring.value = currentTemp.value = null; isLive.value = isManual.value = signalLost.value = false; clearSignalLost() }
+  if (selectedFiring.value?.id === f.id) {
+    stopAllIntervals()
+    selectedFiring.value = null
+    currentTemp.value = null
+    isLive.value = false
+    isManual.value = false
+    signalLost.value = false
+    clearSignalLost()
+  }
   await refreshFirings()
 }
 
+// ── Polling ───────────────────────────────────────────────────────────────────
 function startPolling() {
-  if (pollInterval) clearInterval(pollInterval); if (signalCheckInterval) clearInterval(signalCheckInterval)
+  if (pollInterval)        clearInterval(pollInterval)
+  if (signalCheckInterval) clearInterval(signalCheckInterval)
+
   pollInterval = setInterval(async () => {
     if (!selectedFiring.value || isManual.value) return
-    const rows = await $fetch(`/api/readings?firingId=${selectedFiring.value.id}`)
-    selectedFiring.value.readings = rows; setReadings(rows, selectedFiring.value.started_at); setReadingsMobile(rows, selectedFiring.value.started_at)
-    if (rows.length) { const last = rows.at(-1); currentTemp.value = last.temperature; lastReadingTime.value = last.timestamp; isLive.value = true; if (signalLost.value) { signalLost.value = false; clearSignalLost() } }
+    try {
+      const rows = await $fetch(`/api/readings?firingId=${selectedFiring.value.id}`)
+      selectedFiring.value.readings = rows
+      setReadings(rows, selectedFiring.value.started_at)
+      setReadingsMobile(rows, selectedFiring.value.started_at)
+      const last = lastOf(rows)
+      if (last) {
+        currentTemp.value = last.temperature
+        lastReadingTime.value = last.timestamp
+        isLive.value = true
+        if (signalLost.value) { signalLost.value = false; clearSignalLost() }
+      }
+    } catch (e) {
+      console.warn('Poll error:', e)
+    }
   }, 5000)
+
   signalCheckInterval = setInterval(() => {
     if (!selectedFiring.value || isManual.value) return
     const now = Math.floor(Date.now() / 1000)
-    if (!lastReadingTime.value) { if (now - selectedFiring.value.started_at > SIGNAL_TIMEOUT) { signalLost.value = true; setSignalLost(selectedFiring.value.started_at, null) } return }
-    if (now - lastReadingTime.value > SIGNAL_TIMEOUT) { signalLost.value = true; setSignalLost(selectedFiring.value.started_at, lastReadingTime.value) }
+    if (!lastReadingTime.value) {
+      if (now - selectedFiring.value.started_at > SIGNAL_TIMEOUT) {
+        signalLost.value = true
+        setSignalLost(selectedFiring.value.started_at, null)
+      }
+      return
+    }
+    if (now - lastReadingTime.value > SIGNAL_TIMEOUT) {
+      signalLost.value = true
+      setSignalLost(selectedFiring.value.started_at, lastReadingTime.value)
+    }
   }, 5000)
 }
 </script>

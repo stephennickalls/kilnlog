@@ -130,16 +130,15 @@
               </div>
             </div>
 
-            <!-- Chart thumbnail — tap to fullscreen -->
-            <div class="flex-1 mx-3 mt-3 mb-2 bg-white rounded-xl border border-parchment-3 relative overflow-hidden" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)" @click="chartFullscreen = true">
+            <!-- Chart — always visible, tap expand icon to fullscreen -->
+            <div class="flex-1 mx-3 mt-3 mb-2 bg-white rounded-xl border border-parchment-3 relative overflow-hidden" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
               <canvas ref="chartCanvasMobile" class="w-full h-full"></canvas>
-              <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div class="bg-ink/20 rounded-full p-2.5">
-                  <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <path d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4"/>
-                  </svg>
-                </div>
-              </div>
+              <!-- Expand button — small, unobtrusive corner button -->
+              <button class="absolute top-2 right-2 p-1.5 bg-white/80 backdrop-blur rounded-lg border border-parchment-3 text-ink-faint active:bg-parchment-2 z-10" @click="chartFullscreen = true">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4"/>
+                </svg>
+              </button>
               <div v-if="isManual && isLive && !selectedFiring?.readings?.length" class="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <p class="text-xs text-ink-muted text-center px-6">Log your first reading to see the curve</p>
               </div>
@@ -148,7 +147,10 @@
             <!-- Action bar -->
             <div class="shrink-0 px-3 pb-3 pt-1 flex gap-2">
               <button v-if="isLive && isManual" class="flex-1 py-3 bg-flame text-parchment text-sm font-bold rounded-lg active:bg-flame-dark transition-colors" @click="openLogReading">+ Log reading</button>
-              <button v-if="isLive" class="py-3 px-4 border rounded-lg text-xs font-bold shrink-0 transition-colors" :class="isManual ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-parchment-3 bg-parchment-2 text-ink-muted'" @click="toggleMode">{{ isManual ? 'Manual' : 'Connected' }}</button>
+              <button v-if="isLive" class="py-3 px-4 border rounded-lg text-xs font-bold shrink-0 transition-colors flex items-center gap-1.5" :class="isManual ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-parchment-3 bg-parchment-2 text-ink-muted'" @click="toggleMode">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>
+                {{ isManual ? 'Switch to Connected' : 'Switch to Manual' }}
+              </button>
               <button v-if="!isLive && !activeFiring" class="flex-1 py-3 bg-flame text-parchment text-sm font-bold rounded-lg active:bg-flame-dark transition-colors" @click="openStartModal">+ Start firing</button>
             </div>
           </template>
@@ -292,7 +294,7 @@ const { init, setSchedule, setReadings, setManualMode, setSignalLost, clearSigna
   },
 })
 
-const { init: initMobile, setSchedule: setScheduleMobile, setReadings: setReadingsMobile, destroy: destroyMobile } = useKilnChart(chartCanvasMobile, { enableZoom: false })
+const { init: initMobile, setSchedule: setScheduleMobile, setReadings: setReadingsMobile, destroy: destroyMobile } = useKilnChart(chartCanvasMobile, { enableZoom: false, compact: true })
 
 const { init: initFs, setSchedule: setScheduleFs, setReadings: setReadingsFs, setManualMode: setManualModeFs, resetZoom: resetZoomFullscreen, destroy: destroyFs } = useKilnChart(chartCanvasFullscreen, {
   enableZoom: true,
@@ -383,7 +385,18 @@ function applyMode(mode) {
 
 async function sheetDeleteFiring(f) { sheetConfirmDeleteId.value = null; showFiringSheet.value = false; await deleteFiring(f) }
 
-onMounted(async () => { await init(); await initMobile(); await refreshFirings(); if (activeFiring.value) await selectFiring(activeFiring.value) })
+// Re-init mobile chart whenever its canvas mounts (canvas only exists when selectedFiring is set and the v-else branch renders)
+watch(chartCanvasMobile, async (canvas) => {
+  if (canvas) {
+    await initMobile()
+    if (selectedFiring.value) {
+      setScheduleMobile(selectedFiring.value.schedule ?? [])
+      setReadingsMobile(selectedFiring.value.readings ?? [], selectedFiring.value.started_at)
+    }
+  }
+})
+
+onMounted(async () => { await init(); await refreshFirings(); if (activeFiring.value) await selectFiring(activeFiring.value) })
 onUnmounted(() => { stopAllIntervals(); destroy(); destroyMobile(); destroyFs() })
 async function refreshFirings() { allFirings.value = await $fetch('/api/firings') }
 
@@ -392,6 +405,7 @@ async function selectFiring(f) {
   const data = await $fetch(`/api/firings/${f.id}`)
   selectedFiring.value = data
   setSchedule(data.schedule ?? []); setReadings(data.readings ?? [], data.started_at)
+  if (chartCanvasMobile.value) { await initMobile() }
   setScheduleMobile(data.schedule ?? []); setReadingsMobile(data.readings ?? [], data.started_at)
   if (data.readings?.length) { const last = data.readings.at(-1); currentTemp.value = last.temperature; lastReadingTime.value = last.timestamp }
   const isActive = !!(data.started_at && !data.ended_at)

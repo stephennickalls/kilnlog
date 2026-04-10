@@ -18,7 +18,7 @@ async function ensureZoomPlugin() {
  * @param {import('vue').Ref<HTMLCanvasElement | null>} canvasRef
  * @param {KilnChartOptions} [options]
  */
-export function useKilnChart(canvasRef, { onPointClick, enableZoom = true } = {}) {
+export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, compact = false } = {}) {
   let chart = null
 
   async function init() {
@@ -129,14 +129,14 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true } = {}
         scales: {
           x: {
             type: 'linear',
-            title: { display: true, text: 'Minutes from start', color: '#78716c' },
-            ticks: { color: '#a8a29e', maxTicksLimit: 8 },
+            title: { display: !compact, text: 'Minutes from start', color: '#78716c' },
+            ticks: { color: '#a8a29e', maxTicksLimit: compact ? 5 : 8, font: compact ? { size: 9 } : undefined },
             grid:  { color: '#f5f5f4' },
             min: 0,
           },
           y: {
-            title: { display: true, text: 'Temperature (°C)', color: '#78716c' },
-            ticks: { color: '#a8a29e', maxTicksLimit: 6 },
+            title: { display: !compact, text: 'Temperature (°C)', color: '#78716c' },
+            ticks: { color: '#a8a29e', maxTicksLimit: compact ? 4 : 6, font: compact ? { size: 9 } : undefined },
             grid:  { color: '#f5f5f4' },
             min: 0,
             suggestedMax: 100,

@@ -25,7 +25,7 @@
           <span v-else-if="selectedFiring.ended_at" class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-parchment-2 border border-parchment-3 text-ink-faint shrink-0">Done</span>
           <button v-if="activeFiring && selectedFiring.id === activeFiring.id" class="px-2.5 py-1 text-[10px] font-bold border border-red-300 text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0" @click="endFiring">End</button>
         </template>
-        <NuxtLink to="/sensors" class="hidden sm:flex items-center gap-1 px-2 py-1 text-xs text-ink-muted hover:text-ink hover:bg-parchment-2 rounded-lg transition-colors ml-1">
+        <NuxtLink to="/sensor-setup" class="hidden sm:flex items-center gap-1 px-2 py-1 text-xs text-ink-muted hover:text-ink hover:bg-parchment-2 rounded-lg transition-colors ml-1">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path d="M12 2a4 4 0 014 4v6a4 4 0 01-8 0V6a4 4 0 014-4z"/><path d="M8 12a4 4 0 008 0M12 16v6"/>
           </svg>
@@ -109,6 +109,55 @@
                 :class="isManual ? 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100' : 'border-parchment-3 bg-parchment-2 text-ink-muted hover:bg-parchment-3'"
                 @click="toggleMode"
               >⇅ {{ isManual ? 'Switch to Connected' : 'Switch to Manual' }}</button>
+              <!-- Sensor assignment button -->
+              <button
+                class="flex items-center gap-1.5 px-3 py-2 text-sm font-bold rounded-xl border border-parchment-3 bg-parchment-2 text-ink-muted hover:bg-parchment-3 transition-colors"
+                @click="showSensorPanel = !showSensorPanel"
+              >
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/></svg>
+                Sensors
+                <span v-if="selectedFiring?.sensors?.length" class="text-[10px] bg-flame text-parchment rounded-full w-4 h-4 flex items-center justify-center font-bold">
+                  {{ selectedFiring.sensors.length }}
+                </span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Sensor assignment panel for live firing -->
+          <div v-if="isLive && showSensorPanel" class="shrink-0 border-b border-parchment-3 bg-white px-4 py-3 flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+              <p class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Assigned sensors</p>
+              <button class="text-[10px] text-ink-faint hover:text-flame transition-colors" @click="showSensorPanel = false">Done</button>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <div
+                v-for="s in firingAllSensors"
+                :key="s.id"
+                class="flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all"
+                :class="s.assigned
+                  ? 'bg-blue-50 border-blue-200 text-blue-700'
+                  : 'bg-parchment-2 border-parchment-3 text-ink-muted'"
+              >
+                <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/></svg>
+                {{ s.name }}
+                <button
+                  v-if="s.assigned"
+                  class="ml-1 text-blue-400 hover:text-red-400 transition-colors"
+                  @click="removeSensorFromFiring(s.id)"
+                >
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
+                <button
+                  v-else
+                  class="ml-1 text-ink-faint hover:text-blue-500 transition-colors"
+                  @click="addSensorToFiring(s.id)"
+                >
+                  <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+                </button>
+              </div>
+              <p v-if="!firingAllSensors.length" class="text-xs text-ink-faint">
+                No sensors registered. <NuxtLink to="/sensors" class="text-flame hover:underline">Add one →</NuxtLink>
+              </p>
             </div>
           </div>
 
@@ -233,7 +282,7 @@
 
     <!-- ── MODALS ── -->
     <KilnTempModal :open="showTempModal" :temp="currentTemp" :peak-temp="peakTemp" :rate-of-change="rateOfChange" :elapsed="elapsed" :is-live="isLive" :firing-name="selectedFiring?.name" @close="showTempModal = false" />
-    <StartFiringModal :open="showStartModal" :library="library" @close="showStartModal = false" @create="createFiring" />
+    <StartFiringModal :open="showStartModal" :library="library" :sensors="sensors" @close="showStartModal = false" @create="createFiring" />
     <ManualReadingModal :open="showReadingModal" :started-at="selectedFiring?.started_at ?? 0" :is-edit="!!editingReading" :edit-temp="editingReading?.y ?? null" :edit-ts="editingReading?.ts ?? null" @close="closeReadingModal" @save="saveReading" @delete="deleteReading" />
 
   </div>
@@ -260,6 +309,8 @@ const isManual              = ref(false)
 const signalLost            = ref(false)
 const lastReadingTime       = ref(null)
 const library               = ref([])
+const sensors               = ref([])
+const showSensorPanel       = ref(false)
 
 const { init, setSchedule, setReadings, setManualMode, setSignalLost, clearSignalLost, resetZoom, destroy } = useKilnChart(chartCanvas, {
   enableZoom: true,
@@ -289,6 +340,27 @@ const readingCount = computed(() => selectedFiring.value?.readings?.length ?? 0)
 const rateOfChange = computed(() => { const readings = selectedFiring.value?.readings; if (!readings || readings.length < 6) return '—'; const recent = readings.slice(-6), deltaTemp = recent[recent.length - 1].temperature - recent[0].temperature, deltaMins = (recent[recent.length - 1].timestamp - recent[0].timestamp) / 60; if (deltaMins === 0) return '—'; const rate = Math.round(deltaTemp / deltaMins); return rate >= 0 ? `+${rate}°/m` : `${rate}°/m` })
 const elapsed      = computed(() => { const f = selectedFiring.value; if (!f?.started_at) return '—'; const mins = Math.round((nowUnix.value - f.started_at) / 60), h = Math.floor(mins / 60), m = mins % 60; return h > 0 ? `${h}h ${m}m` : `${m}m` })
 
+// All user sensors merged with assigned status for the current firing
+const firingAllSensors = computed(() => {
+  const assignedIds = new Set((selectedFiring.value?.sensors ?? []).map(s => s.sensor_id))
+  return sensors.value.map(s => ({ ...s, assigned: assignedIds.has(s.id) }))
+})
+
+async function addSensorToFiring(sensorId) {
+  if (!selectedFiring.value) return
+  await $fetch(`/api/firings/${selectedFiring.value.id}/sensors`, { method: 'POST', body: { sensorId } })
+  // Refresh firing data so sensor list updates
+  const data = await $fetch(`/api/firings/${selectedFiring.value.id}`)
+  selectedFiring.value.sensors = data.sensors
+}
+
+async function removeSensorFromFiring(sensorId) {
+  if (!selectedFiring.value) return
+  await $fetch(`/api/firings/${selectedFiring.value.id}/sensors/${sensorId}`, { method: 'DELETE' })
+  const data = await $fetch(`/api/firings/${selectedFiring.value.id}`)
+  selectedFiring.value.sensors = data.sensors
+}
+
 function formatDate(unix) { if (!unix) return ''; return new Date(unix * 1000).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' }) }
 function stopAllIntervals() { if (pollInterval) { clearInterval(pollInterval); pollInterval = null } if (signalCheckInterval) { clearInterval(signalCheckInterval); signalCheckInterval = null } if (elapsedTickInterval) { clearInterval(elapsedTickInterval); elapsedTickInterval = null } }
 
@@ -301,7 +373,14 @@ function startDrag(e) {
   window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp)
 }
 
-async function openStartModal() { if (!library.value.length) library.value = await $fetch('/api/library'); showStartModal.value = true }
+async function openStartModal() {
+  if (!library.value.length) library.value = await $fetch('/api/library')
+  const raw = await $fetch('/api/sensors')
+  // Sensors that have posted a reading in the last 30s are considered online
+  const now = Math.floor(Date.now() / 1000)
+  sensors.value = raw.map(s => ({ ...s, online: false })) // online status — will wire up later
+  showStartModal.value = true
+}
 function openLogReading() { editingReading.value = null; showReadingModal.value = true }
 function closeReadingModal() { showReadingModal.value = false; editingReading.value = null }
 
@@ -338,7 +417,7 @@ function applyMode(mode) {
 
 async function sheetDeleteFiring(f) { sheetConfirmDeleteId.value = null; showFiringSheet.value = false; await deleteFiring(f) }
 
-onMounted(async () => { await init(); await refreshFirings(); if (activeFiring.value) await selectFiring(activeFiring.value) })
+onMounted(async () => { await init(); await refreshFirings(); if (activeFiring.value) await selectFiring(activeFiring.value); sensors.value = await $fetch('/api/sensors') })
 onUnmounted(() => { stopAllIntervals(); destroy(); destroyMobile() })
 async function refreshFirings() { allFirings.value = await $fetch('/api/firings') }
 

@@ -52,6 +52,65 @@
             </p>
           </div>
 
+          <!-- Sensors -->
+          <div class="flex flex-col gap-2">
+            <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">
+              Sensors
+              <span class="text-parchment-4 font-normal normal-case tracking-normal ml-1">(optional — assign now or after starting)</span>
+            </label>
+
+            <!-- Has sensors -->
+            <div v-if="props.sensors.length" class="flex flex-col gap-1.5">
+              <button
+                v-for="sensor in props.sensors"
+                :key="sensor.id"
+                type="button"
+                class="flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all text-left"
+                :class="form.selectedSensors.includes(sensor.id)
+                  ? 'border-blue-300 bg-blue-50'
+                  : 'border-parchment-3 bg-white hover:bg-parchment-2'"
+                @click="toggleSensor(sensor.id)"
+              >
+                <!-- Checkbox -->
+                <div
+                  class="w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors"
+                  :class="form.selectedSensors.includes(sensor.id) ? 'bg-blue-500 border-blue-500' : 'border-parchment-3'"
+                >
+                  <svg v-if="form.selectedSensors.includes(sensor.id)" class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+                </div>
+                <!-- Sensor icon -->
+                <svg class="w-4 h-4 shrink-0" :class="form.selectedSensors.includes(sensor.id) ? 'text-blue-500' : 'text-ink-faint'" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/>
+                </svg>
+                <!-- Name -->
+                <span class="text-sm font-semibold flex-1 truncate" :class="form.selectedSensors.includes(sensor.id) ? 'text-blue-700' : 'text-ink'">
+                  {{ sensor.name }}
+                </span>
+                <!-- Online/offline pill -->
+                <span
+                  class="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1"
+                  :class="sensor.online
+                    ? 'bg-green-50 text-green-700 border border-green-200'
+                    : 'bg-parchment-2 text-ink-faint border border-parchment-3'"
+                >
+                  <span class="w-1.5 h-1.5 rounded-full" :class="sensor.online ? 'bg-green-500' : 'bg-parchment-4'"></span>
+                  {{ sensor.online ? 'Online' : 'Offline' }}
+                </span>
+              </button>
+              <p v-if="form.mode === 'connected' && !form.selectedSensors.length" class="text-[11px] text-amber-600 mt-0.5">
+                ⚠ No sensor selected — you can add one after starting too.
+              </p>
+            </div>
+
+            <!-- No sensors -->
+            <div v-else class="flex items-center gap-3 bg-parchment rounded-xl px-4 py-3 border border-parchment-3">
+              <svg class="w-4 h-4 text-ink-faint shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/>
+              </svg>
+              <p class="text-xs text-ink-muted">No sensors registered yet. <NuxtLink to="/sensors" class="text-flame font-semibold hover:underline">Add one →</NuxtLink></p>
+            </div>
+          </div>
+
           <!-- Schedule section -->
           <div class="flex flex-col gap-3">
             <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Schedule curve</label>
@@ -136,6 +195,7 @@ const props = defineProps({
   open:        Boolean,
   library:     { type: Array, default: () => [] },
   pastFirings: { type: Array, default: () => [] },
+  sensors:     { type: Array, default: () => [] },   // [{ id, name, online }]
 })
 
 const emit = defineEmits(['close', 'create'])
@@ -214,18 +274,20 @@ function formatDate(unix) {
 
 // ── Form ──────────────────────────────────────────────────────────────────────
 const form = reactive({
-  name:           '',
-  notes:          '',
-  mode:           'manual',
-  schedulePoints: BISQUE_POINTS.map(p => ({ ...p })),
+  name:            '',
+  notes:           '',
+  mode:            'manual',
+  schedulePoints:  BISQUE_POINTS.map(p => ({ ...p })),
+  selectedSensors: [],
 })
 
 watch(() => props.open, (val) => {
   if (val) {
-    form.name           = ''
-    form.notes          = ''
-    form.mode           = 'manual'
-    form.schedulePoints = BISQUE_POINTS.map(p => ({ ...p }))
+    form.name            = ''
+    form.notes           = ''
+    form.mode            = 'manual'
+    form.schedulePoints  = BISQUE_POINTS.map(p => ({ ...p }))
+    form.selectedSensors = []
     quickType.value         = 'bisque'
     selectedLibraryId.value = null
     selectedPastId.value    = null
@@ -234,8 +296,20 @@ watch(() => props.open, (val) => {
   }
 })
 
+function toggleSensor(id) {
+  const idx = form.selectedSensors.indexOf(id)
+  if (idx === -1) form.selectedSensors.push(id)
+  else form.selectedSensors.splice(idx, 1)
+}
+
 function submit() {
   if (!form.name.trim()) return
-  emit('create', { name: form.name, notes: form.notes, schedulePoints: form.schedulePoints, mode: form.mode })
+  emit('create', {
+    name:           form.name,
+    notes:          form.notes,
+    schedulePoints: form.schedulePoints,
+    mode:           form.mode,
+    sensorIds:      form.selectedSensors,
+  })
 }
 </script>

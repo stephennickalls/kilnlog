@@ -14,17 +14,16 @@ export default defineEventHandler(async (event) => {
 
   if (error || !firing) throw createError({ statusCode: 404, statusMessage: 'Firing not found' })
 
-  const { data: schedulePoints } = await db
-    .from('schedule')
-    .select('*')
-    .eq('firing_id', id)
-    .order('offset_minutes', { ascending: true })
+  const [{ data: schedulePoints }, { data: readingRows }, { data: assignedSensors }] = await Promise.all([
+    db.from('schedule').select('*').eq('firing_id', id).order('offset_minutes', { ascending: true }),
+    db.from('readings').select('*').eq('firing_id', id).order('timestamp', { ascending: true }),
+    db.from('firing_sensors').select('sensor_id, role, sensors(id, name)').eq('firing_id', id),
+  ])
 
-  const { data: readingRows } = await db
-    .from('readings')
-    .select('*')
-    .eq('firing_id', id)
-    .order('timestamp', { ascending: true })
-
-  return { ...firing, schedule: schedulePoints ?? [], readings: readingRows ?? [] }
+  return {
+    ...firing,
+    schedule:  schedulePoints ?? [],
+    readings:  readingRows ?? [],
+    sensors:   assignedSensors ?? [],
+  }
 })

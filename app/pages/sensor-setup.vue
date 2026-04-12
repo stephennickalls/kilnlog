@@ -152,7 +152,7 @@
                 <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
                 {{ flashing ? 'Flashing…' : 'Flash firmware' }}
               </button>
-              <button class="text-xs text-ink-faint hover:text-flame transition-colors" @click="step = 4">
+              <button class="text-xs text-ink-faint hover:text-flame transition-colors" @click="skipToConfig">
                 Skip — already flashed
               </button>
             </div>
@@ -329,7 +329,7 @@ const debugLog          = ref([])
 const logEl             = ref(null)
 const flashOffset       = ref('0x10000')
 
-const config = reactive({ ssid: '', password: '', apiUrl: '' })
+const config = reactive({ ssid: '', password: '', apiUrl: '', token: '' })
 
 // ── Computed helpers ──────────────────────────────────────────────────────────
 const serialCopied = ref(false)
@@ -344,6 +344,9 @@ function copySerialLog() {
 onMounted(() => {
   webSerialSupported.value = 'serial' in navigator
   if (!config.apiUrl) config.apiUrl = window.location.origin
+  // Pull token from query param if arriving from the sensors management page
+  const params = new URLSearchParams(window.location.search)
+  if (params.get('token')) config.token = params.get('token')
   dbg(`Web Serial supported: ${webSerialSupported.value}`)
 })
 
@@ -458,15 +461,17 @@ async function startReading() {
               espReady.value = true
               alreadyConfigured.value = false
               log('✅ ESP32 ready for config', 'info')
+              if (step.value === 3) step.value = 4
             }
-            // Board booted with saved credentials — show clear step
             if (t === 'KILN_LOG:READY') {
-              alreadyConfigured.value = true
-              espReady.value = false
-              if (step.value === 2) {
-                // still on connect→flash transition, hold at step 2 for clear
+              if (step.value < 4) {
+                alreadyConfigured.value = true
+                espReady.value = false
+                dbg('ESP32 has saved credentials (KILN_LOG:READY)')
+              } else {
+                log('⚠️  Board rebooted with old creds — you can still send new config', 'info')
+                espReady.value = true
               }
-              dbg('ESP32 has saved credentials (KILN_LOG:READY)')
             }
           }
         }
@@ -606,6 +611,13 @@ async function skipFlash() {
   step.value = 4
 }
 
+// ── Skip to configure with espReady true (used after clear-creds flow) ────────
+function skipToConfig() {
+  needsReplug.value = false
+  espReady.value    = true
+  step.value        = 4
+}
+
 // ── Reconfigure: clear NVS credentials on board ───────────────────────────────
 async function sendReconfigure() {
   reconfiguring.value = true
@@ -620,7 +632,8 @@ async function sendReconfigure() {
     await writer.write(new TextEncoder().encode(payload))
     dbg('sent {"reconfigure":true}')
     log('→ Clearing saved credentials on ESP32…', 'info')
-    step.value = 3  // advance to flash step — NEEDS_CONFIG will unlock configure when ready
+    needsReplug.value = false
+    step.value        = 3  // go to flash — user can flash or skip
   } catch (e) {
     log('❌ Reconfigure failed: ' + (e.message ?? e), 'error')
     dbg('❌ sendReconfigure error: ' + e.message)
@@ -651,6 +664,7 @@ async function sendConfig() {
       ssid:     config.ssid.trim(),
       password: config.password,
       apiUrl:   config.apiUrl.trim(),
+      token:    config.token.trim(),
     }) + '\n'
     await writer.write(new TextEncoder().encode(payload))
     dbg('config sent')

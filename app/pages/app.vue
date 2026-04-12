@@ -25,7 +25,7 @@
           <span v-else-if="selectedFiring.ended_at" class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-parchment-2 border border-parchment-3 text-ink-faint shrink-0">Done</span>
           <button v-if="activeFiring && selectedFiring.id === activeFiring.id" class="px-2.5 py-1 text-[10px] font-bold border border-red-300 text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0" @click="endFiring">End</button>
         </template>
-        <NuxtLink to="/sensor-setup" class="hidden sm:flex items-center gap-1 px-2 py-1 text-xs text-ink-muted hover:text-ink hover:bg-parchment-2 rounded-lg transition-colors ml-1">
+        <NuxtLink to="/sensors" class="hidden sm:flex items-center gap-1 px-2 py-1 text-xs text-ink-muted hover:text-ink hover:bg-parchment-2 rounded-lg transition-colors ml-1">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path d="M12 2a4 4 0 014 4v6a4 4 0 01-8 0V6a4 4 0 014-4z"/><path d="M8 12a4 4 0 008 0M12 16v6"/>
           </svg>

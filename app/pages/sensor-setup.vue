@@ -210,9 +210,19 @@
                     class="w-full border border-parchment-3 rounded-xl px-4 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif" />
                 </div>
                 <div class="flex flex-col gap-1.5">
-                  <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Kiln.Log API URL</label>
-                  <div class="w-full border border-parchment-3 rounded-xl px-4 py-2.5 text-sm text-ink-muted bg-parchment font-mono select-all">{{ config.apiUrl }}</div>
-                  <p class="text-xs text-ink-muted">Automatically set to this site's URL.</p>
+                  <div class="flex items-center justify-between">
+                    <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Kiln.Log API URL</label>
+                    <button
+                      class="text-[10px] text-ink-faint hover:text-flame transition-colors"
+                      @click="config.apiUrl = window.location.origin"
+                    >Reset to default</button>
+                  </div>
+                  <input
+                    v-model="config.apiUrl"
+                    type="text"
+                    class="w-full border border-parchment-3 rounded-xl px-4 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-mono"
+                  />
+                  <p class="text-xs text-ink-muted">For local dev use your machine's IP e.g. <span class="font-mono">http://192.168.20.23:3000</span></p>
                 </div>
               </div>
 

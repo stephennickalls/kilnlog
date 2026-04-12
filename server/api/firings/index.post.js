@@ -1,6 +1,8 @@
+// server/api/firings/index.post.js
+
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
-  const { name, notes, schedulePoints } = body
+  const { name, notes, schedulePoints, mode } = body
 
   if (!name?.trim()) throw createError({ statusCode: 400, statusMessage: 'Firing name is required' })
 
@@ -8,7 +10,7 @@ export default defineEventHandler(async (event) => {
 
   const { data: firing, error } = await db
     .from('firings')
-    .insert({ name: name.trim(), notes: notes?.trim() || null })
+    .insert({ name: name.trim(), notes: notes?.trim() || null, mode: mode ?? 'manual' })
     .select()
     .single()
 

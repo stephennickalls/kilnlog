@@ -18,8 +18,9 @@ async function ensureZoomPlugin() {
  * @param {import('vue').Ref<HTMLCanvasElement | null>} canvasRef
  * @param {KilnChartOptions} [options]
  */
-export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, compact = false } = {}) {
+export function useKilnChart(canvasRef, { onPointClick, enableZoom = true } = {}) {
   let chart = null
+  let xMax = 120  // tracks the intended x axis maximum
 
   async function init() {
     if (!canvasRef.value) return
@@ -39,7 +40,7 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, compa
             borderWidth: 2,
             pointRadius: 5,
             pointBackgroundColor: '#a8a29e',
-            tension: 0.35,
+            tension: 0,
             fill: false,
           },
           {
@@ -53,7 +54,7 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, compa
             pointBackgroundColor: '#f97316',
             pointBorderColor: '#fff',
             pointBorderWidth: 2,
-            tension: 0.2,
+            tension: 0,
             fill: true,
           },
           {
@@ -106,8 +107,6 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, compa
             },
           },
           zoom: enableZoom ? {
-            // X-axis only — pan/zoom slides the time window without
-            // ever distorting the temperature curve shape.
             pan: { enabled: true, mode: 'x' },
             zoom: {
               wheel: { enabled: true },
@@ -115,8 +114,8 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, compa
               mode: 'x',
             },
             limits: {
-              x: { min: 0 },
-              y: { min: 'original', max: 'original' },
+              x: { min: 0, max: 120, minRange: 30 },
+              y: { min: 0, max: 1500 },
             },
           } : {
             pan: { enabled: false },
@@ -129,17 +128,17 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, compa
         scales: {
           x: {
             type: 'linear',
-            title: { display: !compact, text: 'Minutes from start', color: '#78716c' },
-            ticks: { color: '#a8a29e', maxTicksLimit: compact ? 5 : 8, font: compact ? { size: 9 } : undefined },
+            title: { display: true, text: 'Minutes from start', color: '#78716c' },
+            ticks: { color: '#a8a29e', maxTicksLimit: 8 },
             grid:  { color: '#f5f5f4' },
             min: 0,
           },
           y: {
-            title: { display: !compact, text: 'Temperature (°C)', color: '#78716c' },
-            ticks: { color: '#a8a29e', maxTicksLimit: compact ? 4 : 6, font: compact ? { size: 9 } : undefined },
+            title: { display: false },
+            ticks: { color: '#a8a29e', maxTicksLimit: 6 },
             grid:  { color: '#f5f5f4' },
             min: 0,
-            suggestedMax: 100,
+            suggestedMax: 200,
           },
         },
       },
@@ -157,9 +156,14 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, compa
     if (points.length) {
       const maxX = Math.max(...points.map(p => p.offset_minutes))
       const maxY = Math.max(...points.map(p => p.target_temp))
-      chart.options.scales.x.max          = maxX
-      chart.options.scales.x.min          = 0
-      chart.options.scales.y.suggestedMax = maxY + 50
+      xMax = maxX + 60  // schedule duration + 1hr buffer
+      chart.options.scales.x.min = 0
+      chart.options.scales.x.max = xMax
+      chart.options.scales.y.suggestedMax = Math.min(maxY + 50, 1500)
+      // Keep zoom limits in sync so users can't zoom beyond the firing window
+      if (chart.options.plugins.zoom?.limits?.x) {
+        chart.options.plugins.zoom.limits.x.max = xMax
+      }
     }
     chart.update('none')
   }

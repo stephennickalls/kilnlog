@@ -22,14 +22,20 @@
           <span v-else-if="isLive && isManual" class="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-blue-50 border border-blue-200 text-blue-700 shrink-0">
             <span class="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>Manual
           </span>
-          <span v-else-if="selectedFiring.ended_at" class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-parchment-2 border border-parchment-3 text-ink-faint shrink-0">Done</span>
+          <template v-else-if="selectedFiring.ended_at">
+            <span v-if="selectedFiring.started_at" class="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-50 border border-amber-200 text-amber-700 shrink-0">
+              <span class="w-1.5 h-1.5 bg-amber-400 rounded-full"></span>Finished
+            </span>
+            <span v-else class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-parchment-2 border border-parchment-3 text-ink-faint shrink-0">Done</span>
+            <button v-if="selectedFiring.started_at && !activeFiring" class="px-2.5 py-1 text-[10px] font-bold border border-amber-300 text-amber-700 hover:bg-amber-50 rounded-lg transition-colors shrink-0" @click="restartFiring(selectedFiring)">↺ Restart</button>
+          </template>
           <button v-if="activeFiring && selectedFiring.id === activeFiring.id" class="px-2.5 py-1 text-[10px] font-bold border border-red-300 text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0" @click="endFiring">End</button>
         </template>
-        <NuxtLink to="/sensor-setup" class="hidden sm:flex items-center gap-1 px-2 py-1 text-xs text-ink-muted hover:text-ink hover:bg-parchment-2 rounded-lg transition-colors ml-1">
+        <NuxtLink to="/sensors" class="hidden sm:flex items-center gap-1 px-2 py-1 text-xs text-ink-muted hover:text-ink hover:bg-parchment-2 rounded-lg transition-colors ml-1">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path d="M12 2a4 4 0 014 4v6a4 4 0 01-8 0V6a4 4 0 014-4z"/><path d="M8 12a4 4 0 008 0M12 16v6"/>
+            <path d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/>
           </svg>
-          Sensor
+          Sensors
         </NuxtLink>
         <NuxtLink to="/account" class="hidden sm:flex items-center gap-1 px-2 py-1 text-xs text-ink-muted hover:text-ink hover:bg-parchment-2 rounded-lg transition-colors ml-1">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -56,6 +62,7 @@
         @start="openStartModal"
         @drag="startDrag"
         @delete="deleteFiring"
+        @restart="restartFiring"
       />
 
       <main class="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -98,66 +105,118 @@
               <span class="text-xl font-bold leading-none tabular-nums text-ink">{{ readingCount }}</span>
             </div>
             <!-- ACTION BUTTONS -->
-            <div v-if="isLive" class="flex items-center gap-2 px-4 ml-auto">
+            <div v-if="selectedFiring" class="flex items-center gap-2 px-4 ml-auto">
               <button
-                v-if="isManual"
+                v-if="isLive && isManual"
                 class="px-4 py-2 bg-flame text-parchment text-sm font-bold rounded-xl hover:bg-flame-dark transition-colors"
                 @click="openLogReading"
               >+ Log reading</button>
               <button
+                v-if="isLive"
                 class="px-4 py-2 text-sm font-bold rounded-xl border transition-colors"
                 :class="isManual ? 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100' : 'border-parchment-3 bg-parchment-2 text-ink-muted hover:bg-parchment-3'"
                 @click="toggleMode"
               >⇅ {{ isManual ? 'Switch to Connected' : 'Switch to Manual' }}</button>
-              <!-- Sensor assignment button -->
+              <!-- Sensor assignment button — always visible when a firing is selected -->
               <button
-                class="flex items-center gap-1.5 px-3 py-2 text-sm font-bold rounded-xl border border-parchment-3 bg-parchment-2 text-ink-muted hover:bg-parchment-3 transition-colors"
+                class="flex items-center gap-1.5 px-3 py-2 text-sm font-bold rounded-xl border transition-colors"
+                :class="showSensorPanel ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-parchment-3 bg-parchment-2 text-ink-muted hover:bg-parchment-3'"
                 @click="showSensorPanel = !showSensorPanel"
               >
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/></svg>
                 Sensors
-                <span v-if="selectedFiring?.sensors?.length" class="text-[10px] bg-flame text-parchment rounded-full w-4 h-4 flex items-center justify-center font-bold">
-                  {{ selectedFiring.sensors.length }}
+                <span v-if="assignedSensors.length" class="text-[10px] bg-flame text-parchment rounded-full w-4 h-4 flex items-center justify-center font-bold">
+                  {{ assignedSensors.length }}
                 </span>
               </button>
             </div>
           </div>
 
-          <!-- Sensor assignment panel for live firing -->
-          <div v-if="isLive && showSensorPanel" class="shrink-0 border-b border-parchment-3 bg-white px-4 py-3 flex flex-col gap-2">
+          <!-- Sensor panel — visible for any selected firing -->
+          <div v-if="selectedFiring && showSensorPanel" class="shrink-0 border-b border-parchment-3 bg-white px-4 py-3 flex flex-col gap-4">
             <div class="flex items-center justify-between">
-              <p class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Assigned sensors</p>
+              <p class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Sensors</p>
               <button class="text-[10px] text-ink-faint hover:text-flame transition-colors" @click="showSensorPanel = false">Done</button>
             </div>
-            <div class="flex flex-wrap gap-2">
-              <div
-                v-for="s in firingAllSensors"
-                :key="s.id"
-                class="flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all"
-                :class="s.assigned
-                  ? 'bg-blue-50 border-blue-200 text-blue-700'
-                  : 'bg-parchment-2 border-parchment-3 text-ink-muted'"
-              >
-                <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/></svg>
-                {{ s.name }}
-                <button
-                  v-if="s.assigned"
-                  class="ml-1 text-blue-400 hover:text-red-400 transition-colors"
-                  @click="removeSensorFromFiring(s.id)"
+
+            <!-- Linked sensors -->
+            <div class="flex flex-col gap-2">
+              <p class="text-[10px] font-semibold text-ink-faint uppercase tracking-wider">Linked to this firing</p>
+              <div v-if="assignedSensors.length" class="flex flex-col gap-2">
+                <div
+                  v-for="s in assignedSensors"
+                  :key="s.id"
+                  class="flex items-center gap-3 px-3 py-2.5 rounded-xl border bg-parchment border-parchment-3"
                 >
-                  <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
-                </button>
-                <button
-                  v-else
-                  class="ml-1 text-ink-faint hover:text-blue-500 transition-colors"
-                  @click="addSensorToFiring(s.id)"
-                >
-                  <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-                </button>
+                  <svg class="w-4 h-4 shrink-0 text-ink-faint" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/></svg>
+                  <span class="text-sm font-semibold text-ink flex-1 truncate">{{ s.name }}</span>
+                  <span
+                    class="text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 flex items-center gap-1"
+                    :class="s.online ? 'bg-green-50 text-green-700 border-green-200' : 'bg-parchment-2 text-ink-faint border-parchment-3'"
+                  >
+                    <span class="w-1.5 h-1.5 rounded-full" :class="s.online ? 'bg-green-500 animate-pulse' : 'bg-parchment-4'"></span>
+                    {{ s.online ? 'Online' : 'Offline' }}
+                  </span>
+                  <!-- Settings link -->
+                  <NuxtLink
+                    to="/sensors"
+                    class="p-1.5 rounded-lg text-ink-faint hover:text-ink hover:bg-parchment-2 transition-colors shrink-0"
+                    title="Manage sensor"
+                  >
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                      <path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/>
+                      <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+                    </svg>
+                  </NuxtLink>
+                  <!-- Unlink button -->
+                  <button
+                    class="text-xs font-semibold text-ink-muted hover:text-red-500 border border-parchment-3 hover:border-red-300 hover:bg-red-50 px-2.5 py-1 rounded-lg transition-colors shrink-0"
+                    @click="removeSensorFromFiring(s.sensor_id ?? s.id)"
+                  >Unlink</button>
+                </div>
               </div>
-              <p v-if="!firingAllSensors.length" class="text-xs text-ink-faint">
-                No sensors registered. <NuxtLink to="/sensors" class="text-flame hover:underline">Add one →</NuxtLink>
-              </p>
+              <p v-else class="text-xs text-ink-faint py-1">No sensors linked to this firing yet.</p>
+            </div>
+
+            <!-- Available to link -->
+            <div v-if="unassignedSensors.length" class="flex flex-col gap-2">
+              <p class="text-[10px] font-semibold text-ink-faint uppercase tracking-wider">Link a sensor</p>
+              <div class="flex flex-col gap-2">
+                <div
+                  v-for="s in unassignedSensors"
+                  :key="s.id"
+                  class="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-parchment-3 bg-parchment"
+                >
+                  <svg class="w-4 h-4 shrink-0 text-ink-faint" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/></svg>
+                  <span class="text-sm font-semibold text-ink flex-1 truncate">{{ s.name }}</span>
+                  <span
+                    class="text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 flex items-center gap-1"
+                    :class="s.online ? 'bg-green-50 text-green-700 border-green-200' : 'bg-parchment-2 text-ink-faint border-parchment-3'"
+                  >
+                    <span class="w-1.5 h-1.5 rounded-full" :class="s.online ? 'bg-green-500 animate-pulse' : 'bg-parchment-4'"></span>
+                    {{ s.online ? 'Online' : 'Offline' }}
+                  </span>
+                  <!-- Settings link -->
+                  <NuxtLink
+                    to="/sensors"
+                    class="p-1.5 rounded-lg text-ink-faint hover:text-ink hover:bg-parchment-2 transition-colors shrink-0"
+                    title="Manage sensor"
+                  >
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                      <path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/>
+                      <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+                    </svg>
+                  </NuxtLink>
+                  <button
+                    class="text-xs font-semibold text-flame border border-flame/30 hover:bg-flame hover:text-parchment px-2.5 py-1 rounded-lg transition-colors shrink-0"
+                    @click="addSensorToFiring(s.id)"
+                  >Link</button>
+                </div>
+              </div>
+            </div>
+
+            <div v-if="!sensors.length" class="text-xs text-ink-faint">
+              No sensors registered yet. <NuxtLink to="/sensors" class="text-flame font-semibold hover:underline">Add one →</NuxtLink>
             </div>
           </div>
 
@@ -225,7 +284,8 @@
             <div class="shrink-0 px-3 pb-3 pt-1 flex gap-2">
               <button v-if="isLive && isManual" class="flex-1 py-3 bg-flame text-parchment text-sm font-bold rounded-lg active:bg-flame-dark transition-colors" @click="openLogReading">+ Log reading</button>
               <button v-if="isLive" class="py-3 px-4 border rounded-lg text-xs font-bold shrink-0 transition-colors" :class="isManual ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-parchment-3 bg-parchment-2 text-ink-muted'" @click="toggleMode">{{ isManual ? 'Manual' : 'Connected' }}</button>
-              <button v-if="!isLive && !activeFiring" class="flex-1 py-3 bg-flame text-parchment text-sm font-bold rounded-lg active:bg-flame-dark transition-colors" @click="openStartModal">+ Start firing</button>
+              <button v-if="!isLive && !activeFiring && selectedFiring?.started_at && selectedFiring?.ended_at" class="flex-1 py-3 bg-amber-500 text-white text-sm font-bold rounded-lg active:bg-amber-600 transition-colors" @click="restartFiring(selectedFiring)">↺ Restart firing</button>
+              <button v-else-if="!isLive && !activeFiring" class="flex-1 py-3 bg-flame text-parchment text-sm font-bold rounded-lg active:bg-flame-dark transition-colors" @click="openStartModal">+ Start firing</button>
             </div>
           </template>
         </div>
@@ -259,13 +319,15 @@
             <li v-if="!pastFirings.length && !activeFiring" class="px-4 py-8 text-sm text-ink-muted text-center">No firings yet</li>
             <li v-for="f in pastFirings" :key="f.id" class="relative">
               <button class="w-full flex items-center gap-3 px-4 py-4 text-left active:bg-parchment-2 pr-16 transition-colors" :class="selectedFiring?.id === f.id ? 'bg-flame-bg border-l-2 border-flame' : ''" @click="selectFiring(f); showFiringSheet = false">
-                <div class="w-2 h-2 rounded-full bg-parchment-4 shrink-0"></div>
+                <div class="w-2 h-2 rounded-full shrink-0" :class="f.started_at && f.ended_at ? 'bg-amber-400' : 'bg-parchment-4'"></div>
                 <div class="flex-1 min-w-0">
                   <p class="text-sm font-semibold text-ink truncate">{{ f.name }}</p>
-                  <p class="text-xs text-ink-faint mt-0.5">{{ formatDate(f.created_at) }}</p>
+                  <p v-if="f.started_at && f.ended_at" class="text-xs text-amber-600 mt-0.5 font-semibold">Finished</p>
+                  <p v-else class="text-xs text-ink-faint mt-0.5">{{ formatDate(f.created_at) }}</p>
                 </div>
               </button>
-              <div class="absolute right-3 top-1/2 -translate-y-1/2">
+              <div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                <button v-if="f.started_at && f.ended_at && !activeFiring && sheetConfirmDeleteId !== f.id" class="px-2 py-1 rounded text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 active:bg-amber-100" @click.stop="restartFiring(f); showFiringSheet = false">↺</button>
                 <button v-if="sheetConfirmDeleteId !== f.id" class="p-2 text-parchment-4 active:text-red-400" @click.stop="sheetConfirmDeleteId = f.id">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
                 </button>
@@ -340,10 +402,22 @@ const readingCount = computed(() => selectedFiring.value?.readings?.length ?? 0)
 const rateOfChange = computed(() => { const readings = selectedFiring.value?.readings; if (!readings || readings.length < 6) return '—'; const recent = readings.slice(-6), deltaTemp = recent[recent.length - 1].temperature - recent[0].temperature, deltaMins = (recent[recent.length - 1].timestamp - recent[0].timestamp) / 60; if (deltaMins === 0) return '—'; const rate = Math.round(deltaTemp / deltaMins); return rate >= 0 ? `+${rate}°/m` : `${rate}°/m` })
 const elapsed      = computed(() => { const f = selectedFiring.value; if (!f?.started_at) return '—'; const mins = Math.round((nowUnix.value - f.started_at) / 60), h = Math.floor(mins / 60), m = mins % 60; return h > 0 ? `${h}h ${m}m` : `${m}m` })
 
-// All user sensors merged with assigned status for the current firing
-const firingAllSensors = computed(() => {
-  const assignedIds = new Set((selectedFiring.value?.sensors ?? []).map(s => s.sensor_id))
-  return sensors.value.map(s => ({ ...s, assigned: assignedIds.has(s.id) }))
+// Sensors actually linked to this firing, enriched with online status from the sensors ref
+const assignedSensors = computed(() => {
+  const rows = selectedFiring.value?.sensors ?? []
+  // rows are { sensor_id, role, sensors: { id, name } }
+  return rows.map(r => {
+    const id   = r.sensors?.id   ?? r.sensor_id
+    const name = r.sensors?.name ?? r.sensor_id
+    const meta = sensors.value.find(s => s.id === id)
+    return { ...r, id, name, online: meta?.online ?? false }
+  })
+})
+
+// User's sensors not yet linked to this firing
+const unassignedSensors = computed(() => {
+  const assignedIds = new Set(assignedSensors.value.map(s => s.sensor_id ?? s.id))
+  return sensors.value.filter(s => !assignedIds.has(s.id))
 })
 
 async function addSensorToFiring(sensorId) {
@@ -423,6 +497,7 @@ async function refreshFirings() { allFirings.value = await $fetch('/api/firings'
 
 async function selectFiring(f) {
   stopAllIntervals(); isLive.value = isManual.value = signalLost.value = false; currentTemp.value = lastReadingTime.value = null
+  showSensorPanel.value = false
   const data = await $fetch(`/api/firings/${f.id}`)
   selectedFiring.value = data
   setSchedule(data.schedule ?? []); setReadings(data.readings ?? [], data.started_at)
@@ -460,6 +535,16 @@ async function endFiring() {
     selectedFiring.value = data; setSchedule(data.schedule ?? []); setReadings(data.readings ?? [], data.started_at)
     setScheduleMobile(data.schedule ?? []); setReadingsMobile(data.readings ?? [], data.started_at)
   }
+}
+
+async function restartFiring(f) {
+  // Guard: only restart a finished firing (has both started_at and ended_at), and only if nothing else is active
+  if (!f?.started_at || !f?.ended_at || activeFiring.value) return
+  await $fetch(`/api/firings/${f.id}`, { method: 'PUT', body: { endedAt: null } })
+  await refreshFirings()
+  // Re-select so charts and state re-initialise properly (picks up isActive = true)
+  const fresh = allFirings.value.find(fi => fi.id === f.id)
+  await selectFiring(fresh ?? f)
 }
 
 async function deleteFiring(f) {

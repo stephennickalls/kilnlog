@@ -18,7 +18,8 @@ export default defineEventHandler(async (event) => {
 
   const updates = {}
   if (body.startedAt !== undefined) updates.started_at = body.startedAt
-  if (body.endedAt   !== undefined) updates.ended_at   = body.endedAt
+  // Allow explicit null to restart a stopped firing (clears ended_at)
+  if ('endedAt' in body)            updates.ended_at   = body.endedAt ?? null
   if (body.notes     !== undefined) updates.notes      = body.notes
   if (body.mode      !== undefined) updates.mode       = body.mode
 

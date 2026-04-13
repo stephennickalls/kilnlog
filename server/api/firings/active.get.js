@@ -20,12 +20,12 @@ export default defineEventHandler(async (event) => {
     .from('sensors')
     .select('id, user_id, name')
     .eq('token', token)
-    .single()
+    .maybeSingle()
 
   if (sensorErr || !sensor) throw createError({ statusCode: 401, statusMessage: 'Invalid sensor token' })
 
   // Find the active firing this sensor is explicitly assigned to
-  const { data: assignment, error: assignErr } = await db
+  const { data: assignments, error: assignErr } = await db
     .from('firing_sensors')
     .select(`
       role,
@@ -36,9 +36,11 @@ export default defineEventHandler(async (event) => {
     .eq('sensor_id', sensor.id)
     .not('firings.started_at', 'is', null)
     .is('firings.ended_at', null)
-    .maybeSingle()
+    .limit(1)
 
   if (assignErr) throw createError({ statusCode: 500, statusMessage: assignErr.message })
+
+  const assignment = assignments?.[0]
 
   if (!assignment?.firings) {
     return { firingId: null, message: 'No active firing assigned to this sensor' }

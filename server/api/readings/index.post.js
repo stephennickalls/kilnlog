@@ -23,20 +23,23 @@ export default defineEventHandler(async (event) => {
 
   if (error) throw createError({ statusCode: 500, statusMessage: error.message })
 
-  // Stamp last_seen on any sensor assigned to this firing
-  // Fire-and-forget — don't let this block or fail the response
+  // Stamp last_seen on sensors assigned to this firing
   const nowUnix = Math.floor(Date.now() / 1000)
-  db.from('firing_sensors')
+  const { data: rows, error: fsErr } = await db
+    .from('firing_sensors')
     .select('sensor_id')
     .eq('firing_id', Number(firingId))
-    .then(({ data: rows }) => {
-      if (!rows?.length) return
-      const sensorIds = rows.map(r => r.sensor_id)
-      db.from('sensors')
-        .update({ last_seen: nowUnix })
-        .in('id', sensorIds)
-        .then(() => {}) // ignore result
-    })
+
+  if (fsErr) console.error('[readings] firing_sensors lookup failed:', fsErr.message)
+
+  if (rows?.length) {
+    const sensorIds = rows.map(r => r.sensor_id)
+    const { error: updateErr } = await db
+      .from('sensors')
+      .update({ last_seen: nowUnix })
+      .in('id', sensorIds)
+    if (updateErr) console.error('[readings] last_seen update failed:', updateErr.message)
+  }
 
   return { ok: true, id: data.id }
 })

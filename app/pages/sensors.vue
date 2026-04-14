@@ -338,8 +338,15 @@ let writer        = null
 let readingActive = false
 
 // ── Load sensors ───────────────────────────────────────────────────────────────
+let sensorRefreshInterval = null
+
 onMounted(async () => {
   await loadSensors()
+  sensorRefreshInterval = setInterval(loadSensors, 15000)
+})
+
+onUnmounted(() => {
+  if (sensorRefreshInterval) clearInterval(sensorRefreshInterval)
 })
 
 async function loadSensors() {
@@ -366,9 +373,11 @@ function masked(token) {
   return token.slice(0, 8) + '-****-****-****-' + token.slice(-4)
 }
 
+const ONLINE_TIMEOUT = 30  // seconds
+
 function sensorIsOnline(sensor) {
-  // Placeholder — will be driven by last seen timestamp once backend wired up
-  return false
+  if (!sensor.last_seen) return false
+  return (Math.floor(Date.now() / 1000) - sensor.last_seen) <= ONLINE_TIMEOUT
 }
 
 // ── Copy token ─────────────────────────────────────────────────────────────────

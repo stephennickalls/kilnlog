@@ -449,13 +449,23 @@ function startDrag(e) {
 
 async function openStartModal() {
   if (!library.value.length) library.value = await $fetch('/api/library')
-  const raw = await $fetch('/api/sensors')
-  // Sensors that have posted a reading in the last 30s are considered online
-  const now = Math.floor(Date.now() / 1000)
-  sensors.value = raw.map(s => ({ ...s, online: false })) // online status — will wire up later
+  await refreshSensors()
   showStartModal.value = true
 }
-function openLogReading() { editingReading.value = null; showReadingModal.value = true }
+const ONLINE_TIMEOUT = 30  // seconds — sensor considered online if last_seen within this
+
+async function refreshSensors() {
+  const now = Math.floor(Date.now() / 1000)
+  const raw = await $fetch('/api/sensors')
+  sensors.value = raw.map(s => ({ ...s, online: !!s.last_seen && (now - s.last_seen) <= ONLINE_TIMEOUT }))
+}
+
+let sensorPollInterval = null
+
+function startSensorPolling() {
+  if (sensorPollInterval) clearInterval(sensorPollInterval)
+  sensorPollInterval = setInterval(refreshSensors, 15000)
+}
 function closeReadingModal() { showReadingModal.value = false; editingReading.value = null }
 
 async function saveReading(payload) {
@@ -491,8 +501,8 @@ function applyMode(mode) {
 
 async function sheetDeleteFiring(f) { sheetConfirmDeleteId.value = null; showFiringSheet.value = false; await deleteFiring(f) }
 
-onMounted(async () => { await init(); await refreshFirings(); if (activeFiring.value) await selectFiring(activeFiring.value); sensors.value = await $fetch('/api/sensors') })
-onUnmounted(() => { stopAllIntervals(); destroy(); destroyMobile() })
+onMounted(async () => { await init(); await refreshFirings(); if (activeFiring.value) await selectFiring(activeFiring.value); await refreshSensors(); startSensorPolling() })
+onUnmounted(() => { stopAllIntervals(); if (sensorPollInterval) clearInterval(sensorPollInterval); destroy(); destroyMobile() })
 async function refreshFirings() { allFirings.value = await $fetch('/api/firings') }
 
 async function selectFiring(f) {

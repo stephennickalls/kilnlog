@@ -457,7 +457,7 @@ const ONLINE_TIMEOUT = 30  // seconds — sensor considered online if last_seen 
 async function refreshSensors() {
   const now = Math.floor(Date.now() / 1000)
   const raw = await $fetch('/api/sensors')
-  sensors.value = raw.map(s => ({ ...s, online: !!s.last_seen && (now - s.last_seen) <= ONLINE_TIMEOUT }))
+  sensors.value = raw.map(s => ({ ...s, online: !s.last_seen && (now - s.last_seen) <= ONLINE_TIMEOUT }))
 }
 
 let sensorPollInterval = null

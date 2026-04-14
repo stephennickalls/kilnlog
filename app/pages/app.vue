@@ -344,13 +344,14 @@
 
     <!-- ── MODALS ── -->
     <KilnTempModal :open="showTempModal" :temp="currentTemp" :peak-temp="peakTemp" :rate-of-change="rateOfChange" :elapsed="elapsed" :is-live="isLive" :firing-name="selectedFiring?.name" @close="showTempModal = false" />
-    <StartFiringModal :open="showStartModal" :library="library" :sensors="sensors" @close="showStartModal = false" @create="createFiring" />
+    <StartFiringModal :open="showStartModal" :library="library" :sensors="sensors.map(s => ({ ...s, online: !!s.last_seen && (nowUnix - Number(s.last_seen)) <= ONLINE_TIMEOUT }))" @close="showStartModal = false" @create="createFiring" />
     <ManualReadingModal :open="showReadingModal" :started-at="selectedFiring?.started_at ?? 0" :is-edit="!!editingReading" :edit-temp="editingReading?.y ?? null" :edit-ts="editingReading?.ts ?? null" @close="closeReadingModal" @save="saveReading" @delete="deleteReading" />
 
   </div>
 </template>
 
 <script setup>
+// pages/app.vue
 import { useKilnChart } from '~/composables/useKilnChart'
 
 definePageMeta({ middleware: ['auth'] })
@@ -371,7 +372,7 @@ const isManual              = ref(false)
 const signalLost            = ref(false)
 const lastReadingTime       = ref(null)
 const library               = ref([])
-const sensors               = ref([])
+const sensors               = ref([])  // raw sensor rows with last_seen
 const showSensorPanel       = ref(false)
 
 const { init, setSchedule, setReadings, setManualMode, setSignalLost, clearSignalLost, resetZoom, destroy } = useKilnChart(chartCanvas, {
@@ -385,14 +386,16 @@ const { init, setSchedule, setReadings, setManualMode, setSignalLost, clearSigna
 
 const { init: initMobile, setSchedule: setScheduleMobile, setReadings: setReadingsMobile, resetZoom: resetZoomMobile, destroy: destroyMobile } = useKilnChart(chartCanvasMobile, { enableZoom: true })
 
-
 const SIGNAL_TIMEOUT = 30
+const ONLINE_TIMEOUT = 30
 const sidebarOpen    = ref(true)
 const sidebarWidth   = ref(280)
 const MIN_WIDTH      = 180
 const isDragging     = ref(false)
-let pollInterval = null, signalCheckInterval = null, elapsedTickInterval = null
+
+// Single reactive clock — drives both elapsed timer and sensor online badges
 const nowUnix = ref(Math.floor(Date.now() / 1000))
+let pollInterval = null, signalCheckInterval = null, elapsedTickInterval = null, sensorPollInterval = null, sensorClockInterval = null
 
 const activeFiring = computed(() => allFirings.value.find(f => f.started_at && !f.ended_at) ?? null)
 const pastFirings  = computed(() => allFirings.value.filter(f => f.ended_at).sort((a, b) => b.created_at - a.created_at))
@@ -402,28 +405,37 @@ const readingCount = computed(() => selectedFiring.value?.readings?.length ?? 0)
 const rateOfChange = computed(() => { const readings = selectedFiring.value?.readings; if (!readings || readings.length < 6) return '—'; const recent = readings.slice(-6), deltaTemp = recent[recent.length - 1].temperature - recent[0].temperature, deltaMins = (recent[recent.length - 1].timestamp - recent[0].timestamp) / 60; if (deltaMins === 0) return '—'; const rate = Math.round(deltaTemp / deltaMins); return rate >= 0 ? `+${rate}°/m` : `${rate}°/m` })
 const elapsed      = computed(() => { const f = selectedFiring.value; if (!f?.started_at) return '—'; const mins = Math.round((nowUnix.value - f.started_at) / 60), h = Math.floor(mins / 60), m = mins % 60; return h > 0 ? `${h}h ${m}m` : `${m}m` })
 
-// Sensors actually linked to this firing, enriched with online status from the sensors ref
+// Sensors linked to this firing — online computed reactively from nowUnix so badge updates live
 const assignedSensors = computed(() => {
   const rows = selectedFiring.value?.sensors ?? []
-  // rows are { sensor_id, role, sensors: { id, name } }
   return rows.map(r => {
-    const id   = r.sensors?.id   ?? r.sensor_id
-    const name = r.sensors?.name ?? r.sensor_id
-    const meta = sensors.value.find(s => s.id === id)
-    return { ...r, id, name, online: meta?.online ?? false }
+    const id     = r.sensors?.id   ?? r.sensor_id
+    const name   = r.sensors?.name ?? r.sensor_id
+    const meta   = sensors.value.find(s => s.id === id)
+    const online = !!meta?.last_seen && (nowUnix.value - Number(meta.last_seen)) <= ONLINE_TIMEOUT
+    return { ...r, id, name, online }
   })
 })
 
-// User's sensors not yet linked to this firing
+// Sensors enriched with reactive online status — passed to StartFiringModal
+const sensorsWithOnline = computed(() =>
+  sensors.value.map(s => ({
+    ...s,
+    online: !!s.last_seen && (nowUnix.value - Number(s.last_seen)) <= ONLINE_TIMEOUT
+  }))
+)
+
+// Sensors not yet linked to this firing — online also reactive
 const unassignedSensors = computed(() => {
   const assignedIds = new Set(assignedSensors.value.map(s => s.sensor_id ?? s.id))
-  return sensors.value.filter(s => !assignedIds.has(s.id))
+  return sensors.value
+    .filter(s => !assignedIds.has(s.id))
+    .map(s => ({ ...s, online: !!s.last_seen && (nowUnix.value - Number(s.last_seen)) <= ONLINE_TIMEOUT }))
 })
 
 async function addSensorToFiring(sensorId) {
   if (!selectedFiring.value) return
   await $fetch(`/api/firings/${selectedFiring.value.id}/sensors`, { method: 'POST', body: { sensorId } })
-  // Refresh firing data so sensor list updates
   const data = await $fetch(`/api/firings/${selectedFiring.value.id}`)
   selectedFiring.value.sensors = data.sensors
 }
@@ -452,20 +464,21 @@ async function openStartModal() {
   await refreshSensors()
   showStartModal.value = true
 }
-const ONLINE_TIMEOUT = 30  // seconds — sensor considered online if last_seen within this
 
+// Store raw last_seen — online status is computed reactively via nowUnix
 async function refreshSensors() {
-  const now = Math.floor(Date.now() / 1000)
   const raw = await $fetch('/api/sensors')
-  sensors.value = raw.map(s => ({ ...s, online: !s.last_seen && (now - s.last_seen) <= ONLINE_TIMEOUT }))
+  sensors.value = raw.map(s => ({ ...s, last_seen: Number(s.last_seen) || null }))
 }
-
-let sensorPollInterval = null
 
 function startSensorPolling() {
-  if (sensorPollInterval) clearInterval(sensorPollInterval)
-  sensorPollInterval = setInterval(refreshSensors, 15000)
+  if (sensorPollInterval)  clearInterval(sensorPollInterval)
+  if (sensorClockInterval) clearInterval(sensorClockInterval)
+  sensorPollInterval  = setInterval(refreshSensors, 15000)
+  // nowUnix ticks every second — keeps online badges live without re-fetching
+  sensorClockInterval = setInterval(() => { nowUnix.value = Math.floor(Date.now() / 1000) }, 1000)
 }
+
 function closeReadingModal() { showReadingModal.value = false; editingReading.value = null }
 
 async function saveReading(payload) {
@@ -501,8 +514,22 @@ function applyMode(mode) {
 
 async function sheetDeleteFiring(f) { sheetConfirmDeleteId.value = null; showFiringSheet.value = false; await deleteFiring(f) }
 
-onMounted(async () => { await init(); await refreshFirings(); if (activeFiring.value) await selectFiring(activeFiring.value); await refreshSensors(); startSensorPolling() })
-onUnmounted(() => { stopAllIntervals(); if (sensorPollInterval) clearInterval(sensorPollInterval); destroy(); destroyMobile() })
+onMounted(async () => {
+  await init()
+  await refreshFirings()
+  if (activeFiring.value) await selectFiring(activeFiring.value)
+  await refreshSensors()
+  startSensorPolling()
+})
+
+onUnmounted(() => {
+  stopAllIntervals()
+  if (sensorPollInterval)  clearInterval(sensorPollInterval)
+  if (sensorClockInterval) clearInterval(sensorClockInterval)
+  destroy()
+  destroyMobile()
+})
+
 async function refreshFirings() { allFirings.value = await $fetch('/api/firings') }
 
 async function selectFiring(f) {
@@ -548,11 +575,9 @@ async function endFiring() {
 }
 
 async function restartFiring(f) {
-  // Guard: only restart a finished firing (has both started_at and ended_at), and only if nothing else is active
   if (!f?.started_at || !f?.ended_at || activeFiring.value) return
   await $fetch(`/api/firings/${f.id}`, { method: 'PUT', body: { endedAt: null } })
   await refreshFirings()
-  // Re-select so charts and state re-initialise properly (picks up isActive = true)
   const fresh = allFirings.value.find(fi => fi.id === f.id)
   await selectFiring(fresh ?? f)
 }
@@ -578,6 +603,8 @@ function startPolling() {
     if (now - lastReadingTime.value > SIGNAL_TIMEOUT) { signalLost.value = true; setSignalLost(selectedFiring.value.started_at, lastReadingTime.value) }
   }, 5000)
 }
+
+function openLogReading() { editingReading.value = null; showReadingModal.value = true }
 </script>
 
 <style>

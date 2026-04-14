@@ -123,7 +123,7 @@
                 v-else-if="sensorIsOnline(sensor)"
                 class="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold rounded-full bg-green-50 text-green-700 border border-green-200"
               >
-                <span class="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                <span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
                 Online
               </span>
               <span
@@ -337,28 +337,45 @@ let activeReader  = null
 let writer        = null
 let readingActive = false
 
+const nowUnix = ref(Math.floor(Date.now() / 1000))
+
 // ── Load sensors ───────────────────────────────────────────────────────────────
 let sensorRefreshInterval = null
+let clockInterval         = null
 
 onMounted(async () => {
-  await loadSensors()
-  sensorRefreshInterval = setInterval(loadSensors, 15000)
+  await loadSensors(true)
+  sensorRefreshInterval = setInterval(() => loadSensors(false), 15000)
+  clockInterval         = setInterval(() => { nowUnix.value = Math.floor(Date.now() / 1000) }, 1000)
 })
 
 onUnmounted(() => {
   if (sensorRefreshInterval) clearInterval(sensorRefreshInterval)
+  if (clockInterval)         clearInterval(clockInterval)
 })
 
-async function loadSensors() {
-  loading.value = true
+async function loadSensors(showSpinner = false) {
+  if (showSpinner) loading.value = true
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return
   const { data, error } = await supabase
     .from('sensors')
-    .select('id, name, token, created_at')
+    .select('id, name, token, created_at, last_seen')  // ← last_seen included
     .eq('user_id', user.id)
     .order('created_at', { ascending: true })
   if (!error) sensors.value = data ?? []
+  loading.value = false
+
+  // DEBUG — remove once online status is confirmed working
+  console.log('[sensors] loaded:', (data ?? []).map(s => ({
+    name:           s.name,
+    last_seen:      s.last_seen,
+    last_seen_type: typeof s.last_seen,
+    now:            Math.floor(Date.now() / 1000),
+    diff:           s.last_seen ? Math.floor(Date.now() / 1000) - Number(s.last_seen) : null,
+    online:         sensorIsOnline(s),
+  })))
+
   loading.value = false
 }
 
@@ -377,7 +394,8 @@ const ONLINE_TIMEOUT = 30  // seconds
 
 function sensorIsOnline(sensor) {
   if (!sensor.last_seen) return false
-  return (Math.floor(Date.now() / 1000) - sensor.last_seen) <= ONLINE_TIMEOUT
+  const diff = nowUnix.value - Number(sensor.last_seen)
+  return diff <= ONLINE_TIMEOUT
 }
 
 // ── Copy token ─────────────────────────────────────────────────────────────────
@@ -421,7 +439,7 @@ async function createSensor() {
   const { data, error } = await supabase
     .from('sensors')
     .insert({ name, user_id: user.id })
-    .select('id, name, token, created_at')
+    .select('id, name, token, created_at, last_seen')
     .single()
   if (!error && data) {
     sensors.value.push(data)

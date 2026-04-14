@@ -41,5 +41,5 @@ export default defineEventHandler(async (event) => {
     if (updateErr) console.error('[readings] last_seen update failed:', updateErr.message)
   }
 
-  return { ok: true, id: data.id, debug: { firingId: Number(firingId), sensorRows: rows?.length ?? 0, lastSeenStamped: nowUnix, updateErr: updateErr?.message ?? null } }
+  return { ok: true, id: data.id }
 })

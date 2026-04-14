@@ -24,29 +24,29 @@ export default defineEventHandler(async (event) => {
 
   if (sensorErr || !sensor) throw createError({ statusCode: 401, statusMessage: 'Invalid sensor token' })
 
-  // Find the active firing this sensor is explicitly assigned to
+  // Find all firings this sensor is assigned to
   const { data: assignments, error: assignErr } = await db
     .from('firing_sensors')
-    .select(`
-      role,
-      firings (
-        id, name, started_at, ended_at
-      )
-    `)
+    .select('firing_id, role')
     .eq('sensor_id', sensor.id)
-    .not('firings.started_at', 'is', null)
-    .is('firings.ended_at', null)
-    .limit(1)
 
   if (assignErr) throw createError({ statusCode: 500, statusMessage: assignErr.message })
+  if (!assignments?.length) return { firingId: null, message: 'No active firing assigned to this sensor' }
 
-  const assignment = assignments?.[0]
+  // Find which of those firings is currently active (started but not ended)
+  const firingIds = assignments.map(a => a.firing_id)
+  const { data: firing, error: firingErr } = await db
+    .from('firings')
+    .select('id, name, started_at, ended_at')
+    .in('id', firingIds)
+    .not('started_at', 'is', null)
+    .is('ended_at', null)
+    .limit(1)
+    .maybeSingle()
 
-  if (!assignment?.firings) {
-    return { firingId: null, message: 'No active firing assigned to this sensor' }
-  }
+  if (firingErr) throw createError({ statusCode: 500, statusMessage: firingErr.message })
 
-  const firing = assignment.firings
+  if (!firing) return { firingId: null, message: 'No active firing assigned to this sensor' }
 
   return {
     firingId:  firing.id,

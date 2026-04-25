@@ -381,8 +381,7 @@ const { init, setSchedule, setReadings, setManualMode, setSignalLost, clearSigna
   },
 })
 
-const { init: initMobile, setSchedule: setScheduleMobile, setReadings: setReadingsMobile, resetZoom: resetZoomMobile, destroy: destroyMobile } = useKilnChart(chartCanvasMobile, { enableZoom: true })
-
+const { init: initMobile, setSchedule: setScheduleMobile, setReadings: setReadingsMobile, resetZoom: resetZoomMobile, destroy: destroyMobile } = useKilnChart(chartCanvasMobile, { enableZoom: true, showLabels: true })
 const SIGNAL_TIMEOUT = 30
 const sidebarOpen    = ref(true)
 const sidebarWidth   = ref(280)

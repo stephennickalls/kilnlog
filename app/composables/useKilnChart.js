@@ -1,3 +1,5 @@
+// app/composables/useKilnChart.js
+
 import { Chart, registerables } from 'chart.js'
 Chart.register(...registerables)
 
@@ -10,17 +12,66 @@ async function ensureZoomPlugin() {
   zoomPluginRegistered = true
 }
 
+// ── Inline label plugin ───────────────────────────────────────────────────────
+// Draws temp labels at each schedule waypoint and the last actual reading.
+// Only registered on mobile (showLabels: true) instances.
+const curveLabelsPlugin = {
+  id: 'curveLabels',
+  afterDatasetsDraw(chart) {
+    const ctx = chart.ctx
+
+    // Labels on schedule waypoints
+    const scheduleData = chart.data.datasets[0]?.data ?? []
+    if (scheduleData.length) {
+      ctx.save()
+      ctx.font = 'bold 10px sans-serif'
+      ctx.fillStyle = '#78716c'
+      ctx.textAlign = 'center'
+
+      scheduleData.forEach((pt, i) => {
+        const meta = chart.getDatasetMeta(0)
+        const el   = meta.data[i]
+        if (!el) return
+        const { x, y } = el.getProps(['x', 'y'], true)
+        const label = `${Math.round(pt.y)}°`
+        // Alternate above/below to avoid overlap on tight segments
+        const offset = i % 2 === 0 ? -14 : 14
+        ctx.fillText(label, x, y + offset)
+      })
+      ctx.restore()
+    }
+
+    // Label on the last actual reading point
+    const actualData = chart.data.datasets[1]?.data ?? []
+    if (actualData.length) {
+      const meta    = chart.getDatasetMeta(1)
+      const lastIdx = actualData.length - 1
+      const el      = meta.data[lastIdx]
+      if (el) {
+        const { x, y } = el.getProps(['x', 'y'], true)
+        const lastPt   = actualData[lastIdx]
+        ctx.save()
+        ctx.font      = 'bold 11px sans-serif'
+        ctx.fillStyle = '#f97316'
+        ctx.textAlign = 'left'
+        ctx.fillText(`${Math.round(lastPt.y)}°`, x + 5, y - 6)
+        ctx.restore()
+      }
+    }
+  },
+}
+
 /**
- * @typedef {{ onPointClick?: (point: any) => void; enableZoom?: boolean }} KilnChartOptions
+ * @typedef {{ onPointClick?: (point: any) => void; enableZoom?: boolean; showLabels?: boolean }} KilnChartOptions
  */
 
 /**
  * @param {import('vue').Ref<HTMLCanvasElement | null>} canvasRef
  * @param {KilnChartOptions} [options]
  */
-export function useKilnChart(canvasRef, { onPointClick, enableZoom = true } = {}) {
+export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showLabels = false } = {}) {
   let chart = null
-  let xMax = 120  // tracks the intended x axis maximum
+  let xMax  = 120
 
   async function init() {
     if (!canvasRef.value) return
@@ -28,8 +79,12 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true } = {}
 
     await ensureZoomPlugin()
 
+    // Register the label plugin only when needed
+    const extraPlugins = showLabels ? [curveLabelsPlugin] : []
+
     const config = {
       type: 'line',
+      plugins: extraPlugins,
       data: {
         datasets: [
           {
@@ -38,7 +93,7 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true } = {}
             borderColor: '#a8a29e',
             borderDash: [6, 4],
             borderWidth: 2,
-            pointRadius: 5,
+            pointRadius: showLabels ? 4 : 5,
             pointBackgroundColor: '#a8a29e',
             tension: 0,
             fill: false,
@@ -50,7 +105,7 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true } = {}
             backgroundColor: 'rgba(249,115,22,0.08)',
             borderWidth: 2.5,
             pointRadius: 0,
-            pointHoverRadius: 8,
+            pointHoverRadius: showLabels ? 0 : 8,
             pointBackgroundColor: '#f97316',
             pointBorderColor: '#fff',
             pointBorderWidth: 2,
@@ -94,6 +149,8 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true } = {}
             },
           },
           tooltip: {
+            // Disable entirely on mobile — labels do the job
+            enabled: !showLabels,
             backgroundColor: '#ffffff',
             borderColor: '#e7e5e4',
             borderWidth: 1,
@@ -128,14 +185,14 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true } = {}
         scales: {
           x: {
             type: 'linear',
-            title: { display: true, text: 'Minutes from start', color: '#78716c' },
-            ticks: { color: '#a8a29e', maxTicksLimit: 8 },
+            title: { display: !showLabels, text: 'Minutes from start', color: '#78716c' },
+            ticks: { color: '#a8a29e', maxTicksLimit: showLabels ? 5 : 8 },
             grid:  { color: '#f5f5f4' },
             min: 0,
           },
           y: {
             title: { display: false },
-            ticks: { color: '#a8a29e', maxTicksLimit: 6 },
+            ticks: { color: '#a8a29e', maxTicksLimit: showLabels ? 4 : 6 },
             grid:  { color: '#f5f5f4' },
             min: 0,
             suggestedMax: 200,
@@ -156,11 +213,10 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true } = {}
     if (points.length) {
       const maxX = Math.max(...points.map(p => p.offset_minutes))
       const maxY = Math.max(...points.map(p => p.target_temp))
-      xMax = maxX + 60  // schedule duration + 1hr buffer
+      xMax = maxX + 60
       chart.options.scales.x.min = 0
       chart.options.scales.x.max = xMax
       chart.options.scales.y.suggestedMax = Math.min(maxY + 50, 1500)
-      // Keep zoom limits in sync so users can't zoom beyond the firing window
       if (chart.options.plugins.zoom?.limits?.x) {
         chart.options.plugins.zoom.limits.x.max = xMax
       }
@@ -181,8 +237,9 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true } = {}
 
   function setManualMode(enabled) {
     if (!chart) return
-    chart.data.datasets[1].pointRadius      = enabled ? 6 : 0
-    chart.data.datasets[1].pointHoverRadius = enabled ? 10 : 4
+    // On label mode, always keep pointRadius 0 on the actual line (label shows the value)
+    chart.data.datasets[1].pointRadius      = showLabels ? 0 : (enabled ? 6 : 0)
+    chart.data.datasets[1].pointHoverRadius = showLabels ? 0 : (enabled ? 10 : 4)
     if (canvasRef.value) canvasRef.value.style.cursor = enabled ? 'pointer' : 'default'
     chart.update('none')
   }

@@ -1,4 +1,4 @@
-<!-- app/app.vue -->
+<!-- app/pages/app.vue -->
 <template>
   <div class="flex flex-col h-screen overflow-hidden bg-parchment font-serif">
 
@@ -73,7 +73,6 @@
 
           <!-- Stats strip -->
           <div v-if="selectedFiring" class="shrink-0 flex items-stretch border-b border-parchment-3 bg-parchment">
-            <!-- NOW -->
             <button
               class="flex flex-col items-center py-3 px-6 border-r border-parchment-3 hover:bg-parchment-2 transition-colors"
               @click="showTempModal = true"
@@ -84,28 +83,23 @@
               </span>
               <span class="text-[9px] mt-0.5" :class="currentTemp !== null ? 'text-flame-light' : 'text-parchment-3'">°C</span>
             </button>
-            <!-- RATE -->
             <div class="flex flex-col items-center py-3 px-6 border-r border-parchment-3">
               <span class="text-[9px] font-bold uppercase tracking-widest text-ink-faint mb-1">Rate</span>
               <span class="text-xl font-bold leading-none tabular-nums" :class="rateOfChange && rateOfChange !== '—' ? 'text-green-600' : 'text-ink-faint'">{{ rateOfChange ?? '—' }}</span>
             </div>
-            <!-- ELAPSED -->
             <div class="flex flex-col items-center py-3 px-6 border-r border-parchment-3">
               <span class="text-[9px] font-bold uppercase tracking-widest text-ink-faint mb-1">Time</span>
               <span class="text-xl font-bold leading-none tabular-nums text-ink">{{ isLive ? elapsed : '—' }}</span>
             </div>
-            <!-- PEAK -->
             <div class="flex flex-col items-center py-3 px-6 border-r border-parchment-3">
               <span class="text-[9px] font-bold uppercase tracking-widest text-ink-faint mb-1">Peak</span>
               <span class="text-2xl font-bold leading-none tabular-nums text-ink">{{ peakTemp !== null ? Math.round(peakTemp) : '—' }}</span>
               <span class="text-[9px] text-ink-faint mt-0.5">°C</span>
             </div>
-            <!-- READINGS -->
             <div class="flex flex-col items-center py-3 px-6 border-r border-parchment-3">
               <span class="text-[9px] font-bold uppercase tracking-widest text-ink-faint mb-1">Readings</span>
               <span class="text-xl font-bold leading-none tabular-nums text-ink">{{ readingCount }}</span>
             </div>
-            <!-- ACTION BUTTONS -->
             <div v-if="selectedFiring" class="flex items-center gap-2 px-4 ml-auto">
               <button
                 v-if="isLive && isManual"
@@ -118,7 +112,6 @@
                 :class="isManual ? 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100' : 'border-parchment-3 bg-parchment-2 text-ink-muted hover:bg-parchment-3'"
                 @click="toggleMode"
               >⇅ {{ isManual ? 'Switch to Connected' : 'Switch to Manual' }}</button>
-              <!-- Sensor assignment button -->
               <button
                 class="flex items-center gap-1.5 px-3 py-2 text-sm font-bold rounded-xl border transition-colors"
                 :class="showSensorPanel ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-parchment-3 bg-parchment-2 text-ink-muted hover:bg-parchment-3'"
@@ -139,70 +132,41 @@
               <p class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Sensors</p>
               <button class="text-[10px] text-ink-faint hover:text-flame transition-colors" @click="showSensorPanel = false">Done</button>
             </div>
-
             <div class="flex flex-col gap-2">
               <p class="text-[10px] font-semibold text-ink-faint uppercase tracking-wider">Linked to this firing</p>
               <div v-if="assignedSensors.length" class="flex flex-col gap-2">
-                <div
-                  v-for="s in assignedSensors"
-                  :key="s.id"
-                  class="flex items-center gap-3 px-3 py-2.5 rounded-xl border bg-parchment border-parchment-3"
-                >
+                <div v-for="s in assignedSensors" :key="s.id" class="flex items-center gap-3 px-3 py-2.5 rounded-xl border bg-parchment border-parchment-3">
                   <svg class="w-4 h-4 shrink-0 text-ink-faint" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/></svg>
                   <span class="text-sm font-semibold text-ink flex-1 truncate">{{ s.name }}</span>
-                  <span
-                    class="text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 flex items-center gap-1"
-                    :class="s.online ? 'bg-green-50 text-green-700 border-green-200' : 'bg-parchment-2 text-ink-faint border-parchment-3'"
-                  >
+                  <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 flex items-center gap-1" :class="s.online ? 'bg-green-50 text-green-700 border-green-200' : 'bg-parchment-2 text-ink-faint border-parchment-3'">
                     <span class="w-1.5 h-1.5 rounded-full" :class="s.online ? 'bg-green-500 animate-pulse' : 'bg-parchment-4'"></span>
                     {{ s.online ? 'Online' : 'Offline' }}
                   </span>
                   <NuxtLink to="/sensors" class="p-1.5 rounded-lg text-ink-faint hover:text-ink hover:bg-parchment-2 transition-colors shrink-0" title="Manage sensor">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                      <path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/>
-                      <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
-                    </svg>
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
                   </NuxtLink>
-                  <button
-                    class="text-xs font-semibold text-ink-muted hover:text-red-500 border border-parchment-3 hover:border-red-300 hover:bg-red-50 px-2.5 py-1 rounded-lg transition-colors shrink-0"
-                    @click="removeSensorFromFiring(s.sensor_id ?? s.id)"
-                  >Unlink</button>
+                  <button class="text-xs font-semibold text-ink-muted hover:text-red-500 border border-parchment-3 hover:border-red-300 hover:bg-red-50 px-2.5 py-1 rounded-lg transition-colors shrink-0" @click="removeSensorFromFiring(s.sensor_id ?? s.id)">Unlink</button>
                 </div>
               </div>
               <p v-else class="text-xs text-ink-faint py-1">No sensors linked to this firing yet.</p>
             </div>
-
             <div v-if="unassignedSensors.length" class="flex flex-col gap-2">
               <p class="text-[10px] font-semibold text-ink-faint uppercase tracking-wider">Link a sensor</p>
               <div class="flex flex-col gap-2">
-                <div
-                  v-for="s in unassignedSensors"
-                  :key="s.id"
-                  class="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-parchment-3 bg-parchment"
-                >
+                <div v-for="s in unassignedSensors" :key="s.id" class="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-parchment-3 bg-parchment">
                   <svg class="w-4 h-4 shrink-0 text-ink-faint" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/></svg>
                   <span class="text-sm font-semibold text-ink flex-1 truncate">{{ s.name }}</span>
-                  <span
-                    class="text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 flex items-center gap-1"
-                    :class="s.online ? 'bg-green-50 text-green-700 border-green-200' : 'bg-parchment-2 text-ink-faint border-parchment-3'"
-                  >
+                  <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 flex items-center gap-1" :class="s.online ? 'bg-green-50 text-green-700 border-green-200' : 'bg-parchment-2 text-ink-faint border-parchment-3'">
                     <span class="w-1.5 h-1.5 rounded-full" :class="s.online ? 'bg-green-500 animate-pulse' : 'bg-parchment-4'"></span>
                     {{ s.online ? 'Online' : 'Offline' }}
                   </span>
                   <NuxtLink to="/sensors" class="p-1.5 rounded-lg text-ink-faint hover:text-ink hover:bg-parchment-2 transition-colors shrink-0" title="Manage sensor">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                      <path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/>
-                      <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
-                    </svg>
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
                   </NuxtLink>
-                  <button
-                    class="text-xs font-semibold text-flame border border-flame/30 hover:bg-flame hover:text-parchment px-2.5 py-1 rounded-lg transition-colors shrink-0"
-                    @click="addSensorToFiring(s.id)"
-                  >Link</button>
+                  <button class="text-xs font-semibold text-flame border border-flame/30 hover:bg-flame hover:text-parchment px-2.5 py-1 rounded-lg transition-colors shrink-0" @click="addSensorToFiring(s.id)">Link</button>
                 </div>
               </div>
             </div>
-
             <div v-if="!sensors.length" class="text-xs text-ink-faint">
               No sensors registered yet. <NuxtLink to="/sensors" class="text-flame font-semibold hover:underline">Add one →</NuxtLink>
             </div>
@@ -223,7 +187,6 @@
         <!-- ── MOBILE ── -->
         <div class="flex flex-col flex-1 sm:hidden overflow-hidden">
 
-          <!-- Empty state -->
           <div v-if="!selectedFiring" class="flex-1 flex flex-col items-center justify-center gap-5 px-8 text-center">
             <div class="w-14 h-14 bg-parchment-2 border border-parchment-3 rounded-xl flex items-center justify-center">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -263,7 +226,6 @@
             <div class="flex-1 mx-3 mt-3 mb-2 bg-white rounded-xl border border-parchment-3 relative overflow-hidden" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
               <canvas ref="chartCanvasMobile" class="w-full h-full touch-none"></canvas>
               <button class="absolute bottom-2 right-2 px-2.5 py-1 text-[10px] font-medium border border-parchment-3 rounded-lg bg-parchment text-ink-faint active:bg-parchment-2" @click="resetZoomMobile">Reset zoom</button>
-              <!-- Refresh button for PWA — no browser chrome available -->
               <button
                 class="absolute bottom-2 left-2 px-2.5 py-1 text-[10px] font-medium border border-parchment-3 rounded-lg bg-parchment text-ink-faint active:bg-parchment-2 flex items-center gap-1"
                 @click="reloadReadings"
@@ -353,24 +315,24 @@ import { useKilnChart } from '~/composables/useKilnChart'
 
 definePageMeta({ middleware: ['auth'] })
 
-const chartCanvas           = ref(null)
-const chartCanvasMobile     = ref(null)
-const editingReading        = ref(null)
-const showReadingModal      = ref(false)
-const showFiringSheet       = ref(false)
-const sheetConfirmDeleteId  = ref(null)
-const showStartModal        = ref(false)
-const showTempModal         = ref(false)
-const allFirings            = ref([])
-const selectedFiring        = ref(null)
-const currentTemp           = ref(null)
-const isLive                = ref(false)
-const isManual              = ref(false)
-const signalLost            = ref(false)
-const lastReadingTime       = ref(null)
-const library               = ref([])
-const sensors               = ref([])
-const showSensorPanel       = ref(false)
+const chartCanvas          = ref(null)
+const chartCanvasMobile    = ref(null)
+const editingReading       = ref(null)
+const showReadingModal     = ref(false)
+const showFiringSheet      = ref(false)
+const sheetConfirmDeleteId = ref(null)
+const showStartModal       = ref(false)
+const showTempModal        = ref(false)
+const allFirings           = ref([])
+const selectedFiring       = ref(null)
+const currentTemp          = ref(null)
+const isLive               = ref(false)
+const isManual             = ref(false)
+const signalLost           = ref(false)
+const lastReadingTime      = ref(null)
+const library              = ref([])
+const sensors              = ref([])
+const showSensorPanel      = ref(false)
 
 const { init, setSchedule, setReadings, setManualMode, setSignalLost, clearSignalLost, resetZoom, destroy } = useKilnChart(chartCanvas, {
   enableZoom: true,
@@ -382,12 +344,17 @@ const { init, setSchedule, setReadings, setManualMode, setSignalLost, clearSigna
 })
 
 const { init: initMobile, setSchedule: setScheduleMobile, setReadings: setReadingsMobile, resetZoom: resetZoomMobile, destroy: destroyMobile } = useKilnChart(chartCanvasMobile, { enableZoom: true, showLabels: true })
-const SIGNAL_TIMEOUT = 30
-const sidebarOpen    = ref(true)
-const sidebarWidth   = ref(280)
-const MIN_WIDTH      = 180
-const isDragging     = ref(false)
-let pollInterval = null, signalCheckInterval = null, elapsedTickInterval = null
+
+const SIGNAL_TIMEOUT   = 30
+const ONLINE_TIMEOUT   = 30
+const RATE_WINDOW_MINS = 20
+
+const sidebarOpen  = ref(true)
+const sidebarWidth = ref(280)
+const MIN_WIDTH    = 180
+const isDragging   = ref(false)
+let pollInterval = null, signalCheckInterval = null, elapsedTickInterval = null, sensorPollInterval = null
+
 const nowUnix = ref(Math.floor(Date.now() / 1000))
 
 const activeFiring = computed(() => allFirings.value.find(f => f.started_at && !f.ended_at) ?? null)
@@ -395,8 +362,31 @@ const pastFirings  = computed(() => allFirings.value.filter(f => f.ended_at).sor
 const peakTemp     = computed(() => { if (!selectedFiring.value?.readings?.length) return null; return Math.max(...selectedFiring.value.readings.map(r => r.temperature)) })
 const duration     = computed(() => { const f = selectedFiring.value; if (!f?.started_at || !f?.ended_at) return null; const mins = Math.round((f.ended_at - f.started_at) / 60), h = Math.floor(mins / 60), m = mins % 60; return h > 0 ? `${h}h ${m}m` : `${m}m` })
 const readingCount = computed(() => selectedFiring.value?.readings?.length ?? 0)
-const rateOfChange = computed(() => { const readings = selectedFiring.value?.readings; if (!readings || readings.length < 6) return '—'; const recent = readings.slice(-6), deltaTemp = recent[recent.length - 1].temperature - recent[0].temperature, deltaMins = (recent[recent.length - 1].timestamp - recent[0].timestamp) / 60; if (deltaMins === 0) return '—'; const rate = Math.round(deltaTemp / deltaMins); return rate >= 0 ? `+${rate}°/m` : `${rate}°/m` })
 const elapsed      = computed(() => { const f = selectedFiring.value; if (!f?.started_at) return '—'; const mins = Math.round((nowUnix.value - f.started_at) / 60), h = Math.floor(mins / 60), m = mins % 60; return h > 0 ? `${h}h ${m}m` : `${m}m` })
+
+// Linear regression over a rolling 20-minute window — smooth, trend-aware rate
+const rateOfChange = computed(() => {
+  const readings = selectedFiring.value?.readings
+  if (!readings || readings.length < 3) return '—'
+  const now    = readings.at(-1).timestamp
+  const cutoff = now - (RATE_WINDOW_MINS * 60)
+  const window = readings.filter(r => r.timestamp >= cutoff)
+  if (window.length < 3) return '—'
+  const spanMins = (window.at(-1).timestamp - window[0].timestamp) / 60
+  if (spanMins < 2) return '—'
+  const x0 = window[0].timestamp
+  let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0
+  const n = window.length
+  for (const r of window) {
+    const x = (r.timestamp - x0) / 60
+    const y = r.temperature
+    sumX += x; sumY += y; sumXY += x * y; sumX2 += x * x
+  }
+  const denom = (n * sumX2 - sumX * sumX)
+  if (denom === 0) return '—'
+  const rate = Math.round((n * sumXY - sumX * sumY) / denom)
+  return rate >= 0 ? `+${rate}°/m` : `${rate}°/m`
+})
 
 const assignedSensors = computed(() => {
   const rows = selectedFiring.value?.sensors ?? []
@@ -445,15 +435,11 @@ async function openStartModal() {
   showStartModal.value = true
 }
 
-const ONLINE_TIMEOUT = 30
-
 async function refreshSensors() {
   const now = Math.floor(Date.now() / 1000)
   const raw = await $fetch('/api/sensors')
   sensors.value = raw.map(s => ({ ...s, online: !!s.last_seen && (now - s.last_seen) <= ONLINE_TIMEOUT }))
 }
-
-let sensorPollInterval = null
 
 function startSensorPolling() {
   if (sensorPollInterval) clearInterval(sensorPollInterval)
@@ -474,14 +460,13 @@ async function saveReading(payload) {
         method: 'POST',
         body: { firingId: selectedFiring.value.id, temperature: payload.temperature, timestamp: payload.timestamp },
       })
-      // Optimistic update — show the entered value immediately, don't wait for reload
+      // Optimistic update — show entered value immediately
       currentTemp.value     = payload.temperature
       lastReadingTime.value = payload.timestamp
     }
     closeReadingModal()
     await reloadReadings()
   } catch (err) {
-    // Keep modal open so user doesn't lose their reading
     console.error('Failed to save reading:', err)
     alert(`Failed to save reading: ${err?.data?.message ?? err.message ?? 'Unknown error'}`)
   }
@@ -534,14 +519,11 @@ function applyMode(mode) {
 
 async function sheetDeleteFiring(f) { sheetConfirmDeleteId.value = null; showFiringSheet.value = false; await deleteFiring(f) }
 
-// ── Page visibility: re-sync when returning to PWA / tab ──────────────────────
 async function onVisibilityChange() {
   if (document.hidden) return
   if (!selectedFiring.value) return
   await reloadReadings()
-  // Restart polling intervals if they died while the page was suspended
   if (isLive.value && !isManual.value) startPolling()
-  // Restart elapsed ticker if it stopped
   if (isLive.value && !elapsedTickInterval) {
     elapsedTickInterval = setInterval(() => { nowUnix.value = Math.floor(Date.now() / 1000) }, 1000)
   }

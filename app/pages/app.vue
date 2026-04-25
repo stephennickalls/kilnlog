@@ -1,3 +1,4 @@
+<!-- app/app.vue -->
 <template>
   <div class="flex flex-col h-screen overflow-hidden bg-parchment font-serif">
 
@@ -117,7 +118,7 @@
                 :class="isManual ? 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100' : 'border-parchment-3 bg-parchment-2 text-ink-muted hover:bg-parchment-3'"
                 @click="toggleMode"
               >⇅ {{ isManual ? 'Switch to Connected' : 'Switch to Manual' }}</button>
-              <!-- Sensor assignment button — always visible when a firing is selected -->
+              <!-- Sensor assignment button -->
               <button
                 class="flex items-center gap-1.5 px-3 py-2 text-sm font-bold rounded-xl border transition-colors"
                 :class="showSensorPanel ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-parchment-3 bg-parchment-2 text-ink-muted hover:bg-parchment-3'"
@@ -132,14 +133,13 @@
             </div>
           </div>
 
-          <!-- Sensor panel — visible for any selected firing -->
+          <!-- Sensor panel -->
           <div v-if="selectedFiring && showSensorPanel" class="shrink-0 border-b border-parchment-3 bg-white px-4 py-3 flex flex-col gap-4">
             <div class="flex items-center justify-between">
               <p class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Sensors</p>
               <button class="text-[10px] text-ink-faint hover:text-flame transition-colors" @click="showSensorPanel = false">Done</button>
             </div>
 
-            <!-- Linked sensors -->
             <div class="flex flex-col gap-2">
               <p class="text-[10px] font-semibold text-ink-faint uppercase tracking-wider">Linked to this firing</p>
               <div v-if="assignedSensors.length" class="flex flex-col gap-2">
@@ -157,18 +157,12 @@
                     <span class="w-1.5 h-1.5 rounded-full" :class="s.online ? 'bg-green-500 animate-pulse' : 'bg-parchment-4'"></span>
                     {{ s.online ? 'Online' : 'Offline' }}
                   </span>
-                  <!-- Settings link -->
-                  <NuxtLink
-                    to="/sensors"
-                    class="p-1.5 rounded-lg text-ink-faint hover:text-ink hover:bg-parchment-2 transition-colors shrink-0"
-                    title="Manage sensor"
-                  >
+                  <NuxtLink to="/sensors" class="p-1.5 rounded-lg text-ink-faint hover:text-ink hover:bg-parchment-2 transition-colors shrink-0" title="Manage sensor">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                       <path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/>
                       <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
                     </svg>
                   </NuxtLink>
-                  <!-- Unlink button -->
                   <button
                     class="text-xs font-semibold text-ink-muted hover:text-red-500 border border-parchment-3 hover:border-red-300 hover:bg-red-50 px-2.5 py-1 rounded-lg transition-colors shrink-0"
                     @click="removeSensorFromFiring(s.sensor_id ?? s.id)"
@@ -178,7 +172,6 @@
               <p v-else class="text-xs text-ink-faint py-1">No sensors linked to this firing yet.</p>
             </div>
 
-            <!-- Available to link -->
             <div v-if="unassignedSensors.length" class="flex flex-col gap-2">
               <p class="text-[10px] font-semibold text-ink-faint uppercase tracking-wider">Link a sensor</p>
               <div class="flex flex-col gap-2">
@@ -196,12 +189,7 @@
                     <span class="w-1.5 h-1.5 rounded-full" :class="s.online ? 'bg-green-500 animate-pulse' : 'bg-parchment-4'"></span>
                     {{ s.online ? 'Online' : 'Offline' }}
                   </span>
-                  <!-- Settings link -->
-                  <NuxtLink
-                    to="/sensors"
-                    class="p-1.5 rounded-lg text-ink-faint hover:text-ink hover:bg-parchment-2 transition-colors shrink-0"
-                    title="Manage sensor"
-                  >
+                  <NuxtLink to="/sensors" class="p-1.5 rounded-lg text-ink-faint hover:text-ink hover:bg-parchment-2 transition-colors shrink-0" title="Manage sensor">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                       <path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/>
                       <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
@@ -271,10 +259,20 @@
               </div>
             </div>
 
-            <!-- Chart — always visible, touch-enabled -->
+            <!-- Chart -->
             <div class="flex-1 mx-3 mt-3 mb-2 bg-white rounded-xl border border-parchment-3 relative overflow-hidden" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
               <canvas ref="chartCanvasMobile" class="w-full h-full touch-none"></canvas>
               <button class="absolute bottom-2 right-2 px-2.5 py-1 text-[10px] font-medium border border-parchment-3 rounded-lg bg-parchment text-ink-faint active:bg-parchment-2" @click="resetZoomMobile">Reset zoom</button>
+              <!-- Refresh button for PWA — no browser chrome available -->
+              <button
+                class="absolute bottom-2 left-2 px-2.5 py-1 text-[10px] font-medium border border-parchment-3 rounded-lg bg-parchment text-ink-faint active:bg-parchment-2 flex items-center gap-1"
+                @click="reloadReadings"
+              >
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                Refresh
+              </button>
               <div v-if="isManual && isLive && !selectedFiring?.readings?.length" class="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <p class="text-xs text-ink-muted text-center px-6">Log your first reading to see the curve</p>
               </div>
@@ -344,14 +342,13 @@
 
     <!-- ── MODALS ── -->
     <KilnTempModal :open="showTempModal" :temp="currentTemp" :peak-temp="peakTemp" :rate-of-change="rateOfChange" :elapsed="elapsed" :is-live="isLive" :firing-name="selectedFiring?.name" @close="showTempModal = false" />
-    <StartFiringModal :open="showStartModal" :library="library" :sensors="sensors.map(s => ({ ...s, online: !!s.last_seen && (nowUnix - Number(s.last_seen)) <= ONLINE_TIMEOUT }))" @close="showStartModal = false" @create="createFiring" />
+    <StartFiringModal :open="showStartModal" :library="library" :sensors="sensors" @close="showStartModal = false" @create="createFiring" />
     <ManualReadingModal :open="showReadingModal" :started-at="selectedFiring?.started_at ?? 0" :is-edit="!!editingReading" :edit-temp="editingReading?.y ?? null" :edit-ts="editingReading?.ts ?? null" @close="closeReadingModal" @save="saveReading" @delete="deleteReading" />
 
   </div>
 </template>
 
 <script setup>
-// pages/app.vue
 import { useKilnChart } from '~/composables/useKilnChart'
 
 definePageMeta({ middleware: ['auth'] })
@@ -372,7 +369,7 @@ const isManual              = ref(false)
 const signalLost            = ref(false)
 const lastReadingTime       = ref(null)
 const library               = ref([])
-const sensors               = ref([])  // raw sensor rows with last_seen
+const sensors               = ref([])
 const showSensorPanel       = ref(false)
 
 const { init, setSchedule, setReadings, setManualMode, setSignalLost, clearSignalLost, resetZoom, destroy } = useKilnChart(chartCanvas, {
@@ -387,15 +384,12 @@ const { init, setSchedule, setReadings, setManualMode, setSignalLost, clearSigna
 const { init: initMobile, setSchedule: setScheduleMobile, setReadings: setReadingsMobile, resetZoom: resetZoomMobile, destroy: destroyMobile } = useKilnChart(chartCanvasMobile, { enableZoom: true })
 
 const SIGNAL_TIMEOUT = 30
-const ONLINE_TIMEOUT = 30
 const sidebarOpen    = ref(true)
 const sidebarWidth   = ref(280)
 const MIN_WIDTH      = 180
 const isDragging     = ref(false)
-
-// Single reactive clock — drives both elapsed timer and sensor online badges
+let pollInterval = null, signalCheckInterval = null, elapsedTickInterval = null
 const nowUnix = ref(Math.floor(Date.now() / 1000))
-let pollInterval = null, signalCheckInterval = null, elapsedTickInterval = null, sensorPollInterval = null, sensorClockInterval = null
 
 const activeFiring = computed(() => allFirings.value.find(f => f.started_at && !f.ended_at) ?? null)
 const pastFirings  = computed(() => allFirings.value.filter(f => f.ended_at).sort((a, b) => b.created_at - a.created_at))
@@ -405,32 +399,19 @@ const readingCount = computed(() => selectedFiring.value?.readings?.length ?? 0)
 const rateOfChange = computed(() => { const readings = selectedFiring.value?.readings; if (!readings || readings.length < 6) return '—'; const recent = readings.slice(-6), deltaTemp = recent[recent.length - 1].temperature - recent[0].temperature, deltaMins = (recent[recent.length - 1].timestamp - recent[0].timestamp) / 60; if (deltaMins === 0) return '—'; const rate = Math.round(deltaTemp / deltaMins); return rate >= 0 ? `+${rate}°/m` : `${rate}°/m` })
 const elapsed      = computed(() => { const f = selectedFiring.value; if (!f?.started_at) return '—'; const mins = Math.round((nowUnix.value - f.started_at) / 60), h = Math.floor(mins / 60), m = mins % 60; return h > 0 ? `${h}h ${m}m` : `${m}m` })
 
-// Sensors linked to this firing — online computed reactively from nowUnix so badge updates live
 const assignedSensors = computed(() => {
   const rows = selectedFiring.value?.sensors ?? []
   return rows.map(r => {
-    const id     = r.sensors?.id   ?? r.sensor_id
-    const name   = r.sensors?.name ?? r.sensor_id
-    const meta   = sensors.value.find(s => s.id === id)
-    const online = !!meta?.last_seen && (nowUnix.value - Number(meta.last_seen)) <= ONLINE_TIMEOUT
-    return { ...r, id, name, online }
+    const id   = r.sensors?.id   ?? r.sensor_id
+    const name = r.sensors?.name ?? r.sensor_id
+    const meta = sensors.value.find(s => s.id === id)
+    return { ...r, id, name, online: meta?.online ?? false }
   })
 })
 
-// Sensors enriched with reactive online status — passed to StartFiringModal
-const sensorsWithOnline = computed(() =>
-  sensors.value.map(s => ({
-    ...s,
-    online: !!s.last_seen && (nowUnix.value - Number(s.last_seen)) <= ONLINE_TIMEOUT
-  }))
-)
-
-// Sensors not yet linked to this firing — online also reactive
 const unassignedSensors = computed(() => {
   const assignedIds = new Set(assignedSensors.value.map(s => s.sensor_id ?? s.id))
-  return sensors.value
-    .filter(s => !assignedIds.has(s.id))
-    .map(s => ({ ...s, online: !!s.last_seen && (nowUnix.value - Number(s.last_seen)) <= ONLINE_TIMEOUT }))
+  return sensors.value.filter(s => !assignedIds.has(s.id))
 })
 
 async function addSensorToFiring(sensorId) {
@@ -465,38 +446,75 @@ async function openStartModal() {
   showStartModal.value = true
 }
 
-// Store raw last_seen — online status is computed reactively via nowUnix
+const ONLINE_TIMEOUT = 30
+
 async function refreshSensors() {
+  const now = Math.floor(Date.now() / 1000)
   const raw = await $fetch('/api/sensors')
-  sensors.value = raw.map(s => ({ ...s, last_seen: Number(s.last_seen) || null }))
+  sensors.value = raw.map(s => ({ ...s, online: !!s.last_seen && (now - s.last_seen) <= ONLINE_TIMEOUT }))
 }
+
+let sensorPollInterval = null
 
 function startSensorPolling() {
-  if (sensorPollInterval)  clearInterval(sensorPollInterval)
-  if (sensorClockInterval) clearInterval(sensorClockInterval)
-  sensorPollInterval  = setInterval(refreshSensors, 15000)
-  // nowUnix ticks every second — keeps online badges live without re-fetching
-  sensorClockInterval = setInterval(() => { nowUnix.value = Math.floor(Date.now() / 1000) }, 1000)
+  if (sensorPollInterval) clearInterval(sensorPollInterval)
+  sensorPollInterval = setInterval(refreshSensors, 15000)
 }
 
+function openLogReading() { editingReading.value = null; showReadingModal.value = true }
 function closeReadingModal() { showReadingModal.value = false; editingReading.value = null }
 
 async function saveReading(payload) {
   if (!selectedFiring.value) return
-  if (editingReading.value) { const id = editingReading.value.id ?? editingReading.value.raw?.id; await $fetch(`/api/readings/${id}`, { method: 'PUT', body: { temperature: payload.temperature } }) }
-  else await $fetch('/api/readings', { method: 'POST', body: { firingId: selectedFiring.value.id, temperature: payload.temperature, timestamp: payload.timestamp } })
-  closeReadingModal(); await reloadReadings()
+  try {
+    if (editingReading.value) {
+      const id = editingReading.value.id ?? editingReading.value.raw?.id
+      await $fetch(`/api/readings/${id}`, { method: 'PUT', body: { temperature: payload.temperature } })
+    } else {
+      await $fetch('/api/readings', {
+        method: 'POST',
+        body: { firingId: selectedFiring.value.id, temperature: payload.temperature, timestamp: payload.timestamp },
+      })
+      // Optimistic update — show the entered value immediately, don't wait for reload
+      currentTemp.value     = payload.temperature
+      lastReadingTime.value = payload.timestamp
+    }
+    closeReadingModal()
+    await reloadReadings()
+  } catch (err) {
+    // Keep modal open so user doesn't lose their reading
+    console.error('Failed to save reading:', err)
+    alert(`Failed to save reading: ${err?.data?.message ?? err.message ?? 'Unknown error'}`)
+  }
 }
 
-async function deleteReading() { if (!editingReading.value) return; const id = editingReading.value.id ?? editingReading.value.raw?.id; await $fetch(`/api/readings/${id}`, { method: 'DELETE' }); closeReadingModal(); await reloadReadings() }
+async function deleteReading() {
+  if (!editingReading.value) return
+  try {
+    const id = editingReading.value.id ?? editingReading.value.raw?.id
+    await $fetch(`/api/readings/${id}`, { method: 'DELETE' })
+    closeReadingModal()
+    await reloadReadings()
+  } catch (err) {
+    console.error('Failed to delete reading:', err)
+    alert(`Failed to delete: ${err?.data?.message ?? err.message ?? 'Unknown error'}`)
+  }
+}
 
 async function reloadReadings() {
   if (!selectedFiring.value) return
-  const data = await $fetch(`/api/firings/${selectedFiring.value.id}`)
-  selectedFiring.value.readings = data.readings
-  setReadings(data.readings, selectedFiring.value.started_at)
-  setReadingsMobile(data.readings, selectedFiring.value.started_at)
-  if (data.readings?.length) { currentTemp.value = data.readings.at(-1).temperature; lastReadingTime.value = data.readings.at(-1).timestamp }
+  try {
+    const data = await $fetch(`/api/firings/${selectedFiring.value.id}`)
+    selectedFiring.value.readings = data.readings
+    setReadings(data.readings, selectedFiring.value.started_at)
+    setReadingsMobile(data.readings, selectedFiring.value.started_at)
+    if (data.readings?.length) {
+      currentTemp.value     = data.readings.at(-1).temperature
+      lastReadingTime.value = data.readings.at(-1).timestamp
+    }
+  } catch (err) {
+    console.error('Failed to reload readings:', err)
+  }
 }
 
 async function toggleMode() {
@@ -508,11 +526,27 @@ async function toggleMode() {
 
 function applyMode(mode) {
   isManual.value = mode === 'manual'; setManualMode(isManual.value)
-  if (isManual.value) { if (pollInterval) { clearInterval(pollInterval); pollInterval = null } if (signalCheckInterval) { clearInterval(signalCheckInterval); signalCheckInterval = null } signalLost.value = false; clearSignalLost() }
-  else startPolling()
+  if (isManual.value) {
+    if (pollInterval) { clearInterval(pollInterval); pollInterval = null }
+    if (signalCheckInterval) { clearInterval(signalCheckInterval); signalCheckInterval = null }
+    signalLost.value = false; clearSignalLost()
+  } else startPolling()
 }
 
 async function sheetDeleteFiring(f) { sheetConfirmDeleteId.value = null; showFiringSheet.value = false; await deleteFiring(f) }
+
+// ── Page visibility: re-sync when returning to PWA / tab ──────────────────────
+async function onVisibilityChange() {
+  if (document.hidden) return
+  if (!selectedFiring.value) return
+  await reloadReadings()
+  // Restart polling intervals if they died while the page was suspended
+  if (isLive.value && !isManual.value) startPolling()
+  // Restart elapsed ticker if it stopped
+  if (isLive.value && !elapsedTickInterval) {
+    elapsedTickInterval = setInterval(() => { nowUnix.value = Math.floor(Date.now() / 1000) }, 1000)
+  }
+}
 
 onMounted(async () => {
   await init()
@@ -520,14 +554,15 @@ onMounted(async () => {
   if (activeFiring.value) await selectFiring(activeFiring.value)
   await refreshSensors()
   startSensorPolling()
+  document.addEventListener('visibilitychange', onVisibilityChange)
 })
 
 onUnmounted(() => {
   stopAllIntervals()
-  if (sensorPollInterval)  clearInterval(sensorPollInterval)
-  if (sensorClockInterval) clearInterval(sensorClockInterval)
+  if (sensorPollInterval) clearInterval(sensorPollInterval)
   destroy()
   destroyMobile()
+  document.removeEventListener('visibilitychange', onVisibilityChange)
 })
 
 async function refreshFirings() { allFirings.value = await $fetch('/api/firings') }
@@ -592,9 +627,11 @@ function startPolling() {
   if (pollInterval) clearInterval(pollInterval); if (signalCheckInterval) clearInterval(signalCheckInterval)
   pollInterval = setInterval(async () => {
     if (!selectedFiring.value || isManual.value) return
-    const rows = await $fetch(`/api/readings?firingId=${selectedFiring.value.id}`)
-    selectedFiring.value.readings = rows; setReadings(rows, selectedFiring.value.started_at); setReadingsMobile(rows, selectedFiring.value.started_at)
-    if (rows.length) { const last = rows.at(-1); currentTemp.value = last.temperature; lastReadingTime.value = last.timestamp; isLive.value = true; if (signalLost.value) { signalLost.value = false; clearSignalLost() } }
+    try {
+      const rows = await $fetch(`/api/readings?firingId=${selectedFiring.value.id}`)
+      selectedFiring.value.readings = rows; setReadings(rows, selectedFiring.value.started_at); setReadingsMobile(rows, selectedFiring.value.started_at)
+      if (rows.length) { const last = rows.at(-1); currentTemp.value = last.temperature; lastReadingTime.value = last.timestamp; isLive.value = true; if (signalLost.value) { signalLost.value = false; clearSignalLost() } }
+    } catch (err) { console.error('Poll error:', err) }
   }, 5000)
   signalCheckInterval = setInterval(() => {
     if (!selectedFiring.value || isManual.value) return
@@ -603,8 +640,6 @@ function startPolling() {
     if (now - lastReadingTime.value > SIGNAL_TIMEOUT) { signalLost.value = true; setSignalLost(selectedFiring.value.started_at, lastReadingTime.value) }
   }, 5000)
 }
-
-function openLogReading() { editingReading.value = null; showReadingModal.value = true }
 </script>
 
 <style>

@@ -336,6 +336,7 @@ const showSensorPanel      = ref(false)
 
 const { init, setSchedule, setReadings, setManualMode, setSignalLost, clearSignalLost, resetZoom, destroy } = useKilnChart(chartCanvas, {
   enableZoom: true,
+  showLabels: true,
   onPointClick: (point) => {
     if (!isManual.value || !isLive.value) return
     editingReading.value = { id: point.raw?.id ?? point.id, ts: point.raw?.ts ?? point.ts, y: point.y, x: point.x }

@@ -203,7 +203,6 @@
           </div>
 
           <template v-else>
-            <!-- Stats strip -->
             <div class="shrink-0 grid grid-cols-3 border-b border-parchment-3 bg-parchment">
               <button class="flex flex-col items-center py-3 px-1 border-r border-parchment-3 active:bg-parchment-2" @click="showTempModal = true">
                 <span class="text-[9px] font-bold uppercase tracking-widest text-ink-faint mb-1">Temp</span>
@@ -222,7 +221,6 @@
               </div>
             </div>
 
-            <!-- Chart -->
             <div class="flex-1 mx-3 mt-3 mb-2 bg-white rounded-xl border border-parchment-3 relative overflow-hidden" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
               <canvas ref="chartCanvasMobile" class="w-full h-full touch-none"></canvas>
               <button class="absolute bottom-2 right-2 px-2.5 py-1 text-[10px] font-medium border border-parchment-3 rounded-lg bg-parchment text-ink-faint active:bg-parchment-2" @click="resetZoomMobile">Reset zoom</button>
@@ -240,7 +238,6 @@
               </div>
             </div>
 
-            <!-- Action bar -->
             <div class="shrink-0 px-3 pb-3 pt-1 flex gap-2">
               <button v-if="isLive && isManual" class="flex-1 py-3 bg-flame text-parchment text-sm font-bold rounded-lg active:bg-flame-dark transition-colors" @click="openLogReading">+ Log reading</button>
               <button v-if="isLive" class="py-3 px-4 border rounded-lg text-xs font-bold shrink-0 transition-colors" :class="isManual ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-parchment-3 bg-parchment-2 text-ink-muted'" @click="toggleMode">{{ isManual ? 'Manual' : 'Connected' }}</button>
@@ -326,6 +323,7 @@ const showTempModal        = ref(false)
 const allFirings           = ref([])
 const selectedFiring       = ref(null)
 const currentTemp          = ref(null)
+const isSaving             = ref(false)
 const isLive               = ref(false)
 const isManual             = ref(false)
 const signalLost           = ref(false)
@@ -452,6 +450,7 @@ function closeReadingModal() { showReadingModal.value = false; editingReading.va
 
 async function saveReading(payload) {
   if (!selectedFiring.value) return
+  isSaving.value = true
   try {
     if (editingReading.value) {
       const id = editingReading.value.id ?? editingReading.value.raw?.id
@@ -461,7 +460,7 @@ async function saveReading(payload) {
         method: 'POST',
         body: { firingId: selectedFiring.value.id, temperature: payload.temperature, timestamp: payload.timestamp },
       })
-      // Optimistic update — show entered value immediately
+      // Optimistic update — protected by isSaving flag so reloadReadings can't overwrite it
       currentTemp.value     = payload.temperature
       lastReadingTime.value = payload.timestamp
     }
@@ -470,6 +469,8 @@ async function saveReading(payload) {
   } catch (err) {
     console.error('Failed to save reading:', err)
     alert(`Failed to save reading: ${err?.data?.message ?? err.message ?? 'Unknown error'}`)
+  } finally {
+    isSaving.value = false
   }
 }
 
@@ -493,7 +494,8 @@ async function reloadReadings() {
     selectedFiring.value.readings = data.readings
     setReadings(data.readings, selectedFiring.value.started_at)
     setReadingsMobile(data.readings, selectedFiring.value.started_at)
-    if (data.readings?.length) {
+    // Only update currentTemp from server if we're not mid-save
+    if (!isSaving.value && data.readings?.length) {
       currentTemp.value     = data.readings.at(-1).temperature
       lastReadingTime.value = data.readings.at(-1).timestamp
     }
@@ -612,7 +614,7 @@ function startPolling() {
     try {
       const rows = await $fetch(`/api/readings?firingId=${selectedFiring.value.id}`)
       selectedFiring.value.readings = rows; setReadings(rows, selectedFiring.value.started_at); setReadingsMobile(rows, selectedFiring.value.started_at)
-      if (rows.length) { const last = rows.at(-1); currentTemp.value = last.temperature; lastReadingTime.value = last.timestamp; isLive.value = true; if (signalLost.value) { signalLost.value = false; clearSignalLost() } }
+      if (rows.length && !isSaving.value) { const last = rows.at(-1); currentTemp.value = last.temperature; lastReadingTime.value = last.timestamp; isLive.value = true; if (signalLost.value) { signalLost.value = false; clearSignalLost() } }
     } catch (err) { console.error('Poll error:', err) }
   }, 5000)
   signalCheckInterval = setInterval(() => {

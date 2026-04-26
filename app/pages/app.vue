@@ -73,45 +73,44 @@
 
           <!-- Stats strip -->
           <div v-if="selectedFiring" class="shrink-0 flex items-stretch border-b border-parchment-3 bg-parchment">
-            <button
-              class="flex flex-col items-center py-3 px-6 border-r border-parchment-3 hover:bg-parchment-2 transition-colors"
-              @click="showTempModal = true"
-            >
+            <!-- TEMP -->
+            <button class="flex flex-col items-center py-3 px-6 border-r border-parchment-3 hover:bg-parchment-2 transition-colors" @click="showTempModal = true">
               <span class="text-[9px] font-bold uppercase tracking-widest text-ink-faint mb-1">Temp</span>
               <span class="text-2xl font-bold leading-none tabular-nums" :class="currentTemp !== null ? 'text-flame' : 'text-parchment-3'">
                 {{ currentTemp !== null ? Math.round(currentTemp) : '—' }}
               </span>
               <span class="text-[9px] mt-0.5" :class="currentTemp !== null ? 'text-flame-light' : 'text-parchment-3'">°C</span>
             </button>
+            <!-- ACTUAL RATE -->
             <div class="flex flex-col items-center py-3 px-6 border-r border-parchment-3">
               <span class="text-[9px] font-bold uppercase tracking-widest text-ink-faint mb-1">Rate</span>
               <span class="text-xl font-bold leading-none tabular-nums" :class="rateOfChange && rateOfChange !== '—' ? 'text-green-600' : 'text-ink-faint'">{{ rateOfChange ?? '—' }}</span>
             </div>
+            <!-- TARGET RATE -->
+            <div class="flex flex-col items-center py-3 px-6 border-r border-parchment-3">
+              <span class="text-[9px] font-bold uppercase tracking-widest text-ink-faint mb-1">Target</span>
+              <span class="text-xl font-bold leading-none tabular-nums" :class="targetRate && targetRate !== '—' ? 'text-ink' : 'text-ink-faint'">{{ targetRate ?? '—' }}</span>
+            </div>
+            <!-- ELAPSED -->
             <div class="flex flex-col items-center py-3 px-6 border-r border-parchment-3">
               <span class="text-[9px] font-bold uppercase tracking-widest text-ink-faint mb-1">Time</span>
               <span class="text-xl font-bold leading-none tabular-nums text-ink">{{ isLive ? elapsed : '—' }}</span>
             </div>
+            <!-- PEAK -->
             <div class="flex flex-col items-center py-3 px-6 border-r border-parchment-3">
               <span class="text-[9px] font-bold uppercase tracking-widest text-ink-faint mb-1">Peak</span>
               <span class="text-2xl font-bold leading-none tabular-nums text-ink">{{ peakTemp !== null ? Math.round(peakTemp) : '—' }}</span>
               <span class="text-[9px] text-ink-faint mt-0.5">°C</span>
             </div>
+            <!-- READINGS -->
             <div class="flex flex-col items-center py-3 px-6 border-r border-parchment-3">
               <span class="text-[9px] font-bold uppercase tracking-widest text-ink-faint mb-1">Readings</span>
               <span class="text-xl font-bold leading-none tabular-nums text-ink">{{ readingCount }}</span>
             </div>
+            <!-- ACTION BUTTONS -->
             <div v-if="selectedFiring" class="flex items-center gap-2 px-4 ml-auto">
-              <button
-                v-if="isLive && isManual"
-                class="px-4 py-2 bg-flame text-parchment text-sm font-bold rounded-xl hover:bg-flame-dark transition-colors"
-                @click="openLogReading"
-              >+ Log reading</button>
-              <button
-                v-if="isLive"
-                class="px-4 py-2 text-sm font-bold rounded-xl border transition-colors"
-                :class="isManual ? 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100' : 'border-parchment-3 bg-parchment-2 text-ink-muted hover:bg-parchment-3'"
-                @click="toggleMode"
-              >⇅ {{ isManual ? 'Switch to Connected' : 'Switch to Manual' }}</button>
+              <button v-if="isLive && isManual" class="px-4 py-2 bg-flame text-parchment text-sm font-bold rounded-xl hover:bg-flame-dark transition-colors" @click="openLogReading">+ Log reading</button>
+              <button v-if="isLive" class="px-4 py-2 text-sm font-bold rounded-xl border transition-colors" :class="isManual ? 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100' : 'border-parchment-3 bg-parchment-2 text-ink-muted hover:bg-parchment-3'" @click="toggleMode">⇅ {{ isManual ? 'Switch to Connected' : 'Switch to Manual' }}</button>
               <button
                 class="flex items-center gap-1.5 px-3 py-2 text-sm font-bold rounded-xl border transition-colors"
                 :class="showSensorPanel ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-parchment-3 bg-parchment-2 text-ink-muted hover:bg-parchment-3'"
@@ -119,9 +118,7 @@
               >
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/></svg>
                 Sensors
-                <span v-if="assignedSensors.length" class="text-[10px] bg-flame text-parchment rounded-full w-4 h-4 flex items-center justify-center font-bold">
-                  {{ assignedSensors.length }}
-                </span>
+                <span v-if="assignedSensors.length" class="text-[10px] bg-flame text-parchment rounded-full w-4 h-4 flex items-center justify-center font-bold">{{ assignedSensors.length }}</span>
               </button>
             </div>
           </div>
@@ -203,7 +200,9 @@
           </div>
 
           <template v-else>
+            <!-- Stats strip — 3 cols: Temp | Rate/Target | Time (small) -->
             <div class="shrink-0 grid grid-cols-3 border-b border-parchment-3 bg-parchment">
+              <!-- TEMP -->
               <button class="flex flex-col items-center py-3 px-1 border-r border-parchment-3 active:bg-parchment-2" @click="showTempModal = true">
                 <span class="text-[9px] font-bold uppercase tracking-widest text-ink-faint mb-1">Temp</span>
                 <span class="text-xl font-bold leading-none tabular-nums" :class="currentTemp !== null ? 'text-flame' : 'text-parchment-3'">
@@ -211,23 +210,29 @@
                 </span>
                 <span class="text-[9px] text-flame-light mt-0.5">°C</span>
               </button>
-              <div class="flex flex-col items-center py-3 px-1 border-r border-parchment-3">
-                <span class="text-[9px] font-bold uppercase tracking-widest text-ink-faint mb-1">Rate</span>
-                <span class="text-lg font-bold leading-none tabular-nums" :class="rateOfChange && rateOfChange !== '—' ? 'text-green-600' : 'text-ink-faint'">{{ rateOfChange ?? '—' }}</span>
+              <!-- RATE + TARGET stacked -->
+              <div class="flex flex-col items-center justify-center py-2 px-1 border-r border-parchment-3 gap-1">
+                <div class="flex flex-col items-center">
+                  <span class="text-[9px] font-bold uppercase tracking-widest text-ink-faint">Rate</span>
+                  <span class="text-lg font-bold leading-none tabular-nums" :class="rateOfChange && rateOfChange !== '—' ? 'text-green-600' : 'text-ink-faint'">{{ rateOfChange ?? '—' }}</span>
+                </div>
+                <div class="flex flex-col items-center">
+                  <span class="text-[9px] font-bold uppercase tracking-widest text-ink-faint">Target</span>
+                  <span class="text-sm font-bold leading-none tabular-nums" :class="targetRate && targetRate !== '—' ? 'text-ink' : 'text-ink-faint'">{{ targetRate ?? '—' }}</span>
+                </div>
               </div>
-              <div class="flex flex-col items-center py-3 px-1">
+              <!-- TIME small -->
+              <div class="flex flex-col items-center justify-center py-3 px-1">
                 <span class="text-[9px] font-bold uppercase tracking-widest text-ink-faint mb-1">Time</span>
-                <span class="text-lg font-bold leading-none tabular-nums text-ink">{{ isLive ? elapsed : '—' }}</span>
+                <span class="text-sm font-bold leading-none tabular-nums text-ink">{{ isLive ? elapsed : '—' }}</span>
               </div>
             </div>
 
+            <!-- Chart -->
             <div class="flex-1 mx-3 mt-3 mb-2 bg-white rounded-xl border border-parchment-3 relative overflow-hidden" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
               <canvas ref="chartCanvasMobile" class="w-full h-full touch-none"></canvas>
               <button class="absolute bottom-2 right-2 px-2.5 py-1 text-[10px] font-medium border border-parchment-3 rounded-lg bg-parchment text-ink-faint active:bg-parchment-2" @click="resetZoomMobile">Reset zoom</button>
-              <button
-                class="absolute bottom-2 left-2 px-2.5 py-1 text-[10px] font-medium border border-parchment-3 rounded-lg bg-parchment text-ink-faint active:bg-parchment-2 flex items-center gap-1"
-                @click="reloadReadings"
-              >
+              <button class="absolute bottom-2 left-2 px-2.5 py-1 text-[10px] font-medium border border-parchment-3 rounded-lg bg-parchment text-ink-faint active:bg-parchment-2 flex items-center gap-1" @click="reloadReadings">
                 <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                   <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
@@ -238,6 +243,7 @@
               </div>
             </div>
 
+            <!-- Action bar -->
             <div class="shrink-0 px-3 pb-3 pt-1 flex gap-2">
               <button v-if="isLive && isManual" class="flex-1 py-3 bg-flame text-parchment text-sm font-bold rounded-lg active:bg-flame-dark transition-colors" @click="openLogReading">+ Log reading</button>
               <button v-if="isLive" class="py-3 px-4 border rounded-lg text-xs font-bold shrink-0 transition-colors" :class="isManual ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-parchment-3 bg-parchment-2 text-ink-muted'" @click="toggleMode">{{ isManual ? 'Manual' : 'Connected' }}</button>
@@ -344,9 +350,11 @@ const { init, setSchedule, setReadings, setManualMode, setSignalLost, clearSigna
 
 const { init: initMobile, setSchedule: setScheduleMobile, setReadings: setReadingsMobile, resetZoom: resetZoomMobile, destroy: destroyMobile } = useKilnChart(chartCanvasMobile, { enableZoom: true, showLabels: true })
 
-const SIGNAL_TIMEOUT   = 30
-const ONLINE_TIMEOUT   = 30
-const RATE_WINDOW_MINS = 20
+const SIGNAL_TIMEOUT = 30
+const ONLINE_TIMEOUT = 30
+// EMA smoothing factor — higher = more reactive, lower = smoother
+// 0.3 is a good middle ground for manual logging
+const EMA_ALPHA = 0.3
 
 const sidebarOpen  = ref(true)
 const sidebarWidth = ref(280)
@@ -363,27 +371,55 @@ const duration     = computed(() => { const f = selectedFiring.value; if (!f?.st
 const readingCount = computed(() => selectedFiring.value?.readings?.length ?? 0)
 const elapsed      = computed(() => { const f = selectedFiring.value; if (!f?.started_at) return '—'; const mins = Math.round((nowUnix.value - f.started_at) / 60), h = Math.floor(mins / 60), m = mins % 60; return h > 0 ? `${h}h ${m}m` : `${m}m` })
 
-// Linear regression over a rolling 20-minute window — smooth, trend-aware rate
+// ── EMA rate of change ────────────────────────────────────────────────────────
+// Calculates instantaneous rate between each consecutive pair of readings,
+// then applies exponential moving average to smooth without over-damping.
 const rateOfChange = computed(() => {
   const readings = selectedFiring.value?.readings
-  if (!readings || readings.length < 3) return '—'
-  const now    = readings.at(-1).timestamp
-  const cutoff = now - (RATE_WINDOW_MINS * 60)
-  const window = readings.filter(r => r.timestamp >= cutoff)
-  if (window.length < 3) return '—'
-  const spanMins = (window.at(-1).timestamp - window[0].timestamp) / 60
-  if (spanMins < 2) return '—'
-  const x0 = window[0].timestamp
-  let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0
-  const n = window.length
-  for (const r of window) {
-    const x = (r.timestamp - x0) / 60
-    const y = r.temperature
-    sumX += x; sumY += y; sumXY += x * y; sumX2 += x * x
+  if (!readings || readings.length < 2) return '—'
+
+  let ema = null
+  for (let i = 1; i < readings.length; i++) {
+    const prev = readings[i - 1]
+    const curr = readings[i]
+    const deltaMins = (curr.timestamp - prev.timestamp) / 60
+    if (deltaMins < 0.5) continue  // skip readings less than 30s apart (noise)
+    const instantRate = (curr.temperature - prev.temperature) / deltaMins
+    ema = ema === null ? instantRate : EMA_ALPHA * instantRate + (1 - EMA_ALPHA) * ema
   }
-  const denom = (n * sumX2 - sumX * sumX)
-  if (denom === 0) return '—'
-  const rate = Math.round((n * sumXY - sumX * sumY) / denom)
+
+  if (ema === null) return '—'
+  const rate = Math.round(ema)
+  return rate >= 0 ? `+${rate}°/m` : `${rate}°/m`
+})
+
+// ── Target rate from schedule ─────────────────────────────────────────────────
+// Finds the two surrounding schedule waypoints at the current elapsed time
+// and returns the slope between them as the planned °/min rate.
+const targetRate = computed(() => {
+  const f = selectedFiring.value
+  if (!f?.started_at || !f?.schedule?.length) return '—'
+
+  const elapsedMins = (nowUnix.value - f.started_at) / 60
+  const schedule    = [...f.schedule].sort((a, b) => a.offset_minutes - b.offset_minutes)
+
+  // Find surrounding waypoints
+  let before = null, after = null
+  for (let i = 0; i < schedule.length - 1; i++) {
+    if (schedule[i].offset_minutes <= elapsedMins && schedule[i + 1].offset_minutes >= elapsedMins) {
+      before = schedule[i]
+      after  = schedule[i + 1]
+      break
+    }
+  }
+
+  if (!before || !after) return '—'
+
+  const deltaTemp = after.target_temp - before.target_temp
+  const deltaMins = after.offset_minutes - before.offset_minutes
+  if (deltaMins === 0) return '—'
+
+  const rate = Math.round(deltaTemp / deltaMins)
   return rate >= 0 ? `+${rate}°/m` : `${rate}°/m`
 })
 
@@ -460,7 +496,7 @@ async function saveReading(payload) {
         method: 'POST',
         body: { firingId: selectedFiring.value.id, temperature: payload.temperature, timestamp: payload.timestamp },
       })
-      // Optimistic update — protected by isSaving flag so reloadReadings can't overwrite it
+      // Optimistic update — protected by isSaving so reloadReadings can't overwrite
       currentTemp.value     = payload.temperature
       lastReadingTime.value = payload.timestamp
     }

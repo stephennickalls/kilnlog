@@ -1,3 +1,4 @@
+<!-- app/components/ManualReadingModal.vue -->
 <template>
   <Teleport to="body">
     <div
@@ -6,7 +7,6 @@
       style="background: rgba(26,18,8,0.6)"
       @click.self="$emit('close')"
     >
-      <!-- Sheet on mobile, centered modal on desktop -->
       <div class="bg-parchment w-full sm:w-[360px] sm:rounded-2xl rounded-t-2xl p-6 flex flex-col gap-5 border border-parchment-3"
         style="box-shadow: 0 -8px 40px rgba(26,18,8,0.15)">
 
@@ -19,7 +19,7 @@
           </button>
         </div>
 
-        <!-- Time info -->
+        <!-- Time info — ticks every second -->
         <div class="bg-parchment-2 border border-parchment-3 rounded-xl px-4 py-3 flex items-center justify-between">
           <div>
             <p class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint mb-0.5">Time from start</p>
@@ -85,29 +85,45 @@ const emit = defineEmits(['close', 'save', 'delete'])
 const tempInput = ref(null)
 const tempValue = ref(null)
 
-const effectiveTimestamp = computed(() =>
-  props.isEdit && props.editTs ? props.editTs : Math.floor(Date.now() / 1000)
+// Ticks every second while modal is open so display stays current
+const nowUnix = ref(Math.floor(Date.now() / 1000))
+let ticker = null
+
+watch(() => props.open, (val) => {
+  if (val) {
+    tempValue.value = props.isEdit && props.editTemp ? props.editTemp : null
+    // Reset clock to now when modal opens
+    nowUnix.value = Math.floor(Date.now() / 1000)
+    ticker = setInterval(() => { nowUnix.value = Math.floor(Date.now() / 1000) }, 1000)
+    nextTick(() => tempInput.value?.focus())
+  } else {
+    clearInterval(ticker)
+    ticker = null
+  }
+})
+
+onUnmounted(() => { clearInterval(ticker) })
+
+const displayTimestamp = computed(() =>
+  props.isEdit && props.editTs ? props.editTs : nowUnix.value
 )
 
 const minuteLabel = computed(() => {
-  const mins = Math.round((effectiveTimestamp.value - props.startedAt) / 60)
+  const mins = Math.round((displayTimestamp.value - props.startedAt) / 60)
   const h = Math.floor(mins / 60), m = mins % 60
   return h > 0 ? `${h}h ${m}m` : `${m}m`
 })
 
 const clockTime = computed(() =>
-  new Date(effectiveTimestamp.value * 1000).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' })
+  new Date(displayTimestamp.value * 1000).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' })
 )
-
-watch(() => props.open, (val) => {
-  if (val) {
-    tempValue.value = props.isEdit && props.editTemp ? props.editTemp : null
-    nextTick(() => tempInput.value?.focus())
-  }
-})
 
 function submit() {
   if (!tempValue.value || tempValue.value <= 0) return
-  emit('save', { temperature: tempValue.value, timestamp: effectiveTimestamp.value })
+  // Capture timestamp at the moment of submit — always current
+  const timestamp = props.isEdit && props.editTs
+    ? props.editTs
+    : Math.floor(Date.now() / 1000)
+  emit('save', { temperature: tempValue.value, timestamp })
 }
 </script>

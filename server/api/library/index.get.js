@@ -1,11 +1,16 @@
+// server/api/library/index.get.js
+// Schedule library is shared/built-in data — no user ownership needed.
+// Uses a fresh client per request (no singleton) to be safe in serverless.
+import { createClient } from '@supabase/supabase-js'
+
 export default defineEventHandler(async () => {
-  const db = useSupabase()
+  const db = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY)
 
   const { data: libraries, error } = await db
     .from('schedule_library')
     .select('*')
     .order('type', { ascending: true })
-    .order('name', { ascending: true })
+    .order('name',  { ascending: true })
 
   if (error) throw createError({ statusCode: 500, statusMessage: error.message })
 

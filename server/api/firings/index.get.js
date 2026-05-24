@@ -1,5 +1,4 @@
 // server/api/firings/index.get.js
-
 export default defineEventHandler(async (event) => {
   const { db, user } = await useServerUser(event)
 

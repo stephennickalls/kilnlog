@@ -1,5 +1,4 @@
 // server/api/firings/[id].get.js
-
 export default defineEventHandler(async (event) => {
   const { db, user } = await useServerUser(event)
   const id = Number(getRouterParam(event, 'id'))
@@ -22,8 +21,8 @@ export default defineEventHandler(async (event) => {
 
   return {
     ...firing,
-    schedule:  schedulePoints ?? [],
-    readings:  readingRows ?? [],
-    sensors:   assignedSensors ?? [],
+    schedule: schedulePoints ?? [],
+    readings: readingRows    ?? [],
+    sensors:  assignedSensors ?? [],
   }
 })

@@ -3,19 +3,16 @@
 import { createClient } from '@supabase/supabase-js'
 
 export default defineEventHandler(async (event) => {
-  const token = getHeader(event, 'x-sensor-token')
+  const sensorToken = getHeader(event, 'x-sensor-token')
 
-  if (token) {
+  if (sensorToken) {
     // ── Sensor path (ESP32) ──────────────────────────────────────────────────
-    const db = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_KEY
-    )
+    const db = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY)
 
     const { data: sensor, error: sensorErr } = await db
       .from('sensors')
       .select('id, user_id, name')
-      .eq('token', token)
+      .eq('token', sensorToken)
       .maybeSingle()
 
     if (sensorErr || !sensor) {
@@ -77,15 +74,15 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 400, statusMessage: 'Invalid temperature value' })
     }
 
-    // Verify the firing belongs to this user
+    // Verify firing belongs to user
     const { data: firing } = await db
       .from('firings')
       .select('id')
       .eq('id', Number(firingId))
       .eq('user_id', user.id)
-      .maybeSingle()
+      .single()
 
-    if (!firing) throw createError({ statusCode: 403, statusMessage: 'Firing not found or access denied' })
+    if (!firing) throw createError({ statusCode: 403, statusMessage: 'Firing not found' })
 
     const { data, error } = await db
       .from('readings')

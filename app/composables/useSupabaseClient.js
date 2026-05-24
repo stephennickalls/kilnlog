@@ -1,4 +1,4 @@
-// composables/useSupabaseClient.js
+// app/composables/useSupabaseClient.js
 import { createClient } from '@supabase/supabase-js'
 
 let client = null
@@ -8,7 +8,7 @@ export function useSupabaseClient() {
     const config = useRuntimeConfig()
     client = createClient(
       config.public.supabaseUrl,
-      config.public.supabaseAnonKey
+      config.public.supabasePublishableKey
     )
   }
   return client

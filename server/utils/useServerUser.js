@@ -1,11 +1,11 @@
 // server/utils/useServerUser.js
+import { createClient } from '@supabase/supabase-js'
 
 export async function useServerUser(event) {
   const url = process.env.SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const key = process.env.SUPABASE_SECRET_KEY
   if (!url || !key) throw createError({ statusCode: 500, statusMessage: 'Supabase env vars not set' })
 
-  const { createClient } = await import('@supabase/supabase-js')
   const db = createClient(url, key)
 
   const authHeader = getHeader(event, 'authorization')

@@ -219,6 +219,22 @@
       @delete="deleteReading"
     />
 
+    <!-- ── Toast ─────────────────────────────────────────────────────────────── -->
+    <Teleport to="body">
+      <Transition name="toast">
+        <div
+          v-if="toast.visible.value"
+          class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-semibold font-serif max-w-sm w-[calc(100%-2rem)]"
+          :class="toast.type.value === 'error' ? 'bg-red-600 text-white' : 'bg-green-600 text-white'"
+        >
+          <span class="flex-1">{{ toast.message.value }}</span>
+          <button class="shrink-0 opacity-75 hover:opacity-100" @click="toast.hide()">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+      </Transition>
+    </Teleport>
+
   </div>
 </template>
 
@@ -227,6 +243,10 @@
 import { useKilnChart } from '~/composables/useKilnChart'
 
 definePageMeta({ middleware: ['auth'] })
+
+// ── Composables ────────────────────────────────────────────────────────────────
+const realtime = useFiringRealtime()
+const toast    = useToast()
 
 // ── Refs ───────────────────────────────────────────────────────────────────────
 const chartCanvas          = ref(null)
@@ -259,14 +279,12 @@ const SIGNAL_TIMEOUT = 30
 const ONLINE_TIMEOUT = 30
 const EMA_ALPHA      = 0.3
 
-// ── Intervals (non-reactive) ───────────────────────────────────────────────────
+// ── Intervals ─────────────────────────────────────────────────────────────────
 let signalCheckInterval = null
 let elapsedTickInterval = null
 let sensorPollInterval  = null
 
-// ── Composables ────────────────────────────────────────────────────────────────
-const realtime = useFiringRealtime()
-
+// ── Charts ─────────────────────────────────────────────────────────────────────
 const { init, setSchedule, setReadings, setManualMode, setSignalLost, clearSignalLost, resetZoom, destroy } = useKilnChart(chartCanvas, {
   enableZoom: true,
   showLabels: true,
@@ -376,7 +394,7 @@ function startDrag(e) {
   window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp)
 }
 
-// ── Realtime subscription (replaces poll) ──────────────────────────────────────
+// ── Realtime ───────────────────────────────────────────────────────────────────
 function startPolling() {
   if (signalCheckInterval) clearInterval(signalCheckInterval)
   if (!selectedFiring.value) return
@@ -388,8 +406,6 @@ function startPolling() {
     if (isManual.value) return
 
     const existing = selectedFiring.value.readings ?? []
-
-    // Guard against duplicate deliveries
     if (existing.some(r => r.id === reading.id)) return
 
     const merged = existing.concat(reading)
@@ -405,7 +421,6 @@ function startPolling() {
     }
   })
 
-  // Signal-lost watchdog — still a local timer
   signalCheckInterval = setInterval(() => {
     if (!selectedFiring.value || isManual.value) return
     const now = Math.floor(Date.now() / 1000)
@@ -541,7 +556,7 @@ async function removeSensorFromFiring(sensorId) {
   selectedFiring.value.sensors = data.sensors
 }
 
-// ── Modals / reading ───────────────────────────────────────────────────────────
+// ── Modals / readings ──────────────────────────────────────────────────────────
 async function openStartModal() {
   if (!library.value.length) library.value = await $fetch('/api/library')
   await refreshSensors()
@@ -569,8 +584,7 @@ async function saveReading(payload) {
     closeReadingModal()
     await reloadReadings()
   } catch (err) {
-    console.error('Failed to save reading:', err)
-    alert(`Failed to save: ${err?.data?.message ?? err.message ?? 'Unknown error'}`)
+    toast.show(`Failed to save: ${err?.data?.message ?? err.message ?? 'Unknown error'}`)
   } finally {
     isSaving.value = false
   }
@@ -584,8 +598,7 @@ async function deleteReading() {
     closeReadingModal()
     await reloadReadings()
   } catch (err) {
-    console.error('Failed to delete reading:', err)
-    alert(`Failed to delete: ${err?.data?.message ?? err.message ?? 'Unknown error'}`)
+    toast.show(`Failed to delete: ${err?.data?.message ?? err.message ?? 'Unknown error'}`)
   }
 }
 
@@ -640,4 +653,6 @@ async function sheetDeleteFiring(f) {
 .btn-ghost   { @apply px-4 py-1.5 border border-parchment-3 text-ink-muted hover:bg-parchment-2 text-sm font-medium rounded-lg transition-colors; }
 .input       { @apply w-full border border-parchment-3 rounded-lg px-3 py-1.5 text-sm text-ink bg-white focus:outline-none focus:ring-2 focus:ring-flame/20 focus:border-flame font-serif; }
 .label       { @apply text-xs font-bold uppercase tracking-widest text-ink-faint; }
+.toast-enter-active, .toast-leave-active { transition: all 0.2s ease; }
+.toast-enter-from, .toast-leave-to       { opacity: 0; transform: translate(-50%, 1rem); }
 </style>

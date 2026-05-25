@@ -1,3 +1,4 @@
+<!-- app/pages/account.vue -->
 <template>
   <div class="min-h-screen bg-parchment font-serif">
 
@@ -12,6 +13,12 @@
     <!-- Loading -->
     <div v-if="loading" class="flex items-center justify-center py-20">
       <div class="w-7 h-7 border-[3px] border-parchment-3 border-t-flame rounded-full animate-spin"></div>
+    </div>
+
+    <!-- Error -->
+    <div v-else-if="loadError" class="flex flex-col items-center justify-center py-20 gap-3">
+      <p class="text-sm text-ink-muted">{{ loadError }}</p>
+      <button class="text-sm text-flame font-semibold" @click="load">Try again</button>
     </div>
 
     <template v-else>
@@ -51,8 +58,16 @@
                 <span class="text-sm font-semibold text-ink">{{ formatDate(profile.trial_ends_at) }}</span>
               </div>
               <p class="text-xs text-ink-faint">{{ daysLeft }} day{{ daysLeft !== 1 ? 's' : '' }} remaining</p>
-              <button class="w-full py-2.5 bg-flame text-parchment text-sm font-bold rounded-xl hover:bg-flame-dark transition-colors" @click="checkout">
-                Subscribe now — $27 NZD/yr
+              <button
+                class="w-full py-2.5 bg-flame text-parchment text-sm font-bold rounded-xl hover:bg-flame-dark transition-colors disabled:opacity-50"
+                :disabled="billingLoading"
+                @click="checkout"
+              >
+                <span v-if="billingLoading" class="flex items-center justify-center gap-2">
+                  <span class="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
+                  Redirecting…
+                </span>
+                <span v-else>Subscribe now — $49 NZD/yr</span>
               </button>
             </template>
 
@@ -65,8 +80,16 @@
                 <span class="text-sm text-ink-muted">Renews</span>
                 <span class="text-sm font-semibold text-ink">{{ formatDate(profile.subscription_ends_at) }}</span>
               </div>
-              <button class="w-full py-2.5 border border-parchment-3 text-ink-muted text-sm font-semibold rounded-xl hover:bg-parchment-2 transition-colors" @click="portal">
-                Manage billing →
+              <button
+                class="w-full py-2.5 border border-parchment-3 text-ink-muted text-sm font-semibold rounded-xl hover:bg-parchment-2 transition-colors disabled:opacity-50"
+                :disabled="billingLoading"
+                @click="portal"
+              >
+                <span v-if="billingLoading" class="flex items-center justify-center gap-2">
+                  <span class="w-3.5 h-3.5 border-2 border-parchment-3 border-t-ink-muted rounded-full animate-spin"></span>
+                  Redirecting…
+                </span>
+                <span v-else>Manage billing →</span>
               </button>
             </template>
 
@@ -76,10 +99,23 @@
                 <span class="px-2.5 py-1 text-xs font-bold rounded-full bg-parchment-2 text-ink-faint border border-parchment-3">Inactive</span>
               </div>
               <p class="text-xs text-ink-muted">Your subscription is not active.</p>
-              <button class="w-full py-2.5 bg-flame text-parchment text-sm font-bold rounded-xl hover:bg-flame-dark transition-colors" @click="checkout">
-                Resubscribe — $27 NZD/yr
+              <button
+                class="w-full py-2.5 bg-flame text-parchment text-sm font-bold rounded-xl hover:bg-flame-dark transition-colors disabled:opacity-50"
+                :disabled="billingLoading"
+                @click="checkout"
+              >
+                <span v-if="billingLoading" class="flex items-center justify-center gap-2">
+                  <span class="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
+                  Redirecting…
+                </span>
+                <span v-else>Resubscribe — $49 NZD/yr</span>
               </button>
             </template>
+
+            <!-- Billing error -->
+            <p v-if="billingError" class="text-xs text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              {{ billingError }}
+            </p>
 
           </div>
         </div>
@@ -116,22 +152,36 @@
 </template>
 
 <script setup>
+// app/pages/account.vue
 definePageMeta({ middleware: 'auth' })
 
-const supabase = useSupabaseClient()
-const loading  = ref(true)
-const user     = ref(null)
-const profile  = ref(null)
+const supabase     = useSupabaseClient()
+const loading      = ref(true)
+const loadError    = ref('')
+const billingLoading = ref(false)
+const billingError = ref('')
+const user         = ref(null)
+const profile      = ref(null)
 
-onMounted(async () => {
-  const { data: { user: u } } = await supabase.auth.getUser()
-  user.value = u
-  if (u) {
-    const { data } = await supabase.from('profiles').select('*').eq('id', u.id).single()
-    profile.value = data
+async function load() {
+  loading.value   = true
+  loadError.value = ''
+  try {
+    const { data: { user: u } } = await supabase.auth.getUser()
+    user.value = u
+    if (u) {
+      const { data, error } = await supabase.from('profiles').select('*').eq('id', u.id).single()
+      if (error) throw error
+      profile.value = data
+    }
+  } catch (e) {
+    loadError.value = 'Could not load your account. Please try again.'
+  } finally {
+    loading.value = false
   }
-  loading.value = false
-})
+}
+
+onMounted(load)
 
 const daysLeft = computed(() => {
   if (!profile.value?.trial_ends_at) return 0
@@ -145,13 +195,29 @@ function formatDate(ts) {
 }
 
 async function checkout() {
-  const { data } = await $fetch('/api/stripe/checkout', { method: 'POST' })
-  if (data?.url) window.location.href = data.url
+  billingLoading.value = true
+  billingError.value   = ''
+  try {
+    const { data } = await $fetch('/api/stripe/checkout', { method: 'POST' })
+    if (data?.url) window.location.href = data.url
+  } catch (e) {
+    billingError.value = e?.data?.message ?? 'Could not start checkout. Please try again.'
+  } finally {
+    billingLoading.value = false
+  }
 }
 
 async function portal() {
-  const { data } = await $fetch('/api/stripe/portal', { method: 'POST' })
-  if (data?.url) window.location.href = data.url
+  billingLoading.value = true
+  billingError.value   = ''
+  try {
+    const { data } = await $fetch('/api/stripe/portal', { method: 'POST' })
+    if (data?.url) window.location.href = data.url
+  } catch (e) {
+    billingError.value = e?.data?.message ?? 'Could not open billing portal. Please try again.'
+  } finally {
+    billingLoading.value = false
+  }
 }
 
 async function signOut() {

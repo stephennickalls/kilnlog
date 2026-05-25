@@ -1,19 +1,35 @@
-# 🔥 Kiln Monitor
+# 🔥 KilnMonitor
 
-Open source kiln temperature monitoring system. Plot a firing schedule, monitor real-time temperature from a K-type thermocouple, and compare actual vs planned on a live chart.
+Real-time kiln temperature monitoring for potters. Connect an ESP32 + thermocouple to watch your firing curve live, compare actual vs planned, and keep a full history of every firing.
 
-## Hardware Required
+**Live app:** [kilnlog.netlify.app](https://kilnlog.netlify.app)
 
-| Part | Cost (approx) |
-|------|--------------|
-| ESP32 dev board | NZ$10-15 |
-| MAX31855 K-Type thermocouple breakout | NZ$9 |
-| K-Type thermocouple probe (rated 1300°C+) | NZ$5-15 |
-| Jumper wires | ~NZ$2 |
+---
 
-**Total: ~NZ$30-40**
+## Features
 
-## Wiring
+- **Live temperature streaming** — ESP32 sends readings every 5 seconds via WiFi. Supabase Realtime pushes them to the browser instantly — no polling.
+- **Manual logging mode** — no sensor? Log readings by hand at your own pace.
+- **Planned vs actual chart** — draw a firing schedule with waypoints and watch actual temperature track against it live.
+- **Schedule library** — built-in schedules for earthenware, stoneware, and porcelain.
+- **Full firing history** — every firing saved, searchable, re-viewable.
+- **Signal lost detection** — alerts you if the sensor stops reporting mid-firing.
+- **Mobile + desktop** — responsive layout with a dedicated mobile chart view.
+
+---
+
+## Hardware
+
+| Part | Cost (approx NZD) |
+|------|-------------------|
+| ESP32 dev board | $10–15 |
+| MAX31855 K-type thermocouple breakout | $9 |
+| K-type thermocouple probe (rated 1300°C+) | $5–15 |
+| Jumper wires | ~$2 |
+
+**Total: ~$30–40 NZD**
+
+### Wiring
 
 | MAX31855 | ESP32 |
 |----------|-------|
@@ -23,13 +39,52 @@ Open source kiln temperature monitoring system. Plot a firing schedule, monitor 
 | CS | GPIO 5 |
 | DO | GPIO 19 |
 
-Thermocouple wires → green screw terminal on MAX31855 board (observe +/- polarity)
+Thermocouple wires → green screw terminal on MAX31855 (observe +/− polarity)
 
-## Software Setup
+---
+
+## Stack
+
+- **Frontend:** Nuxt 4, Vue 3, Tailwind CSS, Chart.js
+- **Backend:** Nuxt server routes (Nitro), deployed on Netlify Functions
+- **Database:** Supabase (Postgres + Auth + Realtime + RLS)
+- **Payments:** Stripe (annual subscription, $49 NZD/yr)
+- **Firmware:** ESP32 Arduino (MAX31855, ArduinoJson, WiFi)
+
+---
+
+## Architecture
+
+```
+ESP32 + MAX31855
+  → reads thermocouple every 5s
+  → GET /api/firings/active  (X-Sensor-Token header)
+  → POST /api/readings       (X-Sensor-Token header)
+
+Supabase Postgres
+  → stores firings, readings, sensors, profiles
+  → RLS on every table
+  → Realtime publication on readings table
+
+Nuxt 4 server (Netlify Functions)
+  → /api/* routes validate JWT via useServerUser()
+  → sensor routes validate via X-Sensor-Token lookup
+  → Stripe webhook updates subscription_status in profiles
+
+Browser
+  → Supabase Realtime subscription for live readings
+  → Chart.js renders planned vs actual curve
+  → Auth via Supabase JWT, injected by auth-fetch plugin
+```
+
+---
+
+## Development Setup
 
 ### Prerequisites
-- Node.js 18+
-- Git
+- Node.js 20+
+- A [Supabase](https://supabase.com) project
+- A [Stripe](https://stripe.com) account
 
 ### 1. Clone & install
 
@@ -39,87 +94,107 @@ cd kiln-monitor
 npm install
 ```
 
-### 2. Run
+### 2. Environment variables
+
+Copy `.env.example` to `.env` and fill in your values:
+
+```bash
+cp .env.example .env
+```
+
+```env
+# Supabase
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+SUPABASE_SECRET_KEY=sb_secret_...
+
+# Stripe
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PRICE_ID=price_...
+
+# App
+APP_URL=http://localhost:3000
+```
+
+### 3. Database
+
+Run the migrations in order in the Supabase SQL editor:
+
+```
+migrations/
+  20250525_enable_rls.sql
+  20250525_enable_realtime.sql
+  20250525_performance_indexes.sql
+```
+
+### 4. Run locally
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) — the SQLite database is created automatically on first run.
+Open [http://localhost:3000](http://localhost:3000)
 
-### 3. Enable mDNS so the ESP32 can find your laptop
+### 5. Stripe webhook (local)
 
-**macOS** — works out of the box via Bonjour ✅
+Use the [Stripe CLI](https://stripe.com/docs/stripe-cli) to forward webhooks:
 
-**Windows** — install [Bonjour](https://support.apple.com/kb/DL999) (or iTunes includes it)
-
-**Linux**
 ```bash
-sudo apt install avahi-daemon
-sudo systemctl enable avahi-daemon
-sudo systemctl start avahi-daemon
+stripe listen --forward-to localhost:3000/api/stripe/webhook
 ```
 
-Your laptop will now be reachable as `kiln.local` on your local network.
+---
 
-### 4. Flash the ESP32
+## ESP32 Firmware
 
-Open `/esp32/kiln_sensor/kiln_sensor.ino` in Arduino IDE.
+Open `esp32/kiln_sensor/kiln_sensor.ino` in Arduino IDE.
 
-Install required libraries via Library Manager:
+**Required libraries** (install via Library Manager):
 - `Adafruit MAX31855 library`
 - `ArduinoJson`
 
-Edit these lines in the sketch:
-```cpp
-const char* WIFI_SSID = "your_wifi_name";
-const char* WIFI_PASSWORD = "your_wifi_password";
-```
+The sensor is configured via the **Sensor Setup** page in the app — connect via USB serial, click Flash, and the app sends your WiFi credentials, API URL, and sensor token directly to the device.
 
-Flash to your ESP32. It will auto-discover `kiln.local` and start posting readings.
+---
 
-## Usage
+## API Reference
 
-1. Open `http://localhost:3000`
-2. Click **New Firing** — give it a name and add your planned schedule (time + target temp waypoints)
-3. Click **Start** — the chart goes live
-4. Watch actual temperature plot against your planned schedule in real time
-5. Click **End Firing** when done — the session is saved for future reference
+All user routes require a `Authorization: Bearer <token>` header.
+Sensor routes require a `X-Sensor-Token: <uuid>` header instead.
 
-## API Endpoints
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| GET | `/api/firings` | User | List all firings |
+| POST | `/api/firings` | User | Create a firing |
+| GET | `/api/firings/:id` | User | Get firing with readings, schedule, sensors |
+| PUT | `/api/firings/:id` | User | Update firing (start, end, mode, notes) |
+| DELETE | `/api/firings/:id` | User | Delete firing and all child records |
+| GET | `/api/firings/active` | Sensor | Get active firing for this sensor |
+| POST | `/api/firings/:id/sensors` | User | Assign sensor to firing |
+| DELETE | `/api/firings/:id/sensors/:sensorId` | User | Remove sensor from firing |
+| GET | `/api/readings` | User | Get readings for a firing (`?firingId=x`) |
+| POST | `/api/readings` | Both | Add a reading (sensor or manual) |
+| PUT | `/api/readings/:id` | User | Edit a manual reading |
+| DELETE | `/api/readings/:id` | User | Delete a reading |
+| GET | `/api/sensors` | User | List sensors |
+| POST | `/api/sensors` | User | Create sensor (generates token server-side) |
+| PUT | `/api/sensors/:id` | User | Rename sensor |
+| DELETE | `/api/sensors/:id` | User | Delete sensor |
+| GET | `/api/library` | Public | Get schedule library |
+| POST | `/api/stripe/checkout` | User | Create Stripe checkout session |
+| POST | `/api/stripe/portal` | User | Create Stripe billing portal session |
+| POST | `/api/stripe/webhook` | Stripe | Handle subscription lifecycle events |
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/readings` | ESP32 posts temperature readings here |
-| GET | `/api/readings?firingId=x` | Get readings for a firing |
-| POST | `/api/firings` | Create a new firing session |
-| GET | `/api/firings` | List all firing sessions |
-| GET | `/api/firings/:id` | Get a single firing with readings |
-| PUT | `/api/firings/:id` | Update (e.g. set ended_at) |
+---
 
-### POST /api/readings payload
-```json
-{
-  "firingId": 1,
-  "temperature": 843.25,
-  "timestamp": 1710000000
-}
-```
+## Deployment
 
-## Architecture
+The app is deployed to [Netlify](https://netlify.com). Push to `main` triggers a deploy.
 
-```
-ESP32 + MAX31855
-  → reads K-type thermocouple every 5s
-  → resolves kiln.local via mDNS
-  → HTTP POST /api/readings
+Required Netlify environment variables mirror the `.env` file above, using production keys.
 
-Nuxt 4 (localhost:3000)
-  → server/api/ routes handle data
-  → better-sqlite3 stores to kiln.db
-  → Vue page polls /api/readings every 5s
-  → Chart.js plots planned vs actual
-```
+---
 
 ## License
 

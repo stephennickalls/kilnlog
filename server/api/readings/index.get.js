@@ -1,4 +1,6 @@
 // server/api/readings/index.get.js
+// Supports ?since=<unix> to fetch only readings newer than a timestamp —
+// used by the live poll so we don't re-download the whole firing every 5s.
 export default defineEventHandler(async (event) => {
   const { db, user } = await useServerUser(event)
   const query = getQuery(event)
@@ -16,12 +18,18 @@ export default defineEventHandler(async (event) => {
 
   if (!firing) throw createError({ statusCode: 403, statusMessage: 'Firing not found' })
 
-  const { data, error } = await db
+  let q = db
     .from('readings')
     .select('*')
     .eq('firing_id', firingId)
     .order('timestamp', { ascending: true })
 
+  // Only fetch readings strictly newer than `since` when provided
+  if (query.since !== undefined && query.since !== '') {
+    q = q.gt('timestamp', Number(query.since))
+  }
+
+  const { data, error } = await q
   if (error) throw createError({ statusCode: 500, statusMessage: error.message })
   return data
 })

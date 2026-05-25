@@ -1,56 +1,35 @@
 <!-- app/pages/app.vue -->
 <template>
-  <div class="flex flex-col h-screen overflow-hidden bg-parchment font-serif">
+  <div class="flex flex-col h-screen overflow-hidden font-serif bg-parchment">
 
-    <!-- ── HEADER ── -->
-    <header class="shrink-0 flex items-center justify-between px-4 py-3 bg-parchment border-b border-parchment-3">
+    <!-- ── Header ───────────────────────────────────────────────────────────── -->
+    <header class="shrink-0 flex items-center justify-between px-4 sm:px-6 py-3 bg-parchment border-b border-parchment-3">
       <div class="flex items-center gap-2">
-        <button class="sm:hidden p-1.5 -ml-1 rounded-lg text-ink-muted active:bg-parchment-2" @click="showFiringSheet = true">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path d="M4 6h16M4 12h16M4 18h16"/>
-          </svg>
+        <button class="sm:hidden p-1.5 -ml-1 rounded-lg text-ink-muted" @click="showFiringSheet = true">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
         </button>
-        <h1 class="text-base font-bold text-ink tracking-tight">KilnMonitor</h1>
+        <NuxtLink to="/account" class="text-base sm:text-lg font-bold flex items-center gap-2 text-ink tracking-tight hover:text-flame transition-colors">🔥 KilnMonitor</NuxtLink>
       </div>
-
       <div class="flex items-center gap-2 min-w-0">
         <template v-if="selectedFiring">
-          <span class="text-xs font-semibold text-ink-muted truncate max-w-[100px] sm:max-w-none">{{ selectedFiring.name }}</span>
-          <span v-if="isLive && signalLost && !isManual" class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-yellow-100 text-yellow-700 border border-yellow-200 shrink-0">Signal lost</span>
-          <span v-else-if="isLive && !isManual" class="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-green-50 border border-green-200 text-green-700 shrink-0">
-            <span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>Live
-          </span>
-          <span v-else-if="isLive && isManual" class="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-blue-50 border border-blue-200 text-blue-700 shrink-0">
-            <span class="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>Manual
-          </span>
-          <template v-else-if="selectedFiring.ended_at">
-            <span v-if="selectedFiring.started_at" class="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-full bg-amber-50 border border-amber-200 text-amber-700 shrink-0">
-              <span class="w-1.5 h-1.5 bg-amber-400 rounded-full"></span>Finished
-            </span>
-            <span v-else class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-parchment-2 border border-parchment-3 text-ink-faint shrink-0">Done</span>
-            <button v-if="selectedFiring.started_at && !activeFiring" class="px-2.5 py-1 text-[10px] font-bold border border-amber-300 text-amber-700 hover:bg-amber-50 rounded-lg transition-colors shrink-0" @click="restartFiring(selectedFiring)">↺ Restart</button>
-          </template>
-          <button v-if="activeFiring && selectedFiring.id === activeFiring.id" class="px-2.5 py-1 text-[10px] font-bold border border-red-300 text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0" @click="endFiring">End</button>
+          <span class="text-xs sm:text-sm font-semibold text-ink truncate max-w-[90px] sm:max-w-none">{{ selectedFiring.name }}</span>
+          <span v-if="isLive" class="hidden sm:inline-flex px-2 py-0.5 text-xs font-bold rounded-full border cursor-pointer transition-colors"
+            :class="isManual ? 'bg-blue-50 text-blue-700 border-blue-200' : 'border-parchment-3 bg-parchment-2 text-ink-muted'"
+            @click="toggleMode">{{ isManual ? 'Manual' : 'Connected' }}</span>
+          <span v-if="isLive && signalLost && !isManual" class="px-2 py-0.5 text-xs font-bold rounded-full bg-yellow-100 text-yellow-700 border border-yellow-200 shrink-0">⚠️</span>
+          <span v-else-if="isLive && !isManual" class="px-2 py-0.5 text-xs font-bold rounded-full bg-green-100 text-green-700 border border-green-200 shrink-0">● LIVE</span>
+          <span v-else-if="isLive && isManual" class="px-2 py-0.5 text-xs font-bold rounded-full bg-blue-100 text-blue-700 border border-blue-200 shrink-0">● ACTIVE</span>
+          <span v-else-if="!selectedFiring.ended_at" class="px-2 py-0.5 text-xs font-bold rounded-full bg-amber-100 text-amber-700 border border-amber-200 shrink-0">⏳</span>
+          <span v-else class="px-2 py-0.5 text-xs font-bold rounded-full bg-parchment-2 text-ink-faint border border-parchment-3 shrink-0">DONE</span>
+          <button v-if="activeFiring && selectedFiring.id === activeFiring.id" class="btn-danger !px-2 !py-1 !text-xs shrink-0" @click="endFiring">End</button>
         </template>
-        <NuxtLink to="/sensors" class="hidden sm:flex items-center gap-1 px-2 py-1 text-xs text-ink-muted hover:text-ink hover:bg-parchment-2 rounded-lg transition-colors ml-1">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/>
-          </svg>
-          Sensors
-        </NuxtLink>
-        <NuxtLink to="/account" class="hidden sm:flex items-center gap-1 px-2 py-1 text-xs text-ink-muted hover:text-ink hover:bg-parchment-2 rounded-lg transition-colors ml-1">
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
-          </svg>
-          Account
-        </NuxtLink>
       </div>
     </header>
 
-    <!-- ── BODY ── -->
+    <!-- ── Body ─────────────────────────────────────────────────────────────── -->
     <div class="flex flex-1 overflow-hidden">
 
-      <!-- Desktop sidebar -->
+      <!-- Sidebar — desktop only -->
       <FiringSidebar
         class="hidden sm:flex"
         :open="sidebarOpen"
@@ -63,190 +42,98 @@
         @start="openStartModal"
         @drag="startDrag"
         @delete="deleteFiring"
-        @restart="restartFiring"
       />
 
+      <!-- Main content -->
       <main class="flex-1 flex flex-col min-w-0 overflow-hidden">
 
-        <!-- ── DESKTOP ── -->
-        <div class="hidden sm:flex flex-col flex-1 overflow-hidden">
+        <!-- Desktop stats bar -->
+        <div class="hidden sm:block p-5 pb-0">
+          <FiringStatsBar
+            v-if="selectedFiring"
+            :peak-temp="peakTemp"
+            :duration="duration"
+            :rate-of-change="rateOfChange"
+            :target-rate="targetRate"
+            :elapsed="elapsed"
+            :reading-count="readingCount"
+            :notes="selectedFiring.notes"
+            :is-live="isLive"
+            :is-manual="isManual"
+            :current-temp="currentTemp"
+            @open-temp="showTempModal = true"
+            @log-reading="openLogReading"
+          />
+        </div>
 
-          <!-- Stats strip -->
-          <div v-if="selectedFiring" class="shrink-0 flex items-stretch border-b border-parchment-3 bg-parchment">
-            <!-- TEMP -->
-            <button class="flex flex-col items-center py-3 px-6 border-r border-parchment-3 hover:bg-parchment-2 transition-colors" @click="showTempModal = true">
-              <span class="text-[9px] font-bold uppercase tracking-widest text-ink-faint mb-1">Temp</span>
-              <span class="text-2xl font-bold leading-none tabular-nums" :class="currentTemp !== null ? 'text-flame' : 'text-parchment-3'">
-                {{ currentTemp !== null ? Math.round(currentTemp) : '—' }}
-              </span>
-              <span class="text-[9px] mt-0.5" :class="currentTemp !== null ? 'text-flame-light' : 'text-parchment-3'">°C</span>
-            </button>
-            <!-- ACTUAL RATE -->
-            <div class="flex flex-col items-center py-3 px-6 border-r border-parchment-3">
-              <span class="text-[9px] font-bold uppercase tracking-widest text-ink-faint mb-1">Rate</span>
-              <span class="text-xl font-bold leading-none tabular-nums" :class="rateOfChange && rateOfChange !== '—' ? 'text-green-600' : 'text-ink-faint'">{{ rateOfChange ?? '—' }}</span>
-            </div>
-            <!-- TARGET RATE -->
-            <div class="flex flex-col items-center py-3 px-6 border-r border-parchment-3">
-              <span class="text-[9px] font-bold uppercase tracking-widest text-ink-faint mb-1">Target</span>
-              <span class="text-xl font-bold leading-none tabular-nums" :class="targetRate && targetRate !== '—' ? 'text-ink' : 'text-ink-faint'">{{ targetRate ?? '—' }}</span>
-            </div>
-            <!-- ELAPSED -->
-            <div class="flex flex-col items-center py-3 px-6 border-r border-parchment-3">
-              <span class="text-[9px] font-bold uppercase tracking-widest text-ink-faint mb-1">Time</span>
-              <span class="text-xl font-bold leading-none tabular-nums text-ink">{{ isLive ? elapsed : '—' }}</span>
-            </div>
-            <!-- PEAK -->
-            <div class="flex flex-col items-center py-3 px-6 border-r border-parchment-3">
-              <span class="text-[9px] font-bold uppercase tracking-widest text-ink-faint mb-1">Peak</span>
-              <span class="text-2xl font-bold leading-none tabular-nums text-ink">{{ peakTemp !== null ? Math.round(peakTemp) : '—' }}</span>
-              <span class="text-[9px] text-ink-faint mt-0.5">°C</span>
-            </div>
-            <!-- READINGS -->
-            <div class="flex flex-col items-center py-3 px-6 border-r border-parchment-3">
-              <span class="text-[9px] font-bold uppercase tracking-widest text-ink-faint mb-1">Readings</span>
-              <span class="text-xl font-bold leading-none tabular-nums text-ink">{{ readingCount }}</span>
-            </div>
-            <!-- ACTION BUTTONS -->
-            <div v-if="selectedFiring" class="flex items-center gap-2 px-4 ml-auto">
-              <button v-if="isLive && isManual" class="px-4 py-2 bg-flame text-parchment text-sm font-bold rounded-xl hover:bg-flame-dark transition-colors" @click="openLogReading">+ Log reading</button>
-              <button v-if="isLive" class="px-4 py-2 text-sm font-bold rounded-xl border transition-colors" :class="isManual ? 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100' : 'border-parchment-3 bg-parchment-2 text-ink-muted hover:bg-parchment-3'" @click="toggleMode">⇅ {{ isManual ? 'Switch to Connected' : 'Switch to Manual' }}</button>
-              <button
-                class="flex items-center gap-1.5 px-3 py-2 text-sm font-bold rounded-xl border transition-colors"
-                :class="showSensorPanel ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-parchment-3 bg-parchment-2 text-ink-muted hover:bg-parchment-3'"
-                @click="showSensorPanel = !showSensorPanel"
-              >
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/></svg>
-                Sensors
-                <span v-if="assignedSensors.length" class="text-[10px] bg-flame text-parchment rounded-full w-4 h-4 flex items-center justify-center font-bold">{{ assignedSensors.length }}</span>
-              </button>
-            </div>
+        <!-- Desktop chart -->
+        <div class="hidden sm:flex flex-1 bg-white rounded-xl border border-parchment-3 relative items-center justify-center min-h-0 sm:m-5 sm:mt-4" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
+          <canvas ref="chartCanvas" class="w-full h-full"></canvas>
+          <button v-if="selectedFiring" class="absolute bottom-4 right-4 px-3 py-1.5 text-xs font-medium border border-parchment-3 rounded-lg bg-white text-ink-muted hover:bg-parchment transition-colors" @click="resetZoom">Reset zoom</button>
+          <div v-if="isManual && isLive && !selectedFiring?.readings?.length" class="absolute flex flex-col items-center gap-2 text-ink-muted pointer-events-none">
+            <p class="text-sm">Use <strong>Log Reading</strong> to record your first temperature</p>
           </div>
-
-          <!-- Sensor panel -->
-          <div v-if="selectedFiring && showSensorPanel" class="shrink-0 border-b border-parchment-3 bg-white px-4 py-3 flex flex-col gap-4">
-            <div class="flex items-center justify-between">
-              <p class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Sensors</p>
-              <button class="text-[10px] text-ink-faint hover:text-flame transition-colors" @click="showSensorPanel = false">Done</button>
-            </div>
-            <div class="flex flex-col gap-2">
-              <p class="text-[10px] font-semibold text-ink-faint uppercase tracking-wider">Linked to this firing</p>
-              <div v-if="assignedSensors.length" class="flex flex-col gap-2">
-                <div v-for="s in assignedSensors" :key="s.id" class="flex items-center gap-3 px-3 py-2.5 rounded-xl border bg-parchment border-parchment-3">
-                  <svg class="w-4 h-4 shrink-0 text-ink-faint" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/></svg>
-                  <span class="text-sm font-semibold text-ink flex-1 truncate">{{ s.name }}</span>
-                  <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 flex items-center gap-1" :class="s.online ? 'bg-green-50 text-green-700 border-green-200' : 'bg-parchment-2 text-ink-faint border-parchment-3'">
-                    <span class="w-1.5 h-1.5 rounded-full" :class="s.online ? 'bg-green-500 animate-pulse' : 'bg-parchment-4'"></span>
-                    {{ s.online ? 'Online' : 'Offline' }}
-                  </span>
-                  <NuxtLink to="/sensors" class="p-1.5 rounded-lg text-ink-faint hover:text-ink hover:bg-parchment-2 transition-colors shrink-0" title="Manage sensor">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
-                  </NuxtLink>
-                  <button class="text-xs font-semibold text-ink-muted hover:text-red-500 border border-parchment-3 hover:border-red-300 hover:bg-red-50 px-2.5 py-1 rounded-lg transition-colors shrink-0" @click="removeSensorFromFiring(s.sensor_id ?? s.id)">Unlink</button>
-                </div>
-              </div>
-              <p v-else class="text-xs text-ink-faint py-1">No sensors linked to this firing yet.</p>
-            </div>
-            <div v-if="unassignedSensors.length" class="flex flex-col gap-2">
-              <p class="text-[10px] font-semibold text-ink-faint uppercase tracking-wider">Link a sensor</p>
-              <div class="flex flex-col gap-2">
-                <div v-for="s in unassignedSensors" :key="s.id" class="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-parchment-3 bg-parchment">
-                  <svg class="w-4 h-4 shrink-0 text-ink-faint" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/></svg>
-                  <span class="text-sm font-semibold text-ink flex-1 truncate">{{ s.name }}</span>
-                  <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 flex items-center gap-1" :class="s.online ? 'bg-green-50 text-green-700 border-green-200' : 'bg-parchment-2 text-ink-faint border-parchment-3'">
-                    <span class="w-1.5 h-1.5 rounded-full" :class="s.online ? 'bg-green-500 animate-pulse' : 'bg-parchment-4'"></span>
-                    {{ s.online ? 'Online' : 'Offline' }}
-                  </span>
-                  <NuxtLink to="/sensors" class="p-1.5 rounded-lg text-ink-faint hover:text-ink hover:bg-parchment-2 transition-colors shrink-0" title="Manage sensor">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
-                  </NuxtLink>
-                  <button class="text-xs font-semibold text-flame border border-flame/30 hover:bg-flame hover:text-parchment px-2.5 py-1 rounded-lg transition-colors shrink-0" @click="addSensorToFiring(s.id)">Link</button>
-                </div>
-              </div>
-            </div>
-            <div v-if="!sensors.length" class="text-xs text-ink-faint">
-              No sensors registered yet. <NuxtLink to="/sensors" class="text-flame font-semibold hover:underline">Add one →</NuxtLink>
-            </div>
-          </div>
-
-          <div class="flex-1 m-4 mt-3 bg-white rounded-xl border border-parchment-3 relative min-h-0 flex items-center justify-center" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
-            <canvas ref="chartCanvas" class="w-full h-full"></canvas>
-            <button v-if="selectedFiring" class="absolute bottom-3 right-3 px-3 py-1.5 text-xs font-medium border border-parchment-3 rounded-lg bg-parchment text-ink-faint hover:bg-parchment-2 transition-colors" @click="resetZoom">Reset zoom</button>
-            <div v-if="isManual && isLive && !selectedFiring?.readings?.length" class="absolute flex flex-col items-center gap-2 text-ink-muted pointer-events-none">
-              <p class="text-sm">Use <strong class="text-ink">Log Reading</strong> to record your first temperature</p>
-            </div>
-            <div v-else-if="!selectedFiring" class="absolute flex flex-col items-center gap-3 text-ink-muted">
-              <p class="text-sm">Select a firing from the sidebar or start a new one</p>
-            </div>
+          <div v-else-if="!selectedFiring" class="absolute flex flex-col items-center gap-3 text-ink-muted">
+            <p class="text-sm">Select a firing from the sidebar or start a new one</p>
           </div>
         </div>
 
-        <!-- ── MOBILE ── -->
+        <!-- Mobile view -->
         <div class="flex flex-col flex-1 sm:hidden overflow-hidden">
 
-          <div v-if="!selectedFiring" class="flex-1 flex flex-col items-center justify-center gap-5 px-8 text-center">
-            <div class="w-14 h-14 bg-parchment-2 border border-parchment-3 rounded-xl flex items-center justify-center">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                <path d="M3 17l4-4 3 3 4-5 5 6" stroke="#b05c1a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M3 5h18" stroke="#b05c1a" stroke-width="1.5" stroke-linecap="round"/>
-              </svg>
-            </div>
-            <div>
-              <p class="font-bold text-ink mb-1">No firing selected</p>
-              <p class="text-sm text-ink-muted">Start a new firing or tap the menu to view past ones</p>
-            </div>
-            <button class="bg-flame text-parchment px-6 py-3 rounded-lg text-sm font-bold hover:bg-flame-dark transition-colors" @click="openStartModal">+ Start firing</button>
-            <button class="text-sm text-flame font-semibold" @click="showFiringSheet = true">View past firings</button>
+          <!-- No firing -->
+          <div v-if="!selectedFiring" class="flex-1 flex flex-col items-center justify-center gap-4 px-8 text-center">
+            <p class="text-ink-muted text-sm">No firing selected</p>
+            <button class="btn-primary px-6 py-3" @click="openStartModal">+ Start firing</button>
+            <button class="text-sm text-flame" @click="showFiringSheet = true">View past firings</button>
           </div>
 
+          <!-- Firing selected -->
           <template v-else>
-            <!-- Stats strip — 3 cols: Temp | Rate/Target | Time (small) -->
-            <div class="shrink-0 grid grid-cols-3 border-b border-parchment-3 bg-parchment">
-              <!-- TEMP -->
-              <button class="flex flex-col items-center py-3 px-1 border-r border-parchment-3 active:bg-parchment-2" @click="showTempModal = true">
-                <span class="text-[9px] font-bold uppercase tracking-widest text-ink-faint mb-1">Temp</span>
-                <span class="text-xl font-bold leading-none tabular-nums" :class="currentTemp !== null ? 'text-flame' : 'text-parchment-3'">
-                  {{ currentTemp !== null ? Math.round(currentTemp) : '—' }}
-                </span>
-                <span class="text-[9px] text-flame-light mt-0.5">°C</span>
+            <!-- Compact stats row -->
+            <div class="shrink-0 px-2 pt-2 flex gap-1.5">
+              <button class="flex-1 bg-white border border-parchment-3 rounded-lg py-1.5 px-2 flex flex-col items-center active:bg-flame-bg" @click="showTempModal = true">
+                <span class="text-[10px] text-ink-faint uppercase tracking-wide leading-none mb-0.5">Now</span>
+                <span class="text-xl font-bold tabular-nums leading-none" :class="currentTemp !== null ? 'text-flame' : 'text-parchment-4'">{{ currentTemp !== null ? Math.round(currentTemp) : '—' }}</span>
+                <span class="text-[10px] text-flame-light">°C</span>
               </button>
-              <!-- RATE + TARGET stacked -->
-              <div class="flex flex-col items-center justify-center py-2 px-1 border-r border-parchment-3 gap-1">
-                <div class="flex flex-col items-center">
-                  <span class="text-[9px] font-bold uppercase tracking-widest text-ink-faint">Rate</span>
-                  <span class="text-lg font-bold leading-none tabular-nums" :class="rateOfChange && rateOfChange !== '—' ? 'text-green-600' : 'text-ink-faint'">{{ rateOfChange ?? '—' }}</span>
-                </div>
-                <div class="flex flex-col items-center">
-                  <span class="text-[9px] font-bold uppercase tracking-widest text-ink-faint">Target</span>
-                  <span class="text-sm font-bold leading-none tabular-nums" :class="targetRate && targetRate !== '—' ? 'text-ink' : 'text-ink-faint'">{{ targetRate ?? '—' }}</span>
-                </div>
+              <div class="flex-1 bg-white border border-parchment-3 rounded-lg py-1.5 px-2 flex flex-col items-center">
+                <span class="text-[10px] text-ink-faint uppercase tracking-wide leading-none mb-0.5">Peak</span>
+                <span class="text-xl font-bold tabular-nums leading-none text-ink">{{ peakTemp !== null ? Math.round(peakTemp) : '—' }}</span>
+                <span class="text-[10px] text-ink-faint">°C</span>
               </div>
-              <!-- TIME small -->
-              <div class="flex flex-col items-center justify-center py-3 px-1">
-                <span class="text-[9px] font-bold uppercase tracking-widest text-ink-faint mb-1">Time</span>
-                <span class="text-sm font-bold leading-none tabular-nums text-ink">{{ isLive ? elapsed : '—' }}</span>
+              <div class="flex-1 bg-white border border-parchment-3 rounded-lg py-1.5 px-2 flex flex-col items-center">
+                <span class="text-[10px] text-ink-faint uppercase tracking-wide leading-none mb-0.5">{{ isLive && !isManual ? 'Elapsed' : 'Readings' }}</span>
+                <span class="text-xl font-bold tabular-nums leading-none text-ink">{{ isLive && !isManual ? elapsed : readingCount }}</span>
+                <span class="text-[10px] text-ink-faint">{{ isLive && !isManual ? '' : 'pts' }}</span>
+              </div>
+              <div class="flex-1 bg-white border border-parchment-3 rounded-lg py-1.5 px-2 flex flex-col items-center">
+                <span class="text-[10px] text-ink-faint uppercase tracking-wide leading-none mb-0.5">Rate</span>
+                <span class="text-base font-bold tabular-nums leading-none text-ink">{{ rateOfChange }}</span>
+                <span class="text-[10px] text-ink-faint">°/m</span>
               </div>
             </div>
 
-            <!-- Chart -->
-            <div class="flex-1 mx-3 mt-3 mb-2 bg-white rounded-xl border border-parchment-3 relative overflow-hidden" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
-              <canvas ref="chartCanvasMobile" class="w-full h-full touch-none"></canvas>
-              <button class="absolute bottom-2 right-2 px-2.5 py-1 text-[10px] font-medium border border-parchment-3 rounded-lg bg-parchment text-ink-faint active:bg-parchment-2" @click="resetZoomMobile">Reset zoom</button>
-              <button class="absolute bottom-2 left-2 px-2.5 py-1 text-[10px] font-medium border border-parchment-3 rounded-lg bg-parchment text-ink-faint active:bg-parchment-2 flex items-center gap-1" @click="reloadReadings">
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                  <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-                Refresh
-              </button>
-              <div v-if="isManual && isLive && !selectedFiring?.readings?.length" class="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <p class="text-xs text-ink-muted text-center px-6">Log your first reading to see the curve</p>
+            <!-- Mobile chart -->
+            <div class="flex-1 relative min-h-0 px-2 py-2 flex items-stretch">
+              <div class="flex-1 bg-white rounded-xl border border-parchment-3 relative" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
+                <canvas ref="chartCanvasMobile" class="w-full h-full"></canvas>
+                <div v-if="!selectedFiring?.readings?.length && !isManual" class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <p class="text-xs text-ink-muted text-center px-4">Waiting for sensor data…</p>
+                </div>
+                <button class="absolute bottom-2 right-2 p-1.5 rounded-lg bg-white border border-parchment-3 text-ink-muted" @click="resetZoomMobile">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"/></svg>
+                </button>
               </div>
             </div>
 
-            <!-- Action bar -->
-            <div class="shrink-0 px-3 pb-3 pt-1 flex gap-2">
-              <button v-if="isLive && isManual" class="flex-1 py-3 bg-flame text-parchment text-sm font-bold rounded-lg active:bg-flame-dark transition-colors" @click="openLogReading">+ Log reading</button>
-              <button v-if="isLive" class="py-3 px-4 border rounded-lg text-xs font-bold shrink-0 transition-colors" :class="isManual ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-parchment-3 bg-parchment-2 text-ink-muted'" @click="toggleMode">{{ isManual ? 'Manual' : 'Connected' }}</button>
+            <!-- Mobile action row -->
+            <div class="shrink-0 flex gap-2 px-2 pb-3 pt-1">
+              <button v-if="activeFiring && selectedFiring.id === activeFiring.id" class="btn-danger flex-1 py-3 !text-sm" @click="endFiring">End firing</button>
+              <button v-if="isLive && isManual" class="btn-primary flex-1 py-3" @click="openLogReading">+ Log reading</button>
+              <button v-if="isLive" class="flex-1 py-3 border text-xs font-bold rounded-lg transition-colors"
+                :class="isManual ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-parchment-3 bg-parchment-2 text-ink-muted'"
+                @click="toggleMode">{{ isManual ? 'Manual' : 'Connected' }}</button>
               <button v-if="!isLive && !activeFiring && selectedFiring?.started_at && selectedFiring?.ended_at" class="flex-1 py-3 bg-amber-500 text-white text-sm font-bold rounded-lg active:bg-amber-600 transition-colors" @click="restartFiring(selectedFiring)">↺ Restart firing</button>
               <button v-else-if="!isLive && !activeFiring" class="flex-1 py-3 bg-flame text-parchment text-sm font-bold rounded-lg active:bg-flame-dark transition-colors" @click="openStartModal">+ Start firing</button>
             </div>
@@ -255,13 +142,11 @@
       </main>
     </div>
 
-    <!-- ── MOBILE FIRING SHEET ── -->
+    <!-- ── Mobile firing sheet ───────────────────────────────────────────────── -->
     <Teleport to="body">
       <div v-if="showFiringSheet" class="fixed inset-0 z-50 flex flex-col justify-end sm:hidden" style="background:rgba(26,18,8,0.6)" @click.self="showFiringSheet = false">
         <div class="bg-parchment rounded-t-2xl flex flex-col" style="max-height:80vh">
-          <div class="flex justify-center pt-3 pb-1 shrink-0">
-            <div class="w-10 h-1 bg-parchment-3 rounded-full"></div>
-          </div>
+          <div class="flex justify-center pt-3 pb-1 shrink-0"><div class="w-10 h-1 bg-parchment-3 rounded-full"></div></div>
           <div class="flex items-center justify-between px-4 py-2 border-b border-parchment-3 shrink-0">
             <h2 class="text-sm font-bold text-ink">Firings</h2>
             <button class="p-1 text-ink-muted" @click="showFiringSheet = false">
@@ -282,16 +167,14 @@
             <li v-if="!pastFirings.length && !activeFiring" class="px-4 py-8 text-sm text-ink-muted text-center">No firings yet</li>
             <li v-for="f in pastFirings" :key="f.id" class="relative">
               <button class="w-full flex items-center gap-3 px-4 py-4 text-left active:bg-parchment-2 pr-16 transition-colors" :class="selectedFiring?.id === f.id ? 'bg-flame-bg border-l-2 border-flame' : ''" @click="selectFiring(f); showFiringSheet = false">
-                <div class="w-2 h-2 rounded-full shrink-0" :class="f.started_at && f.ended_at ? 'bg-amber-400' : 'bg-parchment-4'"></div>
+                <div class="w-2 h-2 rounded-full bg-parchment-4 shrink-0"></div>
                 <div class="flex-1 min-w-0">
                   <p class="text-sm font-semibold text-ink truncate">{{ f.name }}</p>
-                  <p v-if="f.started_at && f.ended_at" class="text-xs text-amber-600 mt-0.5 font-semibold">Finished</p>
-                  <p v-else class="text-xs text-ink-faint mt-0.5">{{ formatDate(f.created_at) }}</p>
+                  <p class="text-xs text-ink-muted mt-0.5">{{ formatDate(f.created_at) }}</p>
                 </div>
               </button>
-              <div class="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                <button v-if="f.started_at && f.ended_at && !activeFiring && sheetConfirmDeleteId !== f.id" class="px-2 py-1 rounded text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 active:bg-amber-100" @click.stop="restartFiring(f); showFiringSheet = false">↺</button>
-                <button v-if="sheetConfirmDeleteId !== f.id" class="p-2 text-parchment-4 active:text-red-400" @click.stop="sheetConfirmDeleteId = f.id">
+              <div class="absolute right-3 top-1/2 -translate-y-1/2">
+                <button v-if="sheetConfirmDeleteId !== f.id" class="p-2 text-parchment-4 hover:text-red-400" @click.stop="sheetConfirmDeleteId = f.id">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
                 </button>
                 <button v-else class="px-2.5 py-1.5 rounded-lg text-xs font-bold text-white bg-red-500" @click.stop="sheetDeleteFiring(f)">Delete?</button>
@@ -299,25 +182,53 @@
             </li>
           </ul>
           <div class="p-3 border-t border-parchment-3 shrink-0">
-            <button class="w-full py-3 bg-flame text-parchment text-sm font-bold rounded-lg active:bg-flame-dark transition-colors" @click="openStartModal(); showFiringSheet = false">+ Start firing</button>
+            <button class="btn-primary w-full py-3" @click="openStartModal(); showFiringSheet = false">+ Start firing</button>
           </div>
         </div>
       </div>
     </Teleport>
 
-    <!-- ── MODALS ── -->
-    <KilnTempModal :open="showTempModal" :temp="currentTemp" :peak-temp="peakTemp" :rate-of-change="rateOfChange" :elapsed="elapsed" :is-live="isLive" :firing-name="selectedFiring?.name" @close="showTempModal = false" />
-    <StartFiringModal :open="showStartModal" :library="library" :sensors="sensors" @close="showStartModal = false" @create="createFiring" />
-    <ManualReadingModal :open="showReadingModal" :started-at="selectedFiring?.started_at ?? 0" :is-edit="!!editingReading" :edit-temp="editingReading?.y ?? null" :edit-ts="editingReading?.ts ?? null" @close="closeReadingModal" @save="saveReading" @delete="deleteReading" />
+    <!-- ── Modals ────────────────────────────────────────────────────────────── -->
+    <KilnTempModal
+      :open="showTempModal"
+      :temp="currentTemp"
+      :peak-temp="peakTemp"
+      :rate-of-change="rateOfChange"
+      :elapsed="elapsed"
+      :is-live="isLive"
+      :firing-name="selectedFiring?.name"
+      @close="showTempModal = false"
+    />
+
+    <StartFiringModal
+      :open="showStartModal"
+      :library="library"
+      :sensors="sensors"
+      @close="showStartModal = false"
+      @create="createFiring"
+    />
+
+    <ManualReadingModal
+      :open="showReadingModal"
+      :started-at="selectedFiring?.started_at ?? 0"
+      :is-edit="!!editingReading"
+      :edit-temp="editingReading?.y ?? null"
+      :edit-ts="editingReading?.ts ?? null"
+      @close="closeReadingModal"
+      @save="saveReading"
+      @delete="deleteReading"
+    />
 
   </div>
 </template>
 
 <script setup>
+// app/pages/app.vue
 import { useKilnChart } from '~/composables/useKilnChart'
 
 definePageMeta({ middleware: ['auth'] })
 
+// ── Refs ───────────────────────────────────────────────────────────────────────
 const chartCanvas          = ref(null)
 const chartCanvasMobile    = ref(null)
 const editingReading       = ref(null)
@@ -337,6 +248,24 @@ const lastReadingTime      = ref(null)
 const library              = ref([])
 const sensors              = ref([])
 const showSensorPanel      = ref(false)
+const sidebarOpen          = ref(true)
+const sidebarWidth         = ref(280)
+const MIN_WIDTH            = 180
+const isDragging           = ref(false)
+const nowUnix              = ref(Math.floor(Date.now() / 1000))
+
+// ── Constants ──────────────────────────────────────────────────────────────────
+const SIGNAL_TIMEOUT = 30
+const ONLINE_TIMEOUT = 30
+const EMA_ALPHA      = 0.3
+
+// ── Intervals (non-reactive) ───────────────────────────────────────────────────
+let signalCheckInterval = null
+let elapsedTickInterval = null
+let sensorPollInterval  = null
+
+// ── Composables ────────────────────────────────────────────────────────────────
+const realtime = useFiringRealtime()
 
 const { init, setSchedule, setReadings, setManualMode, setSignalLost, clearSignalLost, resetZoom, destroy } = useKilnChart(chartCanvas, {
   enableZoom: true,
@@ -350,20 +279,7 @@ const { init, setSchedule, setReadings, setManualMode, setSignalLost, clearSigna
 
 const { init: initMobile, setSchedule: setScheduleMobile, setReadings: setReadingsMobile, resetZoom: resetZoomMobile, destroy: destroyMobile } = useKilnChart(chartCanvasMobile, { enableZoom: true, showLabels: true })
 
-const SIGNAL_TIMEOUT = 30
-const ONLINE_TIMEOUT = 30
-// EMA smoothing factor — higher = more reactive, lower = smoother
-// 0.3 is a good middle ground for manual logging
-const EMA_ALPHA = 0.3
-
-const sidebarOpen  = ref(true)
-const sidebarWidth = ref(280)
-const MIN_WIDTH    = 180
-const isDragging   = ref(false)
-let pollInterval = null, signalCheckInterval = null, elapsedTickInterval = null, sensorPollInterval = null
-
-const nowUnix = ref(Math.floor(Date.now() / 1000))
-
+// ── Computed ───────────────────────────────────────────────────────────────────
 const activeFiring = computed(() => allFirings.value.find(f => f.started_at && !f.ended_at) ?? null)
 const pastFirings  = computed(() => allFirings.value.filter(f => f.ended_at).sort((a, b) => b.created_at - a.created_at))
 const peakTemp     = computed(() => { if (!selectedFiring.value?.readings?.length) return null; return Math.max(...selectedFiring.value.readings.map(r => r.temperature)) })
@@ -371,54 +287,37 @@ const duration     = computed(() => { const f = selectedFiring.value; if (!f?.st
 const readingCount = computed(() => selectedFiring.value?.readings?.length ?? 0)
 const elapsed      = computed(() => { const f = selectedFiring.value; if (!f?.started_at) return '—'; const mins = Math.round((nowUnix.value - f.started_at) / 60), h = Math.floor(mins / 60), m = mins % 60; return h > 0 ? `${h}h ${m}m` : `${m}m` })
 
-// ── EMA rate of change ────────────────────────────────────────────────────────
-// Calculates instantaneous rate between each consecutive pair of readings,
-// then applies exponential moving average to smooth without over-damping.
 const rateOfChange = computed(() => {
   const readings = selectedFiring.value?.readings
   if (!readings || readings.length < 2) return '—'
-
   let ema = null
   for (let i = 1; i < readings.length; i++) {
-    const prev = readings[i - 1]
-    const curr = readings[i]
+    const prev = readings[i - 1], curr = readings[i]
     const deltaMins = (curr.timestamp - prev.timestamp) / 60
-    if (deltaMins < 0.5) continue  // skip readings less than 30s apart (noise)
+    if (deltaMins < 0.5) continue
     const instantRate = (curr.temperature - prev.temperature) / deltaMins
     ema = ema === null ? instantRate : EMA_ALPHA * instantRate + (1 - EMA_ALPHA) * ema
   }
-
   if (ema === null) return '—'
   const rate = Math.round(ema)
   return rate >= 0 ? `+${rate}°/m` : `${rate}°/m`
 })
 
-// ── Target rate from schedule ─────────────────────────────────────────────────
-// Finds the two surrounding schedule waypoints at the current elapsed time
-// and returns the slope between them as the planned °/min rate.
 const targetRate = computed(() => {
   const f = selectedFiring.value
   if (!f?.started_at || !f?.schedule?.length) return '—'
-
   const elapsedMins = (nowUnix.value - f.started_at) / 60
   const schedule    = [...f.schedule].sort((a, b) => a.offset_minutes - b.offset_minutes)
-
-  // Find surrounding waypoints
   let before = null, after = null
   for (let i = 0; i < schedule.length - 1; i++) {
     if (schedule[i].offset_minutes <= elapsedMins && schedule[i + 1].offset_minutes >= elapsedMins) {
-      before = schedule[i]
-      after  = schedule[i + 1]
-      break
+      before = schedule[i]; after = schedule[i + 1]; break
     }
   }
-
   if (!before || !after) return '—'
-
   const deltaTemp = after.target_temp - before.target_temp
   const deltaMins = after.offset_minutes - before.offset_minutes
   if (deltaMins === 0) return '—'
-
   const rate = Math.round(deltaTemp / deltaMins)
   return rate >= 0 ? `+${rate}°/m` : `${rate}°/m`
 })
@@ -438,6 +337,196 @@ const unassignedSensors = computed(() => {
   return sensors.value.filter(s => !assignedIds.has(s.id))
 })
 
+// ── Lifecycle ──────────────────────────────────────────────────────────────────
+onMounted(async () => {
+  await init()
+  await refreshFirings()
+  if (activeFiring.value) await selectFiring(activeFiring.value)
+  await refreshSensors()
+  startSensorPolling()
+  document.addEventListener('visibilitychange', onVisibilityChange)
+})
+
+onUnmounted(() => {
+  stopAllIntervals()
+  if (sensorPollInterval) clearInterval(sensorPollInterval)
+  destroy()
+  destroyMobile()
+  document.removeEventListener('visibilitychange', onVisibilityChange)
+})
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+function formatDate(unix) {
+  if (!unix) return ''
+  return new Date(unix * 1000).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+function stopAllIntervals() {
+  realtime.unsubscribe()
+  if (signalCheckInterval) { clearInterval(signalCheckInterval); signalCheckInterval = null }
+  if (elapsedTickInterval) { clearInterval(elapsedTickInterval); elapsedTickInterval = null }
+}
+
+function startDrag(e) {
+  isDragging.value = true
+  const startX = e.clientX, startWidth = sidebarWidth.value, maxWidth = () => Math.floor(window.innerWidth / 3)
+  function onMove(e) { sidebarWidth.value = Math.min(Math.max(startWidth + e.clientX - startX, MIN_WIDTH), maxWidth()) }
+  function onUp() { isDragging.value = false; window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); document.body.style.cursor = document.body.style.userSelect = '' }
+  document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none'
+  window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp)
+}
+
+// ── Realtime subscription (replaces poll) ──────────────────────────────────────
+function startPolling() {
+  if (signalCheckInterval) clearInterval(signalCheckInterval)
+  if (!selectedFiring.value) return
+
+  const firingId = selectedFiring.value.id
+
+  realtime.subscribe(firingId, (reading) => {
+    if (!selectedFiring.value || selectedFiring.value.id !== firingId) return
+    if (isManual.value) return
+
+    const existing = selectedFiring.value.readings ?? []
+
+    // Guard against duplicate deliveries
+    if (existing.some(r => r.id === reading.id)) return
+
+    const merged = existing.concat(reading)
+    selectedFiring.value.readings = merged
+    setReadings(merged, selectedFiring.value.started_at)
+    setReadingsMobile(merged, selectedFiring.value.started_at)
+
+    if (!isSaving.value) {
+      currentTemp.value     = reading.temperature
+      lastReadingTime.value = reading.timestamp
+      isLive.value          = true
+      if (signalLost.value) { signalLost.value = false; clearSignalLost() }
+    }
+  })
+
+  // Signal-lost watchdog — still a local timer
+  signalCheckInterval = setInterval(() => {
+    if (!selectedFiring.value || isManual.value) return
+    const now = Math.floor(Date.now() / 1000)
+    if (!lastReadingTime.value) {
+      if (now - selectedFiring.value.started_at > SIGNAL_TIMEOUT) { signalLost.value = true; setSignalLost(selectedFiring.value.started_at, null) }
+      return
+    }
+    if (now - lastReadingTime.value > SIGNAL_TIMEOUT) { signalLost.value = true; setSignalLost(selectedFiring.value.started_at, lastReadingTime.value) }
+  }, 5000)
+}
+
+// ── Sensors ────────────────────────────────────────────────────────────────────
+async function refreshSensors() {
+  const now = Math.floor(Date.now() / 1000)
+  const raw = await $fetch('/api/sensors')
+  sensors.value = raw.map(s => ({ ...s, online: !!s.last_seen && (now - s.last_seen) <= ONLINE_TIMEOUT }))
+}
+
+function startSensorPolling() {
+  if (sensorPollInterval) clearInterval(sensorPollInterval)
+  sensorPollInterval = setInterval(refreshSensors, 15000)
+}
+
+// ── Visibility ─────────────────────────────────────────────────────────────────
+async function onVisibilityChange() {
+  if (document.hidden) return
+  if (!selectedFiring.value) return
+  await reloadReadings()
+  if (isLive.value && !isManual.value) startPolling()
+  if (isLive.value && !elapsedTickInterval) {
+    elapsedTickInterval = setInterval(() => { nowUnix.value = Math.floor(Date.now() / 1000) }, 1000)
+  }
+}
+
+// ── Data ───────────────────────────────────────────────────────────────────────
+async function refreshFirings() {
+  allFirings.value = await $fetch('/api/firings')
+}
+
+async function selectFiring(f) {
+  stopAllIntervals()
+  isLive.value = isManual.value = signalLost.value = false
+  currentTemp.value = lastReadingTime.value = null
+  showSensorPanel.value = false
+
+  const data = await $fetch(`/api/firings/${f.id}`)
+  selectedFiring.value = data
+  setSchedule(data.schedule ?? [])
+  setReadings(data.readings ?? [], data.started_at)
+  await nextTick(); await initMobile()
+  setScheduleMobile(data.schedule ?? [])
+  setReadingsMobile(data.readings ?? [], data.started_at)
+
+  if (data.readings?.length) {
+    const last = data.readings.at(-1)
+    currentTemp.value     = last.temperature
+    lastReadingTime.value = last.timestamp
+  }
+
+  const isActive = !!(data.started_at && !data.ended_at)
+  const mode = data.mode ?? 'connected'
+  isManual.value = mode === 'manual'
+  setManualMode(isManual.value)
+
+  if (isActive) {
+    isLive.value = true
+    elapsedTickInterval = setInterval(() => { nowUnix.value = Math.floor(Date.now() / 1000) }, 1000)
+    if (!isManual.value) {
+      if (!data.readings?.length) { signalLost.value = true; setSignalLost(data.started_at, null) }
+      else { const secs = Math.floor(Date.now() / 1000) - lastReadingTime.value; if (secs > SIGNAL_TIMEOUT) { signalLost.value = true; setSignalLost(data.started_at, lastReadingTime.value) } }
+      startPolling()
+    }
+  }
+}
+
+async function createFiring(payload) {
+  const firing = await $fetch('/api/firings', { method: 'POST', body: payload })
+  await $fetch(`/api/firings/${firing.id}`, { method: 'PUT', body: { startedAt: Math.floor(Date.now() / 1000) } })
+  showStartModal.value = false
+  await refreshFirings()
+  const fresh = allFirings.value.find(f => f.id === firing.id)
+  await selectFiring(fresh ?? firing)
+}
+
+async function endFiring() {
+  if (!activeFiring.value) return
+  const id = activeFiring.value.id
+  await $fetch(`/api/firings/${id}`, { method: 'PUT', body: { endedAt: Math.floor(Date.now() / 1000) } })
+  stopAllIntervals()
+  signalLost.value = isLive.value = false
+  currentTemp.value = null
+  await refreshFirings()
+  if (selectedFiring.value?.id === id) {
+    const data = await $fetch(`/api/firings/${id}`)
+    selectedFiring.value = data
+    setSchedule(data.schedule ?? [])
+    setReadings(data.readings ?? [], data.started_at)
+    setScheduleMobile(data.schedule ?? [])
+    setReadingsMobile(data.readings ?? [], data.started_at)
+  }
+}
+
+async function restartFiring(f) {
+  if (!f?.started_at || !f?.ended_at || activeFiring.value) return
+  await $fetch(`/api/firings/${f.id}`, { method: 'PUT', body: { endedAt: null } })
+  await refreshFirings()
+  const fresh = allFirings.value.find(fi => fi.id === f.id)
+  await selectFiring(fresh ?? f)
+}
+
+async function deleteFiring(f) {
+  await $fetch(`/api/firings/${f.id}`, { method: 'DELETE' })
+  if (selectedFiring.value?.id === f.id) {
+    stopAllIntervals()
+    selectedFiring.value = currentTemp.value = null
+    isLive.value = isManual.value = signalLost.value = false
+    clearSignalLost()
+  }
+  await refreshFirings()
+}
+
 async function addSensorToFiring(sensorId) {
   if (!selectedFiring.value) return
   await $fetch(`/api/firings/${selectedFiring.value.id}/sensors`, { method: 'POST', body: { sensorId } })
@@ -452,36 +541,14 @@ async function removeSensorFromFiring(sensorId) {
   selectedFiring.value.sensors = data.sensors
 }
 
-function formatDate(unix) { if (!unix) return ''; return new Date(unix * 1000).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' }) }
-function stopAllIntervals() { if (pollInterval) { clearInterval(pollInterval); pollInterval = null } if (signalCheckInterval) { clearInterval(signalCheckInterval); signalCheckInterval = null } if (elapsedTickInterval) { clearInterval(elapsedTickInterval); elapsedTickInterval = null } }
-
-function startDrag(e) {
-  isDragging.value = true
-  const startX = e.clientX, startWidth = sidebarWidth.value, maxWidth = () => Math.floor(window.innerWidth / 3)
-  function onMove(e) { sidebarWidth.value = Math.min(Math.max(startWidth + e.clientX - startX, MIN_WIDTH), maxWidth()) }
-  function onUp() { isDragging.value = false; window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); document.body.style.cursor = document.body.style.userSelect = '' }
-  document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none'
-  window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp)
-}
-
+// ── Modals / reading ───────────────────────────────────────────────────────────
 async function openStartModal() {
   if (!library.value.length) library.value = await $fetch('/api/library')
   await refreshSensors()
   showStartModal.value = true
 }
 
-async function refreshSensors() {
-  const now = Math.floor(Date.now() / 1000)
-  const raw = await $fetch('/api/sensors')
-  sensors.value = raw.map(s => ({ ...s, online: !!s.last_seen && (now - s.last_seen) <= ONLINE_TIMEOUT }))
-}
-
-function startSensorPolling() {
-  if (sensorPollInterval) clearInterval(sensorPollInterval)
-  sensorPollInterval = setInterval(refreshSensors, 15000)
-}
-
-function openLogReading() { editingReading.value = null; showReadingModal.value = true }
+function openLogReading()    { editingReading.value = null; showReadingModal.value = true }
 function closeReadingModal() { showReadingModal.value = false; editingReading.value = null }
 
 async function saveReading(payload) {
@@ -496,7 +563,6 @@ async function saveReading(payload) {
         method: 'POST',
         body: { firingId: selectedFiring.value.id, temperature: payload.temperature, timestamp: payload.timestamp },
       })
-      // Optimistic update — protected by isSaving so reloadReadings can't overwrite
       currentTemp.value     = payload.temperature
       lastReadingTime.value = payload.timestamp
     }
@@ -504,7 +570,7 @@ async function saveReading(payload) {
     await reloadReadings()
   } catch (err) {
     console.error('Failed to save reading:', err)
-    alert(`Failed to save reading: ${err?.data?.message ?? err.message ?? 'Unknown error'}`)
+    alert(`Failed to save: ${err?.data?.message ?? err.message ?? 'Unknown error'}`)
   } finally {
     isSaving.value = false
   }
@@ -530,7 +596,6 @@ async function reloadReadings() {
     selectedFiring.value.readings = data.readings
     setReadings(data.readings, selectedFiring.value.started_at)
     setReadingsMobile(data.readings, selectedFiring.value.started_at)
-    // Only update currentTemp from server if we're not mid-save
     if (!isSaving.value && data.readings?.length) {
       currentTemp.value     = data.readings.at(-1).temperature
       lastReadingTime.value = data.readings.at(-1).timestamp
@@ -540,125 +605,32 @@ async function reloadReadings() {
   }
 }
 
+// ── Mode ───────────────────────────────────────────────────────────────────────
 async function toggleMode() {
   if (!selectedFiring.value || !isLive.value) return
   const newMode = isManual.value ? 'connected' : 'manual'
   await $fetch(`/api/firings/${selectedFiring.value.id}`, { method: 'PUT', body: { mode: newMode } })
-  selectedFiring.value.mode = newMode; applyMode(newMode)
+  selectedFiring.value.mode = newMode
+  applyMode(newMode)
 }
 
 function applyMode(mode) {
-  isManual.value = mode === 'manual'; setManualMode(isManual.value)
+  isManual.value = mode === 'manual'
+  setManualMode(isManual.value)
   if (isManual.value) {
-    if (pollInterval) { clearInterval(pollInterval); pollInterval = null }
+    realtime.unsubscribe()
     if (signalCheckInterval) { clearInterval(signalCheckInterval); signalCheckInterval = null }
-    signalLost.value = false; clearSignalLost()
-  } else startPolling()
-}
-
-async function sheetDeleteFiring(f) { sheetConfirmDeleteId.value = null; showFiringSheet.value = false; await deleteFiring(f) }
-
-async function onVisibilityChange() {
-  if (document.hidden) return
-  if (!selectedFiring.value) return
-  await reloadReadings()
-  if (isLive.value && !isManual.value) startPolling()
-  if (isLive.value && !elapsedTickInterval) {
-    elapsedTickInterval = setInterval(() => { nowUnix.value = Math.floor(Date.now() / 1000) }, 1000)
+    signalLost.value = false
+    clearSignalLost()
+  } else {
+    startPolling()
   }
 }
 
-onMounted(async () => {
-  await init()
-  await refreshFirings()
-  if (activeFiring.value) await selectFiring(activeFiring.value)
-  await refreshSensors()
-  startSensorPolling()
-  document.addEventListener('visibilitychange', onVisibilityChange)
-})
-
-onUnmounted(() => {
-  stopAllIntervals()
-  if (sensorPollInterval) clearInterval(sensorPollInterval)
-  destroy()
-  destroyMobile()
-  document.removeEventListener('visibilitychange', onVisibilityChange)
-})
-
-async function refreshFirings() { allFirings.value = await $fetch('/api/firings') }
-
-async function selectFiring(f) {
-  stopAllIntervals(); isLive.value = isManual.value = signalLost.value = false; currentTemp.value = lastReadingTime.value = null
-  showSensorPanel.value = false
-  const data = await $fetch(`/api/firings/${f.id}`)
-  selectedFiring.value = data
-  setSchedule(data.schedule ?? []); setReadings(data.readings ?? [], data.started_at)
-  await nextTick(); await initMobile()
-  setScheduleMobile(data.schedule ?? []); setReadingsMobile(data.readings ?? [], data.started_at)
-  if (data.readings?.length) { const last = data.readings.at(-1); currentTemp.value = last.temperature; lastReadingTime.value = last.timestamp }
-  const isActive = !!(data.started_at && !data.ended_at)
-  const mode = data.mode ?? 'connected'; isManual.value = mode === 'manual'; setManualMode(isManual.value)
-  if (isActive) {
-    isLive.value = true
-    elapsedTickInterval = setInterval(() => { nowUnix.value = Math.floor(Date.now() / 1000) }, 1000)
-    if (!isManual.value) {
-      if (!data.readings?.length) { signalLost.value = true; setSignalLost(data.started_at, null) }
-      else { const secs = Math.floor(Date.now() / 1000) - lastReadingTime.value; if (secs > SIGNAL_TIMEOUT) { signalLost.value = true; setSignalLost(data.started_at, lastReadingTime.value) } }
-      startPolling()
-    }
-  }
-}
-
-async function createFiring(payload) {
-  const firing = await $fetch('/api/firings', { method: 'POST', body: payload })
-  await $fetch(`/api/firings/${firing.id}`, { method: 'PUT', body: { startedAt: Math.floor(Date.now() / 1000) } })
-  showStartModal.value = false; await refreshFirings()
-  const fresh = allFirings.value.find(f => f.id === firing.id); await selectFiring(fresh ?? firing)
-}
-
-async function endFiring() {
-  if (!activeFiring.value) return
-  const id = activeFiring.value.id
-  await $fetch(`/api/firings/${id}`, { method: 'PUT', body: { endedAt: Math.floor(Date.now() / 1000) } })
-  stopAllIntervals(); signalLost.value = isLive.value = false; currentTemp.value = null
-  await refreshFirings()
-  if (selectedFiring.value?.id === id) {
-    const data = await $fetch(`/api/firings/${id}`)
-    selectedFiring.value = data; setSchedule(data.schedule ?? []); setReadings(data.readings ?? [], data.started_at)
-    setScheduleMobile(data.schedule ?? []); setReadingsMobile(data.readings ?? [], data.started_at)
-  }
-}
-
-async function restartFiring(f) {
-  if (!f?.started_at || !f?.ended_at || activeFiring.value) return
-  await $fetch(`/api/firings/${f.id}`, { method: 'PUT', body: { endedAt: null } })
-  await refreshFirings()
-  const fresh = allFirings.value.find(fi => fi.id === f.id)
-  await selectFiring(fresh ?? f)
-}
-
-async function deleteFiring(f) {
-  await $fetch(`/api/firings/${f.id}`, { method: 'DELETE' })
-  if (selectedFiring.value?.id === f.id) { stopAllIntervals(); selectedFiring.value = currentTemp.value = null; isLive.value = isManual.value = signalLost.value = false; clearSignalLost() }
-  await refreshFirings()
-}
-
-function startPolling() {
-  if (pollInterval) clearInterval(pollInterval); if (signalCheckInterval) clearInterval(signalCheckInterval)
-  pollInterval = setInterval(async () => {
-    if (!selectedFiring.value || isManual.value) return
-    try {
-      const rows = await $fetch(`/api/readings?firingId=${selectedFiring.value.id}`)
-      selectedFiring.value.readings = rows; setReadings(rows, selectedFiring.value.started_at); setReadingsMobile(rows, selectedFiring.value.started_at)
-      if (rows.length && !isSaving.value) { const last = rows.at(-1); currentTemp.value = last.temperature; lastReadingTime.value = last.timestamp; isLive.value = true; if (signalLost.value) { signalLost.value = false; clearSignalLost() } }
-    } catch (err) { console.error('Poll error:', err) }
-  }, 5000)
-  signalCheckInterval = setInterval(() => {
-    if (!selectedFiring.value || isManual.value) return
-    const now = Math.floor(Date.now() / 1000)
-    if (!lastReadingTime.value) { if (now - selectedFiring.value.started_at > SIGNAL_TIMEOUT) { signalLost.value = true; setSignalLost(selectedFiring.value.started_at, null) } return }
-    if (now - lastReadingTime.value > SIGNAL_TIMEOUT) { signalLost.value = true; setSignalLost(selectedFiring.value.started_at, lastReadingTime.value) }
-  }, 5000)
+async function sheetDeleteFiring(f) {
+  sheetConfirmDeleteId.value = null
+  showFiringSheet.value = false
+  await deleteFiring(f)
 }
 </script>
 

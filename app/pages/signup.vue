@@ -3,7 +3,7 @@
     <div class="bg-white border border-parchment-3 rounded-2xl p-10 w-full max-w-md shadow-lg">
 
       <div class="text-center mb-5">
-        <NuxtLink to="/" class="inline-block text-3xl font-bold text-ink tracking-tight mb-1">Kiln.Log</NuxtLink>
+        <NuxtLink to="/" class="inline-block text-3xl font-bold text-ink tracking-tight mb-1">KilnMonitor</NuxtLink>
         <p class="text-sm text-ink-muted italic">Start your 30-day free trial</p>
       </div>
 

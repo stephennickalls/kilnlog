@@ -10,7 +10,7 @@
             <path d="M4 6h16M4 12h16M4 18h16"/>
           </svg>
         </button>
-        <h1 class="text-base font-bold text-ink tracking-tight">Kiln.Log</h1>
+        <h1 class="text-base font-bold text-ink tracking-tight">KilnMonitor</h1>
       </div>
 
       <div class="flex items-center gap-2 min-w-0">

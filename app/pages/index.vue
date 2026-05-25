@@ -4,7 +4,7 @@
     <!-- Nav -->
     <nav class="sticky top-0 z-50 bg-parchment/95 backdrop-blur border-b border-parchment-3">
       <div class="max-w-[1200px] mx-auto px-10 h-[68px] flex items-center justify-between">
-        <a href="/" class="text-[1.3rem] font-bold text-ink tracking-tight">Kiln.Log</a>
+        <a href="/" class="text-[1.3rem] font-bold text-ink tracking-tight">KilnMonitor</a>
         <div class="hidden md:flex items-center gap-9 text-[0.95rem] text-ink-muted">
           <a href="#features" class="hover:text-ink transition-colors">Features</a>
           <a href="#pricing" class="hover:text-ink transition-colors">Pricing</a>
@@ -33,7 +33,7 @@
         <div class="max-w-[680px] mb-14">
           <p class="text-flame font-semibold tracking-[0.16em] uppercase text-[0.72rem] mb-4">Kiln monitoring software</p>
           <h1 class="text-[clamp(2.75rem,5vw,4.25rem)] font-bold text-ink leading-[1.07] tracking-tight mb-6">Some kilns don't<br>come with a screen.</h1>
-          <p class="text-[1.1rem] text-ink-muted leading-[1.7] mb-7">Electric kilns have controllers. Wood and gas kilns have you — your instincts, your notes, and now Kiln.Log. Stream live temperatures from a cheap sensor, or log by hand as you stoke. Finally, the data to match your craft.</p>
+          <p class="text-[1.1rem] text-ink-muted leading-[1.7] mb-7">Electric kilns have controllers. Wood and gas kilns have you — your instincts, your notes, and now KilnMonitor. Stream live temperatures from a cheap sensor, or log by hand as you stoke. Finally, the data to match your craft.</p>
 
           <!-- Electric strip -->
           <div class="flex items-center gap-4 bg-parchment-2 border-[1.5px] border-parchment-4 rounded-lg px-5 py-[0.875rem] mb-8 max-w-[800px]">
@@ -123,7 +123,7 @@
             </div>
             <div class="bg-flame-bg border border-parchment-4 rounded-[10px] px-[1.625rem] py-6 flex flex-col gap-2">
               <p class="text-[0.7rem] font-bold uppercase tracking-[0.12em] text-flame">Curious about fire?</p>
-              <p class="text-[0.9rem] text-ink-muted leading-relaxed">Once you see a temperature curve climb in real time you'll be hooked. Kiln.Log makes the invisible visible.</p>
+              <p class="text-[0.9rem] text-ink-muted leading-relaxed">Once you see a temperature curve climb in real time you'll be hooked. KilnMonitor makes the invisible visible.</p>
             </div>
           </div>
 
@@ -242,8 +242,8 @@
     <!-- Footer -->
     <footer class="bg-ink border-t border-white/[0.08] px-10 py-7">
       <div class="max-w-[1200px] mx-auto flex items-center justify-between gap-4 flex-wrap">
-        <span class="text-[0.95rem] font-bold text-parchment">Kiln.Log</span>
-        <span class="text-[0.825rem] text-ink-muted">&copy; {{ new Date().getFullYear() }} Kiln.Log. Made for potters.</span>
+        <span class="text-[0.95rem] font-bold text-parchment">KilnMonitor</span>
+        <span class="text-[0.825rem] text-ink-muted">&copy; {{ new Date().getFullYear() }} KilnMonitor. Made for potters.</span>
         <div class="flex gap-7 text-[0.825rem] text-ink-muted">
           <NuxtLink to="/login" class="hover:text-parchment transition-colors">Sign in</NuxtLink>
           <NuxtLink to="/signup" class="hover:text-parchment transition-colors">Sign up</NuxtLink>

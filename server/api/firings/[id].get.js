@@ -1,4 +1,6 @@
 // server/api/firings/[id].get.js
+// Single query with nested selects — schedule, readings, and sensors
+// all come back in one round trip instead of three.
 export default defineEventHandler(async (event) => {
   const { db, user } = await useServerUser(event)
   const id = Number(getRouterParam(event, 'id'))
@@ -6,23 +8,22 @@ export default defineEventHandler(async (event) => {
 
   const { data: firing, error } = await db
     .from('firings')
-    .select('*')
+    .select(`
+      *,
+      schedule:schedule(*),
+      readings:readings(*),
+      sensors:firing_sensors(sensor_id, role, sensors(id, name))
+    `)
     .eq('id', id)
     .eq('user_id', user.id)
     .single()
 
   if (error || !firing) throw createError({ statusCode: 404, statusMessage: 'Firing not found' })
 
-  const [{ data: schedulePoints }, { data: readingRows }, { data: assignedSensors }] = await Promise.all([
-    db.from('schedule').select('*').eq('firing_id', id).order('offset_minutes', { ascending: true }),
-    db.from('readings').select('*').eq('firing_id', id).order('timestamp', { ascending: true }),
-    db.from('firing_sensors').select('sensor_id, role, sensors(id, name)').eq('firing_id', id),
-  ])
+  // Nested rows aren't guaranteed ordered — sort client-side after the single fetch
+  firing.schedule = (firing.schedule ?? []).sort((a, b) => a.offset_minutes - b.offset_minutes)
+  firing.readings = (firing.readings ?? []).sort((a, b) => a.timestamp - b.timestamp)
+  firing.sensors  = firing.sensors ?? []
 
-  return {
-    ...firing,
-    schedule: schedulePoints ?? [],
-    readings: readingRows    ?? [],
-    sensors:  assignedSensors ?? [],
-  }
+  return firing
 })

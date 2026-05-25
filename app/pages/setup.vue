@@ -5,7 +5,7 @@
 
       <!-- Header -->
       <div class="mb-8">
-        <NuxtLink to="/app" class="text-sm text-flame font-semibold hover:underline">← Back to Kiln.Log</NuxtLink>
+        <NuxtLink to="/app" class="text-sm text-flame font-semibold hover:underline">← Back to KilnMonitor</NuxtLink>
         <h1 class="text-2xl font-bold text-ink mt-3 tracking-tight">ESP32 Setup</h1>
         <p class="text-sm text-ink-muted mt-1">Flash firmware and configure your kiln sensor in one go.</p>
       </div>
@@ -58,7 +58,7 @@
             <StepBadge :n="2" :done="step > 2" :active="step === 2" />
             <div>
               <p class="text-sm font-bold text-ink">Flash firmware</p>
-              <p class="text-xs text-ink-muted">Upload Kiln.Log firmware to the ESP32</p>
+              <p class="text-xs text-ink-muted">Upload KilnMonitor firmware to the ESP32</p>
             </div>
             <div class="ml-auto">
               <span v-if="step > 2" class="text-xs font-bold text-green-600 flex items-center gap-1">
@@ -151,7 +151,7 @@
                 <input v-model="config.password" type="password" placeholder="••••••••" class="border border-parchment-3 rounded-xl px-4 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif" />
               </div>
               <div class="flex flex-col gap-1.5">
-                <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Kiln.Log API URL</label>
+                <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">KilnMonitor API URL</label>
                 <input v-model="config.apiUrl" type="url" placeholder="https://kilnlog.netlify.app" class="border border-parchment-3 rounded-xl px-4 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif" />
                 <p class="text-xs text-ink-muted">Leave blank to use mDNS (same local network only)</p>
               </div>
@@ -179,7 +179,7 @@
             <p class="text-sm text-green-700 mt-1">The sensor is rebooting and will connect to <strong>{{ config.ssid }}</strong> shortly. The LED will go solid when it's ready.</p>
           </div>
           <NuxtLink to="/app" class="mt-2 px-4 py-2 bg-flame text-parchment text-sm font-bold rounded-lg hover:bg-flame-dark transition-colors">
-            Go to Kiln.Log →
+            Go to KilnMonitor →
           </NuxtLink>
         </div>
 

@@ -36,7 +36,7 @@
         <!-- Intro -->
         <div class="bg-white border border-parchment-3 rounded-2xl px-5 py-4" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
           <p class="text-sm font-semibold text-ink mb-1">MAX31855 + ESP32</p>
-          <p class="text-xs text-ink-muted leading-relaxed">Connect your ESP32 via USB, then follow the steps below to flash the Kiln.Log firmware and configure your WiFi credentials. Once set up, the sensor will stream temperature readings automatically.</p>
+          <p class="text-xs text-ink-muted leading-relaxed">Connect your ESP32 via USB, then follow the steps below to flash the KilnMonitor firmware and configure your WiFi credentials. Once set up, the sensor will stream temperature readings automatically.</p>
         </div>
 
         <!-- ── STEP 1: CONNECT ── -->
@@ -109,7 +109,7 @@
             <StepBadge :n="3" :done="step > 3" :active="step === 3" />
             <div class="flex-1 min-w-0">
               <p class="text-sm font-bold text-ink">Flash firmware</p>
-              <p class="text-xs text-ink-muted">Upload Kiln.Log firmware to the ESP32</p>
+              <p class="text-xs text-ink-muted">Upload KilnMonitor firmware to the ESP32</p>
             </div>
             <span v-if="step > 3" class="text-xs font-bold text-green-600 flex items-center gap-1 shrink-0">
               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
@@ -211,7 +211,7 @@
                 </div>
                 <div class="flex flex-col gap-1.5">
                   <div class="flex items-center justify-between">
-                    <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Kiln.Log API URL</label>
+                    <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">KilnMonitor API URL</label>
                     <button
                       class="text-[10px] text-ink-faint hover:text-flame transition-colors"
                       @click="config.apiUrl = window.location.origin"
@@ -260,7 +260,7 @@
             <p class="text-sm text-green-700 mt-1">The ESP32 is rebooting and will connect to <strong>{{ config.ssid }}</strong>. The LED goes solid when it's ready.</p>
           </div>
           <NuxtLink to="/app" class="mt-1 px-5 py-2.5 bg-flame text-parchment text-sm font-bold rounded-xl hover:bg-flame-dark transition-colors">
-            Go to Kiln.Log →
+            Go to KilnMonitor →
           </NuxtLink>
         </div>
 

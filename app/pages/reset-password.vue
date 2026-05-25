@@ -8,7 +8,7 @@
       <!-- Brand -->
       <div class="text-center mb-6">
         <span class="text-5xl block mb-2">🔥</span>
-        <h1 class="text-2xl font-bold text-ink tracking-tight">Kiln.Log</h1>
+        <h1 class="text-2xl font-bold text-ink tracking-tight">KilnMonitor</h1>
         <p class="text-sm text-ink-muted italic mt-0.5">Choose a new password</p>
       </div>
 

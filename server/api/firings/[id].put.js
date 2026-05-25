@@ -1,5 +1,4 @@
 // server/api/firings/[id].put.js
-
 export default defineEventHandler(async (event) => {
   const { db, user } = await useServerUser(event)
   const id   = Number(getRouterParam(event, 'id'))
@@ -7,18 +6,17 @@ export default defineEventHandler(async (event) => {
   if (isNaN(id)) throw createError({ statusCode: 400, statusMessage: 'Invalid id' })
 
   // Verify ownership first
-  const { data: existing, error: fetchErr } = await db
+  const { data: existing } = await db
     .from('firings')
     .select('id')
     .eq('id', id)
     .eq('user_id', user.id)
     .single()
 
-  if (fetchErr || !existing) throw createError({ statusCode: 404, statusMessage: 'Firing not found' })
+  if (!existing) throw createError({ statusCode: 404, statusMessage: 'Firing not found' })
 
   const updates = {}
   if (body.startedAt !== undefined) updates.started_at = body.startedAt
-  // Allow explicit null to restart a stopped firing (clears ended_at)
   if ('endedAt' in body)            updates.ended_at   = body.endedAt ?? null
   if (body.notes     !== undefined) updates.notes      = body.notes
   if (body.mode      !== undefined) updates.mode       = body.mode

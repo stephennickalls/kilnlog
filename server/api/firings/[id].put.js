@@ -1,5 +1,4 @@
 // server/api/firings/[id].put.js
-import { logger } from '~/server/utils/logger'
 
 export default defineEventHandler(async (event) => {
   const { db, user } = await useServerUser(event)

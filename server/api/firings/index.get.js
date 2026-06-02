@@ -5,7 +5,6 @@
 //   Manual firing:    no readings for 2 hours
 //   Either type:      started but never had a reading, and started > 1 hour ago
 
-import { logger } from '~/server/utils/logger'
 
 const FOUR_HOURS = 4 * 60 * 60
 const TWO_HOURS  = 2 * 60 * 60

@@ -7,7 +7,6 @@ export default defineEventHandler(async (event) => {
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY)
   const sig      = getHeader(event, 'stripe-signature')
 
-  // Nitro may return rawBody as a string — Stripe needs the exact bytes
   const rawBody  = await readRawBody(event, false)
 
   let stripeEvent
@@ -24,6 +23,16 @@ export default defineEventHandler(async (event) => {
       past_due: 'past_due', unpaid: 'past_due', incomplete: 'past_due',
       incomplete_expired: 'expired', paused: 'canceled',
     })[s] ?? 'expired'
+  }
+
+  // current_period_end lives on the subscription item in newer API versions,
+  // not the subscription object. Fall back gracefully if absent.
+  function toIso(unixSeconds) {
+    return Number.isFinite(unixSeconds) ? new Date(unixSeconds * 1000).toISOString() : null
+  }
+
+  function periodEnd(sub) {
+    return sub?.items?.data?.[0]?.current_period_end ?? sub?.current_period_end ?? null
   }
 
   async function updateProfile(customerId, updates, eventTs) {
@@ -51,15 +60,15 @@ export default defineEventHandler(async (event) => {
     case 'customer.subscription.updated': {
       await updateProfile(obj.customer, {
         subscription_status:  mapStatus(obj.status),
-        subscription_ends_at: new Date(obj.current_period_end * 1000).toISOString(),
-        trial_ends_at:        obj.trial_end ? new Date(obj.trial_end * 1000).toISOString() : null,
+        subscription_ends_at: toIso(periodEnd(obj)),
+        trial_ends_at:        toIso(obj.trial_end),
       }, ts)
       break
     }
     case 'customer.subscription.deleted': {
       await updateProfile(obj.customer, {
         subscription_status:  'canceled',
-        subscription_ends_at: new Date(obj.current_period_end * 1000).toISOString(),
+        subscription_ends_at: toIso(periodEnd(obj)),
       }, ts)
       break
     }

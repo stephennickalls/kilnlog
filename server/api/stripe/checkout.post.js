@@ -2,7 +2,7 @@
 import Stripe from 'stripe'
 
 export default defineEventHandler(async (event) => {
-  const { db, user } = await useServerUser(event)
+  const { db, user } = await useServerUser(event, { requireSubscription: false })
 
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 

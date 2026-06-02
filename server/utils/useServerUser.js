@@ -17,7 +17,7 @@ export async function useServerUser(event, { requireSubscription = true } = {}) 
 
   const { data: profile, error: profErr } = await db
     .from('profiles')
-    .select('subscription_status, trial_ends_at, subscription_ends_at')
+    .select('subscription_status, trial_ends_at, subscription_ends_at, stripe_customer_id')
     .eq('id', user.id)
     .single()
 

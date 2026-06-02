@@ -1,6 +1,6 @@
 <!-- app/pages/subscribe.vue -->
 <template>
-  <div
+  <div v-if="mounted"
     class="min-h-screen bg-parchment font-serif flex flex-col lg:flex-row"
     style="background-image: radial-gradient(ellipse at 80% 20%, rgba(176,92,26,0.06) 0%, transparent 55%)"
   >
@@ -94,6 +94,7 @@
     </div>
 
   </div>
+  <div v-else class="min-h-screen bg-parchment" />
 </template>
 
 <script setup>
@@ -103,6 +104,9 @@ definePageMeta({ layout: false })
 const supabase = useSupabaseClient()
 const error    = ref('')
 const loading  = ref(false)
+const mounted  = ref(false)
+
+onMounted(() => { mounted.value = true })
 
 const features = [
   'Unlimited kiln firings',

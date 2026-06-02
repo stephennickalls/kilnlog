@@ -6,12 +6,15 @@ export default defineEventHandler(async (event) => {
   const stripe   = new Stripe(process.env.STRIPE_SECRET_KEY)
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY)
   const sig      = getHeader(event, 'stripe-signature')
-  const rawBody  = await readRawBody(event)
+
+  // Nitro may return rawBody as a string — Stripe needs the exact bytes
+  const rawBody  = await readRawBody(event, false)
 
   let stripeEvent
   try {
     stripeEvent = stripe.webhooks.constructEvent(rawBody, sig, process.env.STRIPE_WEBHOOK_SECRET)
   } catch (err) {
+    logger.error('stripe.webhook.signature_failed', { err })
     throw createError({ statusCode: 400, statusMessage: `Webhook error: ${err.message}` })
   }
 
@@ -23,8 +26,6 @@ export default defineEventHandler(async (event) => {
     })[s] ?? 'expired'
   }
 
-  // Update only if this event is newer than what we last applied.
-  // last_stripe_event_at guards against out-of-order delivery.
   async function updateProfile(customerId, updates, eventTs) {
     const { data, error } = await supabase
       .from('profiles')
@@ -38,13 +39,12 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 500, statusMessage: 'Profile update failed' })
     }
     if (!data?.length) {
-      // Either no matching customer, or a newer event already applied (safe to skip)
       logger.warn('stripe.webhook.no_row_updated', { customerId, type: stripeEvent.type })
     }
   }
 
   const obj = stripeEvent.data.object
-  const ts  = stripeEvent.created  // unix seconds, authoritative ordering key
+  const ts  = stripeEvent.created
 
   switch (stripeEvent.type) {
     case 'customer.subscription.created':

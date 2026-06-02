@@ -5,14 +5,16 @@
 //   Manual firing:    no readings for 2 hours
 //   Either type:      started but never had a reading, and started > 1 hour ago
 
-const FOUR_HOURS  = 4 * 60 * 60
-const TWO_HOURS   = 2 * 60 * 60
-const ONE_HOUR    = 1 * 60 * 60
+import { logger } from '~/server/utils/logger'
+
+const FOUR_HOURS = 4 * 60 * 60
+const TWO_HOURS  = 2 * 60 * 60
+const ONE_HOUR   = 1 * 60 * 60
 
 export default defineEventHandler(async (event) => {
   const { db, user } = await useServerUser(event)
 
-  // Fetch all active firings (no ended_at) with their last reading timestamp
+  // Fetch all active firings with their reading timestamps
   const { data: activeFirings, error: activeError } = await db
     .from('firings')
     .select(`
@@ -23,36 +25,43 @@ export default defineEventHandler(async (event) => {
     .is('ended_at', null)
     .not('started_at', 'is', null)
 
-  if (activeError) throw createError({ statusCode: 500, statusMessage: activeError.message })
+  if (activeError) {
+    logger.error('firings.list.active_query_failed', { userId: user.id, err: activeError })
+    throw createError({ statusCode: 500, statusMessage: activeError.message })
+  }
 
   const now = Math.floor(Date.now() / 1000)
   const toAutoEnd = []
 
   for (const firing of activeFirings ?? []) {
-    const mode = firing.mode ?? 'connected'
+    const mode     = firing.mode ?? 'connected'
     const readings = firing.readings ?? []
+
+    // Safe reduce — avoids Math.max(...array) stack overflow on large arrays
     const lastTs = readings.length
-      ? Math.max(...readings.map(r => r.timestamp))
+      ? readings.reduce((max, r) => r.timestamp > max ? r.timestamp : max, readings[0].timestamp)
       : null
 
-    const noReadings = lastTs === null
-
-    if (noReadings) {
-      // Never had a reading — auto-end after 1 hour regardless of mode
+    if (lastTs === null) {
       if (now - firing.started_at > ONE_HOUR) {
+        logger.info('firings.auto_end.queued', { firingId: firing.id, reason: 'no_readings', mode })
         toAutoEnd.push(firing.id)
       }
     } else if (mode === 'connected') {
-      if (now - lastTs > FOUR_HOURS) toAutoEnd.push(firing.id)
+      if (now - lastTs > FOUR_HOURS) {
+        logger.info('firings.auto_end.queued', { firingId: firing.id, reason: 'signal_lost_4h', mode })
+        toAutoEnd.push(firing.id)
+      }
     } else {
-      // manual
-      if (now - lastTs > TWO_HOURS) toAutoEnd.push(firing.id)
+      if (now - lastTs > TWO_HOURS) {
+        logger.info('firings.auto_end.queued', { firingId: firing.id, reason: 'no_manual_readings_2h', mode })
+        toAutoEnd.push(firing.id)
+      }
     }
   }
 
-  // Auto-end stale firings in parallel
   if (toAutoEnd.length) {
-    await Promise.all(
+    const results = await Promise.all(
       toAutoEnd.map(id =>
         db.from('firings')
           .update({ ended_at: now, auto_ended: true })
@@ -60,15 +69,25 @@ export default defineEventHandler(async (event) => {
           .eq('user_id', user.id)
       )
     )
+    results.forEach((res, i) => {
+      if (res.error) {
+        logger.error('firings.auto_end.update_failed', { firingId: toAutoEnd[i], err: res.error })
+      } else {
+        logger.info('firings.auto_end.completed', { firingId: toAutoEnd[i] })
+      }
+    })
   }
 
-  // Now fetch the full list (stale ones are now ended)
   const { data, error } = await db
     .from('firings')
     .select('*')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
 
-  if (error) throw createError({ statusCode: 500, statusMessage: error.message })
+  if (error) {
+    logger.error('firings.list.query_failed', { userId: user.id, err: error })
+    throw createError({ statusCode: 500, statusMessage: error.message })
+  }
+
   return data ?? []
 })

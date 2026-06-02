@@ -28,3 +28,6 @@ export default defineNuxtRouteMiddleware(async (to) => {
 
   if (!ok) return navigateTo('/subscribe')
 })
+
+
+

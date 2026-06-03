@@ -204,14 +204,17 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     chart = new Chart(canvasRef.value, config)
   }
 
-  function setSchedule(points) {
+  // `offset` shifts every planned waypoint right by N minutes — used by
+  // pause/resume and recalibrate. The schedule data itself is never mutated;
+  // the shift is applied here at render time.
+  function setSchedule(points, offset = 0) {
     if (!chart) return
     chart.data.datasets[0].data = points.map(p => ({
-      x: p.offset_minutes,
+      x: p.offset_minutes + offset,
       y: p.target_temp,
     }))
     if (points.length) {
-      const maxX = Math.max(...points.map(p => p.offset_minutes))
+      const maxX = Math.max(...points.map(p => p.offset_minutes + offset))
       const maxY = Math.max(...points.map(p => p.target_temp))
       xMax = maxX + 60
       chart.options.scales.x.min = 0

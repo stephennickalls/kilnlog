@@ -13,15 +13,44 @@
       <div class="flex items-center gap-2 min-w-0">
         <template v-if="selectedFiring">
           <span class="text-xs sm:text-sm font-semibold text-ink truncate max-w-[90px] sm:max-w-none">{{ selectedFiring.name }}</span>
-          <span v-if="isLive" class="hidden sm:inline-flex px-2 py-0.5 text-xs font-bold rounded-full border cursor-pointer transition-colors"
-            :class="isManual ? 'bg-blue-50 text-blue-700 border-blue-200' : 'border-parchment-3 bg-parchment-2 text-ink-muted'"
-            @click="toggleMode">{{ isManual ? 'Manual' : 'Connected' }}</span>
-          <span v-if="isLive && signalLost && !isManual" class="px-2 py-0.5 text-xs font-bold rounded-full bg-yellow-100 text-yellow-700 border border-yellow-200 shrink-0">⚠️</span>
+          <!-- Mode segmented toggle (visible while live) -->
+          <div v-if="isLive" class="hidden sm:inline-flex items-center rounded-full border border-parchment-3 bg-parchment-2 p-0.5 shrink-0">
+            <button
+              class="px-2.5 py-0.5 text-xs font-bold rounded-full transition-colors"
+              :class="!isManual ? 'bg-green-100 text-green-700' : 'text-ink-faint hover:text-ink'"
+              @click="!isManual || toggleMode()"
+            >Connected</button>
+            <button
+              class="px-2.5 py-0.5 text-xs font-bold rounded-full transition-colors"
+              :class="isManual ? 'bg-blue-100 text-blue-700' : 'text-ink-faint hover:text-ink'"
+              @click="isManual || toggleMode()"
+            >Manual</button>
+          </div>
+          <span v-if="isLive && signalLost && !isManual" class="px-2 py-0.5 text-xs font-bold rounded-full bg-yellow-100 text-yellow-700 border border-yellow-200 shrink-0" title="Sensor signal lost">⚠️ No signal</span>
           <span v-else-if="isLive && !isManual" class="px-2 py-0.5 text-xs font-bold rounded-full bg-green-100 text-green-700 border border-green-200 shrink-0">● LIVE</span>
           <span v-else-if="isLive && isManual" class="px-2 py-0.5 text-xs font-bold rounded-full bg-blue-100 text-blue-700 border border-blue-200 shrink-0">● ACTIVE</span>
           <span v-else-if="!selectedFiring.ended_at" class="px-2 py-0.5 text-xs font-bold rounded-full bg-amber-100 text-amber-700 border border-amber-200 shrink-0">⏳</span>
           <span v-else class="px-2 py-0.5 text-xs font-bold rounded-full bg-parchment-2 text-ink-faint border border-parchment-3 shrink-0">DONE</span>
-          <button v-if="activeFiring && selectedFiring.id === activeFiring.id" class="btn-danger !px-2 !py-1 !text-xs shrink-0" @click="endFiring">End</button>
+          <!-- Live controls -->
+          <template v-if="activeFiring && selectedFiring.id === activeFiring.id">
+            <button v-if="isLive && !isPaused" class="shrink-0 flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-lg border border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-colors" @click="pauseFiring">⏸ Pause</button>
+            <button v-if="isPaused" class="shrink-0 px-3 py-1.5 text-xs font-bold rounded-lg bg-flame hover:bg-flame-dark text-parchment transition-colors" @click="resumeFiring">▶ Resume</button>
+            <div v-if="isLive && !isPaused" class="relative shrink-0">
+              <button class="flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-lg border border-flame/40 text-flame bg-flame-bg hover:bg-flame/10 transition-colors" @click="showRecalibrateInfo = !showRecalibrateInfo">
+                ↻ Recalibrate
+                <svg class="w-3 h-3 opacity-60" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+              </button>
+              <div v-if="showRecalibrateInfo" class="absolute right-0 top-full mt-2 w-72 z-50 bg-white border border-parchment-3 rounded-xl p-3 text-left" style="box-shadow:0 4px 20px rgba(58,30,8,0.12)">
+                <p class="text-xs font-bold text-ink mb-1">When to recalibrate</p>
+                <p class="text-xs text-ink-muted leading-relaxed">Use this when your kiln has fallen behind the planned curve — a weak burner, a stall, or after a gas-out. It slides the rest of your schedule to start from your <strong>current temperature</strong>, keeping every ramp rate intact. Your firing just finishes later.</p>
+                <div class="flex gap-2 mt-3">
+                  <button class="flex-1 py-1.5 bg-flame hover:bg-flame-dark text-parchment text-xs font-bold rounded-lg transition-colors" @click="recalibrate">Recalibrate now</button>
+                  <button class="px-3 py-1.5 border border-parchment-3 text-ink-muted text-xs font-semibold rounded-lg hover:bg-parchment-2 transition-colors" @click="showRecalibrateInfo = false">Cancel</button>
+                </div>
+              </div>
+            </div>
+            <button class="btn-danger !px-3 !py-1.5 !text-xs shrink-0" @click="endFiring">End</button>
+          </template>
         </template>
       </div>
     </header>
@@ -50,7 +79,7 @@
         <!-- Desktop stats bar -->
         <div class="hidden sm:block p-5 pb-0">
           <FiringStatsBar
-            v-if="selectedFiring"
+            v-if="selectedFiring && !selectedFiring.ended_at"
             :peak-temp="peakTemp"
             :duration="duration"
             :rate-of-change="rateOfChange"
@@ -64,6 +93,14 @@
             @open-temp="showTempModal = true"
             @log-reading="openLogReading"
           />
+          <!-- Stopped firing — restart prompt in place of stats bar -->
+          <div v-else-if="selectedFiring?.ended_at && !activeFiring" class="flex items-center gap-3 px-1 py-1">
+            <span class="text-sm text-ink-muted">This firing has ended.</span>
+            <button
+              class="flex items-center gap-2 px-4 py-1.5 bg-flame hover:bg-flame-dark text-parchment text-sm font-bold rounded-lg transition-colors"
+              @click="restartFiring(selectedFiring)"
+            >↺ Restart firing</button>
+          </div>
         </div>
 
         <!-- Desktop chart -->
@@ -75,6 +112,9 @@
           </div>
           <div v-else-if="!selectedFiring" class="absolute flex flex-col items-center gap-3 text-ink-muted">
             <p class="text-sm">Select a firing from the sidebar or start a new one</p>
+          </div>
+          <div v-if="isPaused" class="absolute top-4 left-1/2 -translate-x-1/2 flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold">
+            ⏸ Paused — resume when your kiln is firing again
           </div>
         </div>
 
@@ -127,18 +167,58 @@
               </div>
             </div>
 
+            <!-- Mobile mode toggle -->
+            <div v-if="isLive && !isPaused" class="shrink-0 px-2 pt-1">
+              <div class="flex items-center rounded-lg border border-parchment-3 bg-parchment-2 p-0.5">
+                <button
+                  class="flex-1 py-2 text-xs font-bold rounded-md transition-colors"
+                  :class="!isManual ? 'bg-green-100 text-green-700' : 'text-ink-faint'"
+                  @click="!isManual || toggleMode()"
+                >📡 Connected</button>
+                <button
+                  class="flex-1 py-2 text-xs font-bold rounded-md transition-colors"
+                  :class="isManual ? 'bg-blue-100 text-blue-700' : 'text-ink-faint'"
+                  @click="isManual || toggleMode()"
+                >✏️ Manual</button>
+              </div>
+            </div>
+
             <!-- Mobile action row -->
-            <div class="shrink-0 flex gap-2 px-2 pb-3 pt-1">
-              <button v-if="activeFiring && selectedFiring.id === activeFiring.id" class="btn-danger flex-1 py-3 !text-sm" @click="endFiring">End firing</button>
+            <div class="shrink-0 flex flex-wrap gap-2 px-2 pb-3 pt-1">
+              <button v-if="isPaused" class="flex-1 py-3 bg-flame text-parchment text-sm font-bold rounded-lg active:bg-flame-dark transition-colors" @click="resumeFiring">▶ Resume firing</button>
+              <button v-if="isLive && !isPaused" class="flex-1 py-3 border border-amber-300 bg-amber-50 text-amber-700 text-sm font-bold rounded-lg transition-colors" @click="pauseFiring">⏸ Pause</button>
+              <button v-if="isLive && !isPaused" class="flex-1 py-3 border border-flame/40 bg-flame-bg text-flame text-sm font-bold rounded-lg transition-colors" @click="showRecalibrateInfo = true">↻ Recalibrate</button>
+              <button v-if="activeFiring && selectedFiring.id === activeFiring.id && !isPaused" class="btn-danger flex-1 py-3 !text-sm" @click="endFiring">End firing</button>
               <button v-if="isLive && isManual" class="btn-primary flex-1 py-3" @click="openLogReading">+ Log reading</button>
-              <button v-if="isLive" class="flex-1 py-3 border text-xs font-bold rounded-lg transition-colors"
-                :class="isManual ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-parchment-3 bg-parchment-2 text-ink-muted'"
-                @click="toggleMode">{{ isManual ? 'Manual' : 'Connected' }}</button>
               <button v-if="!isLive && !activeFiring && selectedFiring?.started_at && selectedFiring?.ended_at" class="flex-1 py-3 bg-amber-500 text-white text-sm font-bold rounded-lg active:bg-amber-600 transition-colors" @click="restartFiring(selectedFiring)">↺ Restart firing</button>
               <button v-else-if="!isLive && !activeFiring" class="flex-1 py-3 bg-flame text-parchment text-sm font-bold rounded-lg active:bg-flame-dark transition-colors" @click="openStartModal">+ Start firing</button>
             </div>
+
+            <!-- Mobile recalibrate sheet -->
+            <Teleport to="body">
+              <div v-if="showRecalibrateInfo" class="fixed inset-0 z-[60] flex items-end sm:hidden" style="background:rgba(26,18,8,0.6)" @click.self="showRecalibrateInfo = false">
+                <div class="bg-parchment rounded-t-2xl w-full p-5 flex flex-col gap-3">
+                  <p class="text-sm font-bold text-ink">When to recalibrate</p>
+                  <p class="text-sm text-ink-muted leading-relaxed">Use this when your kiln has fallen behind the planned curve — a weak burner, a stall, or after a gas-out. It slides the rest of your schedule to start from your <strong>current temperature</strong>, keeping every ramp rate intact. Your firing just finishes later.</p>
+                  <button class="w-full py-3 bg-flame text-parchment text-sm font-bold rounded-lg active:bg-flame-dark transition-colors" @click="recalibrate">Recalibrate now</button>
+                  <button class="w-full py-2.5 border border-parchment-3 text-ink-muted text-sm font-semibold rounded-lg" @click="showRecalibrateInfo = false">Cancel</button>
+                </div>
+              </div>
+            </Teleport>
           </template>
         </div>
+
+        <!-- Desktop sensor panel -->
+        <FiringSensorPanel
+          v-if="showSensorPanel && selectedFiring"
+          class="hidden sm:block"
+          :assigned="assignedSensors"
+          :unassigned="unassignedSensors"
+          @add="addSensorToFiring"
+          @remove="removeSensorFromFiring"
+          @close="showSensorPanel = false"
+        />
+
       </main>
     </div>
 
@@ -263,11 +343,13 @@ const currentTemp          = ref(null)
 const isSaving             = ref(false)
 const isLive               = ref(false)
 const isManual             = ref(false)
+const isPaused             = ref(false)
 const signalLost           = ref(false)
 const lastReadingTime      = ref(null)
 const library              = ref([])
 const sensors              = ref([])
 const showSensorPanel      = ref(false)
+const showRecalibrateInfo  = ref(false)
 const sidebarOpen          = ref(true)
 const sidebarWidth         = ref(280)
 const MIN_WIDTH            = 180
@@ -277,7 +359,6 @@ const nowUnix              = ref(Math.floor(Date.now() / 1000))
 // ── Constants ──────────────────────────────────────────────────────────────────
 const SIGNAL_TIMEOUT = 30
 const ONLINE_TIMEOUT = 30
-const EMA_ALPHA      = 0.3
 
 // ── Intervals ─────────────────────────────────────────────────────────────────
 let signalCheckInterval = null
@@ -300,45 +381,9 @@ const { init: initMobile, setSchedule: setScheduleMobile, setReadings: setReadin
 // ── Computed ───────────────────────────────────────────────────────────────────
 const activeFiring = computed(() => allFirings.value.find(f => f.started_at && !f.ended_at) ?? null)
 const pastFirings  = computed(() => allFirings.value.filter(f => f.ended_at).sort((a, b) => b.created_at - a.created_at))
-const peakTemp     = computed(() => { if (!selectedFiring.value?.readings?.length) return null; return Math.max(...selectedFiring.value.readings.map(r => r.temperature)) })
-const duration     = computed(() => { const f = selectedFiring.value; if (!f?.started_at || !f?.ended_at) return null; const mins = Math.round((f.ended_at - f.started_at) / 60), h = Math.floor(mins / 60), m = mins % 60; return h > 0 ? `${h}h ${m}m` : `${m}m` })
-const readingCount = computed(() => selectedFiring.value?.readings?.length ?? 0)
-const elapsed      = computed(() => { const f = selectedFiring.value; if (!f?.started_at) return '—'; const mins = Math.round((nowUnix.value - f.started_at) / 60), h = Math.floor(mins / 60), m = mins % 60; return h > 0 ? `${h}h ${m}m` : `${m}m` })
 
-const rateOfChange = computed(() => {
-  const readings = selectedFiring.value?.readings
-  if (!readings || readings.length < 2) return '—'
-  let ema = null
-  for (let i = 1; i < readings.length; i++) {
-    const prev = readings[i - 1], curr = readings[i]
-    const deltaMins = (curr.timestamp - prev.timestamp) / 60
-    if (deltaMins < 0.5) continue
-    const instantRate = (curr.temperature - prev.temperature) / deltaMins
-    ema = ema === null ? instantRate : EMA_ALPHA * instantRate + (1 - EMA_ALPHA) * ema
-  }
-  if (ema === null) return '—'
-  const rate = Math.round(ema)
-  return rate >= 0 ? `+${rate}°/m` : `${rate}°/m`
-})
-
-const targetRate = computed(() => {
-  const f = selectedFiring.value
-  if (!f?.started_at || !f?.schedule?.length) return '—'
-  const elapsedMins = (nowUnix.value - f.started_at) / 60
-  const schedule    = [...f.schedule].sort((a, b) => a.offset_minutes - b.offset_minutes)
-  let before = null, after = null
-  for (let i = 0; i < schedule.length - 1; i++) {
-    if (schedule[i].offset_minutes <= elapsedMins && schedule[i + 1].offset_minutes >= elapsedMins) {
-      before = schedule[i]; after = schedule[i + 1]; break
-    }
-  }
-  if (!before || !after) return '—'
-  const deltaTemp = after.target_temp - before.target_temp
-  const deltaMins = after.offset_minutes - before.offset_minutes
-  if (deltaMins === 0) return '—'
-  const rate = Math.round(deltaTemp / deltaMins)
-  return rate >= 0 ? `+${rate}°/m` : `${rate}°/m`
-})
+const { peakTemp, duration, readingCount, elapsed, rateOfChange, targetRate }
+  = useFiringStats(selectedFiring, nowUnix)
 
 const assignedSensors = computed(() => {
   const rows = selectedFiring.value?.sensors ?? []
@@ -354,6 +399,16 @@ const unassignedSensors = computed(() => {
   const assignedIds = new Set(assignedSensors.value.map(s => s.sensor_id ?? s.id))
   return sensors.value.filter(s => !assignedIds.has(s.id))
 })
+
+// Current schedule shift (minutes) for the selected firing.
+const scheduleOffset = computed(() => selectedFiring.value?.schedule_offset ?? 0)
+
+// Push the planned schedule to both charts with the firing's current offset applied.
+function applySchedule(scheduleRows) {
+  const rows = scheduleRows ?? selectedFiring.value?.schedule ?? []
+  setSchedule(rows, scheduleOffset.value)
+  setScheduleMobile(rows, scheduleOffset.value)
+}
 
 // ── Lifecycle ──────────────────────────────────────────────────────────────────
 onMounted(async () => {
@@ -463,15 +518,16 @@ async function refreshFirings() {
 async function selectFiring(f) {
   stopAllIntervals()
   isLive.value = isManual.value = signalLost.value = false
+  isPaused.value = false
   currentTemp.value = lastReadingTime.value = null
   showSensorPanel.value = false
 
   const data = await $fetch(`/api/firings/${f.id}`)
   selectedFiring.value = data
-  setSchedule(data.schedule ?? [])
+  setSchedule(data.schedule ?? [], data.schedule_offset ?? 0)
   setReadings(data.readings ?? [], data.started_at)
   await nextTick(); await initMobile()
-  setScheduleMobile(data.schedule ?? [])
+  setScheduleMobile(data.schedule ?? [], data.schedule_offset ?? 0)
   setReadingsMobile(data.readings ?? [], data.started_at)
 
   if (data.readings?.length) {
@@ -484,6 +540,14 @@ async function selectFiring(f) {
   const mode = data.mode ?? 'connected'
   isManual.value = mode === 'manual'
   setManualMode(isManual.value)
+
+  // A firing with paused_at set is active but suspended — show resume state,
+  // don't restart the live engine.
+  if (isActive && data.paused_at) {
+    isPaused.value = true
+    isLive.value = true
+    return
+  }
 
   if (isActive) {
     isLive.value = true
@@ -510,15 +574,15 @@ async function endFiring() {
   const id = activeFiring.value.id
   await $fetch(`/api/firings/${id}`, { method: 'PUT', body: { endedAt: Math.floor(Date.now() / 1000) } })
   stopAllIntervals()
-  signalLost.value = isLive.value = false
+  signalLost.value = isLive.value = isPaused.value = false
   currentTemp.value = null
   await refreshFirings()
   if (selectedFiring.value?.id === id) {
     const data = await $fetch(`/api/firings/${id}`)
     selectedFiring.value = data
-    setSchedule(data.schedule ?? [])
+    setSchedule(data.schedule ?? [], data.schedule_offset ?? 0)
     setReadings(data.readings ?? [], data.started_at)
-    setScheduleMobile(data.schedule ?? [])
+    setScheduleMobile(data.schedule ?? [], data.schedule_offset ?? 0)
     setReadingsMobile(data.readings ?? [], data.started_at)
   }
 }
@@ -531,12 +595,84 @@ async function restartFiring(f) {
   await selectFiring(fresh ?? f)
 }
 
+// ── Pause / Resume / Recalibrate ─────────────────────────────────────────────
+// Pause: suspend a live firing (e.g. ran out of gas). Records the moment so we
+// can measure the gap on resume. Stops the live engine; firing stays active.
+async function pauseFiring() {
+  const f = selectedFiring.value
+  if (!f || !isLive.value || isPaused.value) return
+  const pausedAt = Math.floor(Date.now() / 1000)
+  await $fetch(`/api/firings/${f.id}`, { method: 'PUT', body: { pausedAt } })
+  stopAllIntervals()
+  signalLost.value = false
+  clearSignalLost()
+  isPaused.value = true
+  f.paused_at = pausedAt
+}
+
+// Resume: add the dead time to schedule_offset so the planned curve slides
+// right by exactly how long we were paused, then restart the engine.
+async function resumeFiring() {
+  const f = selectedFiring.value
+  if (!f || !isPaused.value || !f.paused_at) return
+  const gapMins = Math.round((Math.floor(Date.now() / 1000) - f.paused_at) / 60)
+  const newOffset = (f.schedule_offset ?? 0) + gapMins
+  await $fetch(`/api/firings/${f.id}`, { method: 'PUT', body: { pausedAt: null, scheduleOffset: newOffset } })
+  f.schedule_offset = newOffset
+  f.paused_at = null
+  isPaused.value = false
+  applySchedule()
+  // Restart the live engine the same way selectFiring does for an active firing.
+  elapsedTickInterval = setInterval(() => { nowUnix.value = Math.floor(Date.now() / 1000) }, 1000)
+  if (!isManual.value) startPolling()
+  toast.show(`Resumed — schedule shifted ${gapMins} min to match.`, 'success')
+}
+
+// Recalibrate (temp-anchored shift): find where current temp sits on the
+// original planned curve and slide the whole plan so that point lands at "now".
+// Absorbs both a pause and any slow lag from a struggling burner.
+async function recalibrate() {
+  const f = selectedFiring.value
+  if (!f || !isLive.value || currentTemp.value == null || !f.schedule?.length) return
+
+  const schedule = [...f.schedule].sort((a, b) => a.offset_minutes - b.offset_minutes)
+  const temp = currentTemp.value
+
+  // Find the planned minute at which the schedule first reaches current temp.
+  let plannedMin = null
+  for (let i = 0; i < schedule.length - 1; i++) {
+    const a = schedule[i], b = schedule[i + 1]
+    const lo = Math.min(a.target_temp, b.target_temp)
+    const hi = Math.max(a.target_temp, b.target_temp)
+    if (temp >= lo && temp <= hi) {
+      const span = b.target_temp - a.target_temp
+      const frac = span === 0 ? 0 : (temp - a.target_temp) / span
+      plannedMin = a.offset_minutes + frac * (b.offset_minutes - a.offset_minutes)
+      break
+    }
+  }
+  if (plannedMin == null) {
+    toast.show('Current temperature is outside the planned range — can\u2019t recalibrate.')
+    return
+  }
+
+  const elapsedMins = (Math.floor(Date.now() / 1000) - f.started_at) / 60
+  // We want planned point `plannedMin` to fall at `elapsedMins`, i.e.
+  // plannedMin + offset = elapsedMins.
+  const newOffset = Math.round(elapsedMins - plannedMin)
+  await $fetch(`/api/firings/${f.id}`, { method: 'PUT', body: { scheduleOffset: newOffset } })
+  f.schedule_offset = newOffset
+  applySchedule()
+  showRecalibrateInfo.value = false
+  toast.show('Schedule recalibrated to current temperature.', 'success')
+}
+
 async function deleteFiring(f) {
   await $fetch(`/api/firings/${f.id}`, { method: 'DELETE' })
   if (selectedFiring.value?.id === f.id) {
     stopAllIntervals()
     selectedFiring.value = currentTemp.value = null
-    isLive.value = isManual.value = signalLost.value = false
+    isLive.value = isManual.value = signalLost.value = isPaused.value = false
     clearSignalLost()
   }
   await refreshFirings()

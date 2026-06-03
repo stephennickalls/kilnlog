@@ -38,64 +38,35 @@
         No firings yet
       </li>
 
+      <!-- Past firings — select only, delete on hover -->
       <li v-for="f in pastFirings" :key="f.id" class="group relative">
         <button
-          class="w-full flex flex-col px-4 py-3 text-left transition-colors"
-          :class="[
-            selectedId === f.id ? 'bg-flame-bg border-l-2 border-flame' : 'hover:bg-parchment-2',
-            isStopped(f) ? 'pr-24' : 'pr-10',
-          ]"
+          class="w-full flex flex-col px-4 py-3 pr-10 text-left transition-colors"
+          :class="selectedId === f.id ? 'bg-flame-bg border-l-2 border-flame' : 'hover:bg-parchment-2'"
           @click="$emit('select', f)"
         >
           <span class="text-sm font-medium text-ink truncate">{{ f.name }}</span>
-          <span v-if="isStopped(f)" class="flex items-center gap-1 text-xs text-amber-600 mt-0.5 font-semibold">
+          <span v-if="f.started_at && f.ended_at" class="flex items-center gap-1 text-xs text-amber-600 mt-0.5 font-semibold">
             <span class="w-1.5 h-1.5 bg-amber-400 rounded-full"></span>Finished
           </span>
           <span v-else class="text-xs text-ink-faint mt-0.5">{{ formatDate(f.created_at) }}</span>
         </button>
 
-        <!-- Finished firing: Restart + Delete -->
-        <template v-if="isStopped(f)">
-          <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
-            <button
-              v-if="confirmDeleteId !== f.id"
-              class="px-2 py-1 rounded text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-colors"
-              @click.stop="$emit('restart', f)"
-            >↺ Restart</button>
-            <button
-              v-if="confirmDeleteId !== f.id"
-              class="p-1.5 rounded-md text-parchment-4 hover:text-red-400 hover:bg-red-50 transition-all"
-              @click.stop="confirmDeleteId = f.id"
-            >
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
-              </svg>
-            </button>
-            <button
-              v-if="confirmDeleteId === f.id"
-              class="px-2 py-1 rounded text-xs font-bold text-white bg-red-500 hover:bg-red-600 transition-colors"
-              @click.stop="confirmDelete(f)"
-            >Delete?</button>
-          </div>
-        </template>
-
-        <!-- Normal past firing: Delete only -->
-        <template v-else>
-          <button
-            v-if="confirmDeleteId !== f.id"
-            class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-parchment-4 hover:text-red-400 hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
-            @click.stop="confirmDeleteId = f.id"
-          >
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
-            </svg>
-          </button>
-          <button
-            v-else
-            class="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 rounded text-xs font-bold text-white bg-red-500 hover:bg-red-600 transition-colors"
-            @click.stop="confirmDelete(f)"
-          >Delete?</button>
-        </template>
+        <!-- Delete -->
+        <button
+          v-if="confirmDeleteId !== f.id"
+          class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-parchment-4 hover:text-red-400 hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
+          @click.stop="confirmDeleteId = f.id"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
+          </svg>
+        </button>
+        <button
+          v-else
+          class="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 rounded text-xs font-bold text-white bg-red-500 hover:bg-red-600 transition-colors"
+          @click.stop="confirmDelete(f)"
+        >Delete?</button>
       </li>
     </ul>
 
@@ -138,14 +109,9 @@ const props = defineProps({
   pastFirings:  { type: Array, default: () => [] },
 })
 
-const emit = defineEmits(['toggle', 'select', 'start', 'drag', 'delete', 'restart'])
+const emit = defineEmits(['toggle', 'select', 'start', 'drag', 'delete'])
 
 const confirmDeleteId = ref(null)
-
-// A finished firing has been started before but ended — and is not the active one
-function isStopped(f) {
-  return !!(f.started_at && f.ended_at)
-}
 
 function confirmDelete(f) {
   confirmDeleteId.value = null

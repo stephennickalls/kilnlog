@@ -105,7 +105,7 @@
 
         <!-- Desktop chart -->
         <div class="hidden sm:flex flex-1 bg-white rounded-xl border border-parchment-3 relative items-center justify-center min-h-0 sm:m-5 sm:mt-4" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
-          <canvas ref="chartCanvas" class="w-full h-full"></canvas>
+          <canvas ref="chartCanvas" class="w-full h-full"/>
           <button v-if="selectedFiring" class="absolute bottom-4 right-4 px-3 py-1.5 text-xs font-medium border border-parchment-3 rounded-lg bg-white text-ink-muted hover:bg-parchment transition-colors" @click="resetZoom">Reset zoom</button>
           <div v-if="isManual && isLive && !selectedFiring?.readings?.length" class="absolute flex flex-col items-center gap-2 text-ink-muted pointer-events-none">
             <p class="text-sm">Use <strong>Log Reading</strong> to record your first temperature</p>
@@ -157,7 +157,7 @@
             <!-- Mobile chart -->
             <div class="flex-1 relative min-h-0 px-2 py-2 flex items-stretch">
               <div class="flex-1 bg-white rounded-xl border border-parchment-3 relative" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
-                <canvas ref="chartCanvasMobile" class="w-full h-full"></canvas>
+                <canvas ref="chartCanvasMobile" class="w-full h-full"/>
                 <div v-if="!selectedFiring?.readings?.length && !isManual" class="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <p class="text-xs text-ink-muted text-center px-4">Waiting for sensor data…</p>
                 </div>
@@ -226,7 +226,7 @@
     <Teleport to="body">
       <div v-if="showFiringSheet" class="fixed inset-0 z-50 flex flex-col justify-end sm:hidden" style="background:rgba(26,18,8,0.6)" @click.self="showFiringSheet = false">
         <div class="bg-parchment rounded-t-2xl flex flex-col" style="max-height:80vh">
-          <div class="flex justify-center pt-3 pb-1 shrink-0"><div class="w-10 h-1 bg-parchment-3 rounded-full"></div></div>
+          <div class="flex justify-center pt-3 pb-1 shrink-0"><div class="w-10 h-1 bg-parchment-3 rounded-full"/></div>
           <div class="flex items-center justify-between px-4 py-2 border-b border-parchment-3 shrink-0">
             <h2 class="text-sm font-bold text-ink">Firings</h2>
             <button class="p-1 text-ink-muted" @click="showFiringSheet = false">
@@ -236,7 +236,7 @@
           <ul class="overflow-y-auto flex-1 divide-y divide-parchment-3">
             <li v-if="activeFiring">
               <button class="w-full flex items-center gap-3 px-4 py-4 text-left active:bg-parchment-2 transition-colors" :class="selectedFiring?.id === activeFiring.id ? 'bg-flame-bg border-l-2 border-flame' : ''" @click="selectFiring(activeFiring); showFiringSheet = false">
-                <div class="w-2 h-2 rounded-full bg-green-500 shrink-0 animate-pulse"></div>
+                <div class="w-2 h-2 rounded-full bg-green-500 shrink-0 animate-pulse"/>
                 <div class="flex-1 min-w-0">
                   <p class="text-sm font-bold text-ink truncate">{{ activeFiring.name }}</p>
                   <p class="text-xs text-green-600 mt-0.5 font-semibold">Live</p>
@@ -247,7 +247,7 @@
             <li v-if="!pastFirings.length && !activeFiring" class="px-4 py-8 text-sm text-ink-muted text-center">No firings yet</li>
             <li v-for="f in pastFirings" :key="f.id" class="relative">
               <button class="w-full flex items-center gap-3 px-4 py-4 text-left active:bg-parchment-2 pr-16 transition-colors" :class="selectedFiring?.id === f.id ? 'bg-flame-bg border-l-2 border-flame' : ''" @click="selectFiring(f); showFiringSheet = false">
-                <div class="w-2 h-2 rounded-full bg-parchment-4 shrink-0"></div>
+                <div class="w-2 h-2 rounded-full bg-parchment-4 shrink-0"/>
                 <div class="flex-1 min-w-0">
                   <p class="text-sm font-semibold text-ink truncate">{{ f.name }}</p>
                   <p class="text-xs text-ink-muted mt-0.5">{{ formatDate(f.created_at) }}</p>

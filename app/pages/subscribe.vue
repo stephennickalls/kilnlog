@@ -1,6 +1,7 @@
 <!-- app/pages/subscribe.vue -->
 <template>
-  <div v-if="mounted"
+  <div
+v-if="mounted"
     class="min-h-screen bg-parchment font-serif flex flex-col lg:flex-row"
     style="background-image: radial-gradient(ellipse at 80% 20%, rgba(176,92,26,0.06) 0%, transparent 55%)"
   >
@@ -50,7 +51,7 @@
             class="w-full flex items-center justify-center gap-2 bg-flame text-parchment py-3.5 rounded-xl text-base font-bold hover:bg-flame-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             @click="checkout"
           >
-            <span v-if="loading" class="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
+            <span v-if="loading" class="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"/>
             <span v-else>Subscribe now →</span>
           </button>
 
@@ -68,7 +69,8 @@
     </div>
 
     <!-- ── Right — marketing (desktop only) ───────────────────────────────── -->
-    <div class="hidden lg:flex flex-1 bg-ink items-center justify-center px-16"
+    <div
+class="hidden lg:flex flex-1 bg-ink items-center justify-center px-16"
       style="background-image: radial-gradient(ellipse at 20% 50%, rgba(176,92,26,0.18) 0%, transparent 60%)"
     >
       <div class="max-w-md">

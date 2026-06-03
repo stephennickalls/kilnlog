@@ -29,7 +29,7 @@
         >
           <span class="text-sm font-semibold text-ink truncate">{{ activeFiring.name }}</span>
           <span class="flex items-center gap-1 text-xs text-green-600 mt-0.5 font-semibold">
-            <span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>Live
+            <span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"/>Live
           </span>
         </button>
       </li>
@@ -47,7 +47,7 @@
         >
           <span class="text-sm font-medium text-ink truncate">{{ f.name }}</span>
           <span v-if="f.started_at && f.ended_at" class="flex items-center gap-1 text-xs text-amber-600 mt-0.5 font-semibold">
-            <span class="w-1.5 h-1.5 bg-amber-400 rounded-full"></span>Finished
+            <span class="w-1.5 h-1.5 bg-amber-400 rounded-full"/>Finished
           </span>
           <span v-else class="text-xs text-ink-faint mt-0.5">{{ formatDate(f.created_at) }}</span>
         </button>
@@ -80,9 +80,9 @@
     <div class="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-flame/30 transition-colors z-10" @mousedown="$emit('drag', $event)">
       <div class="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-8 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
         <div class="flex flex-col gap-0.5">
-          <div class="w-0.5 h-1 bg-ink-faint rounded-full"></div>
-          <div class="w-0.5 h-1 bg-ink-faint rounded-full"></div>
-          <div class="w-0.5 h-1 bg-ink-faint rounded-full"></div>
+          <div class="w-0.5 h-1 bg-ink-faint rounded-full"/>
+          <div class="w-0.5 h-1 bg-ink-faint rounded-full"/>
+          <div class="w-0.5 h-1 bg-ink-faint rounded-full"/>
         </div>
       </div>
     </div>

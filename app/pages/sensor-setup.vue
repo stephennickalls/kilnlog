@@ -138,7 +138,7 @@
                 <span>Flashing…</span><span>{{ flashProgress }}%</span>
               </div>
               <div class="h-2 bg-parchment-2 rounded-full overflow-hidden">
-                <div class="h-full bg-flame rounded-full transition-all duration-150" :style="{ width: flashProgress + '%' }"></div>
+                <div class="h-full bg-flame rounded-full transition-all duration-150" :style="{ width: flashProgress + '%' }"/>
               </div>
             </div>
 
@@ -201,13 +201,15 @@
               <div class="flex flex-col gap-3">
                 <div class="flex flex-col gap-1.5">
                   <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">WiFi network (SSID)</label>
-                  <input v-model="config.ssid" type="text" placeholder="YourWiFiName"
-                    class="w-full border border-parchment-3 rounded-xl px-4 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif" />
+                  <input
+v-model="config.ssid" type="text" placeholder="YourWiFiName"
+                    class="w-full border border-parchment-3 rounded-xl px-4 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif" >
                 </div>
                 <div class="flex flex-col gap-1.5">
                   <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">WiFi password</label>
-                  <input v-model="config.password" type="password" placeholder="••••••••"
-                    class="w-full border border-parchment-3 rounded-xl px-4 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif" />
+                  <input
+v-model="config.password" type="password" placeholder="••••••••"
+                    class="w-full border border-parchment-3 rounded-xl px-4 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif" >
                 </div>
                 <div class="flex flex-col gap-1.5">
                   <div class="flex items-center justify-between">
@@ -221,7 +223,7 @@
                     v-model="config.apiUrl"
                     type="text"
                     class="w-full border border-parchment-3 rounded-xl px-4 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-mono"
-                  />
+                  >
                   <p class="text-xs text-ink-muted">For local dev use your machine's IP e.g. <span class="font-mono">http://192.168.20.23:3000</span></p>
                 </div>
               </div>

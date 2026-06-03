@@ -185,7 +185,7 @@
     <div class="flex flex-col gap-2 mt-1">
       <div class="flex items-center justify-between px-1">
         <div class="grid grid-cols-[1fr_1fr_28px] gap-2 text-[10px] font-bold uppercase tracking-[0.08em] text-ink-faint flex-1">
-          <span>Time (mins)</span><span>Target °C</span><span></span>
+          <span>Time (mins)</span><span>Target °C</span><span/>
         </div>
         <button
           class="text-[10px] font-semibold text-ink-faint hover:text-flame transition-colors ml-4 shrink-0"
@@ -203,13 +203,13 @@
             type="number" min="0" placeholder="0"
             class="w-full border border-parchment-3 rounded-lg px-3 py-1.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif"
             @change="updatePoint(i, 'offsetMinutes', Number($event.target.value))"
-          />
+          >
           <input
             :value="pt.targetTemp"
             type="number" min="0" max="1400" placeholder="100"
             class="w-full border border-parchment-3 rounded-lg px-3 py-1.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif"
             @change="updatePoint(i, 'targetTemp', Number($event.target.value))"
-          />
+          >
           <button class="text-parchment-4 hover:text-red-400 transition-colors text-sm" @click="removePoint(i)">✕</button>
         </div>
         <button class="text-sm text-flame hover:text-flame-dark font-semibold text-left" @click="addPointAtEnd">+ Add waypoint</button>

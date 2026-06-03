@@ -16,7 +16,7 @@
           <!-- Name -->
           <div class="flex flex-col gap-1.5">
             <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Name</label>
-            <input v-model="form.name" type="text" placeholder="e.g. Cone 10 reduction" class="w-full border border-parchment-3 rounded-xl px-4 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif" />
+            <input v-model="form.name" type="text" placeholder="e.g. Cone 10 reduction" class="w-full border border-parchment-3 rounded-xl px-4 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif" >
           </div>
 
           <!-- Notes -->
@@ -93,7 +93,7 @@
                     ? 'bg-green-50 text-green-700 border border-green-200'
                     : 'bg-parchment-2 text-ink-faint border border-parchment-3'"
                 >
-                  <span class="w-1.5 h-1.5 rounded-full" :class="sensor.online ? 'bg-green-500' : 'bg-parchment-4'"></span>
+                  <span class="w-1.5 h-1.5 rounded-full" :class="sensor.online ? 'bg-green-500' : 'bg-parchment-4'"/>
                   {{ sensor.online ? 'Online' : 'Offline' }}
                 </span>
               </button>
@@ -135,7 +135,7 @@
               <span class="text-xs text-ink-faint">or load:</span>
 
               <!-- Library preset dropdown -->
-              <div class="relative" v-if="library.length">
+              <div v-if="library.length" class="relative">
                 <select
                   class="appearance-none bg-white border border-parchment-3 rounded-lg pl-3 pr-7 py-1.5 text-xs text-ink font-semibold focus:outline-none focus:border-flame cursor-pointer font-serif max-w-[160px]"
                   :value="selectedLibraryId ?? ''"
@@ -152,7 +152,7 @@
               </div>
 
               <!-- Past firings dropdown -->
-              <div class="relative" v-if="pastFirings.length">
+              <div v-if="pastFirings.length" class="relative">
                 <select
                   class="appearance-none bg-white border border-parchment-3 rounded-lg pl-3 pr-7 py-1.5 text-xs text-ink font-semibold focus:outline-none focus:border-flame cursor-pointer font-serif max-w-[160px]"
                   :value="selectedPastId ?? ''"

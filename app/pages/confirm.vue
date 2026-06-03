@@ -3,7 +3,7 @@
     <div class="bg-white border border-parchment-3 rounded-2xl p-10 w-full max-w-sm shadow-lg text-center">
       <div class="text-3xl font-bold text-ink tracking-tight mb-6">KilnMonitor</div>
       <div class="flex flex-col items-center gap-4 text-sm" :class="error ? 'text-red-500' : 'text-ink-muted'">
-        <div v-if="!error" class="w-8 h-8 border-[3px] border-parchment-3 border-t-flame rounded-full animate-spin"></div>
+        <div v-if="!error" class="w-8 h-8 border-[3px] border-parchment-3 border-t-flame rounded-full animate-spin"/>
         <p>{{ message }}</p>
       </div>
     </div>

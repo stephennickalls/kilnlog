@@ -3,7 +3,7 @@ export default defineNuxtConfig({
   compatibilityDate: '2024-11-01',
   devtools: { enabled: process.env.NODE_ENV !== 'production' },
   future: { compatibilityVersion: 4 },
-  modules: ['@nuxtjs/tailwindcss'],
+  modules: ['@nuxtjs/tailwindcss', '@nuxt/eslint'],
   runtimeConfig: {
     // Private — server only
     stripeSecretKey:      process.env.STRIPE_SECRET_KEY,

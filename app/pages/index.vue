@@ -11,10 +11,10 @@
           <NuxtLink to="/login" class="hover:text-ink transition-colors">Sign in</NuxtLink>
           <NuxtLink to="/signup" class="bg-flame text-parchment px-5 py-2 rounded text-[0.875rem] font-semibold hover:bg-flame-dark transition-colors">Start free trial</NuxtLink>
         </div>
-        <button class="md:hidden flex flex-col gap-[5px] p-1" @click="mobileMenu = !mobileMenu" aria-label="Menu">
-          <span class="block w-6 h-[1.5px] bg-ink rounded"></span>
-          <span class="block w-6 h-[1.5px] bg-ink rounded"></span>
-          <span class="block w-6 h-[1.5px] bg-ink rounded"></span>
+        <button class="md:hidden flex flex-col gap-[5px] p-1" aria-label="Menu" @click="mobileMenu = !mobileMenu">
+          <span class="block w-6 h-[1.5px] bg-ink rounded"/>
+          <span class="block w-6 h-[1.5px] bg-ink rounded"/>
+          <span class="block w-6 h-[1.5px] bg-ink rounded"/>
         </button>
       </div>
       <div v-if="mobileMenu" class="md:hidden flex flex-col bg-parchment border-t border-parchment-3">
@@ -66,7 +66,7 @@
             <div class="flex justify-between items-center mb-[0.875rem]">
               <span class="text-[0.875rem] font-semibold text-ink-2">Cone 10 Reduction</span>
               <span class="flex items-center gap-[5px] bg-green-50 border border-green-200 rounded-full px-[10px] py-[3px] text-[0.75rem] font-bold text-green-700">
-                <span class="w-[6px] h-[6px] bg-green-500 rounded-full animate-pulse"></span>
+                <span class="w-[6px] h-[6px] bg-green-500 rounded-full animate-pulse"/>
                 Live
               </span>
             </div>
@@ -212,7 +212,7 @@
             <p class="text-[0.825rem] text-ink-faint mt-3">No credit card required to start</p>
           </div>
 
-          <div class="hidden md:block w-px bg-parchment-3 self-stretch"></div>
+          <div class="hidden md:block w-px bg-parchment-3 self-stretch"/>
 
           <div>
             <p class="text-[0.75rem] font-bold uppercase tracking-[0.1em] text-ink-faint mb-4">Everything included:</p>

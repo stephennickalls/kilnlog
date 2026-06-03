@@ -1,6 +1,6 @@
 <!-- app/components/UserMenu.vue -->
 <template>
-  <div class="relative" ref="root">
+  <div ref="root" class="relative">
     <button
       class="flex items-center gap-2 pl-2 pr-1.5 py-1 rounded-full border border-parchment-3 bg-white hover:bg-parchment-2 transition-colors"
       @click="open = !open"
@@ -8,7 +8,8 @@
       <span class="w-6 h-6 rounded-full bg-flame text-parchment text-xs font-bold grid place-items-center shrink-0">
         {{ initial }}
       </span>
-      <svg class="w-3.5 h-3.5 text-ink-faint transition-transform" :class="open ? 'rotate-180' : ''"
+      <svg
+class="w-3.5 h-3.5 text-ink-faint transition-transform" :class="open ? 'rotate-180' : ''"
         fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
     </button>
 

@@ -80,7 +80,7 @@
                     class="flex-1 border border-parchment-3 rounded-lg px-2.5 py-1 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif"
                     @keydown.enter="saveEdit(sensor)"
                     @keydown.escape="cancelEdit"
-                  />
+                  >
                   <button class="p-1.5 rounded-md bg-flame text-parchment hover:bg-flame-dark transition-colors" @click="saveEdit(sensor)">
                     <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
                   </button>
@@ -97,21 +97,21 @@
                   v-if="connectedSensor?.id === sensor.id"
                   class="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold rounded-full bg-blue-50 text-blue-600 border border-blue-200"
                 >
-                  <span class="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></span>
+                  <span class="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"/>
                   Serial open
                 </span>
                 <span
                   v-else-if="sensorIsOnline(sensor)"
                   class="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold rounded-full bg-green-50 text-green-700 border border-green-200"
                 >
-                  <span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
+                  <span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"/>
                   Online
                 </span>
                 <span
                   v-else
                   class="flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold rounded-full bg-parchment-2 text-ink-faint border border-parchment-3"
                 >
-                  <span class="w-1.5 h-1.5 bg-parchment-4 rounded-full"></span>
+                  <span class="w-1.5 h-1.5 bg-parchment-4 rounded-full"/>
                   Offline
                 </span>
               </div>
@@ -234,7 +234,7 @@
               class="flex-1 bg-white/10 text-parchment font-mono text-[11px] rounded-lg px-3 py-2 border border-white/10 focus:outline-none focus:border-flame/60 placeholder-parchment-4/40"
               placeholder="Send command…"
               @keydown.enter="sendCmd"
-            />
+            >
             <button
               class="px-3 py-2 bg-flame text-parchment text-xs font-bold rounded-lg hover:bg-flame-dark transition-colors"
               @click="sendCmd"
@@ -270,7 +270,7 @@
                 placeholder="e.g. Top shelf, Bottom shelf…"
                 class="w-full border border-parchment-3 rounded-xl px-4 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif"
                 @keydown.enter="createSensor"
-              />
+              >
             </div>
             <p class="text-xs text-ink-muted leading-relaxed">
               A token will be generated for this sensor. You can then flash it to your ESP32 from the sensor card.

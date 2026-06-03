@@ -78,7 +78,7 @@
                 @dragover.prevent
                 @drop.prevent="onFirmwareDrop"
               >
-                <input ref="firmwareInput" type="file" accept=".bin" class="hidden" @change="onFirmwareFile" />
+                <input ref="firmwareInput" type="file" accept=".bin" class="hidden" @change="onFirmwareFile" >
                 <template v-if="firmwareFile">
                   <p class="text-sm font-bold text-flame">{{ firmwareFile.name }}</p>
                   <p class="text-xs text-ink-muted mt-0.5">{{ (firmwareFile.size / 1024).toFixed(0) }} KB</p>
@@ -96,7 +96,7 @@
             <div class="flex items-center gap-3">
               <div class="flex flex-col gap-1 flex-1">
                 <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Flash offset</label>
-                <input v-model="flashOffset" class="border border-parchment-3 rounded-lg px-3 py-1.5 text-sm font-mono text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10" />
+                <input v-model="flashOffset" class="border border-parchment-3 rounded-lg px-3 py-1.5 text-sm font-mono text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10" >
               </div>
               <p class="text-xs text-ink-muted mt-4">Standard ESP32 app address</p>
             </div>
@@ -108,7 +108,7 @@
                 <span>{{ flashProgress }}%</span>
               </div>
               <div class="h-2 bg-parchment-2 rounded-full overflow-hidden">
-                <div class="h-full bg-flame rounded-full transition-all" :style="{ width: flashProgress + '%' }"></div>
+                <div class="h-full bg-flame rounded-full transition-all" :style="{ width: flashProgress + '%' }"/>
               </div>
             </div>
 
@@ -144,15 +144,15 @@
             <div class="flex flex-col gap-3">
               <div class="flex flex-col gap-1.5">
                 <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">WiFi network (SSID)</label>
-                <input v-model="config.ssid" type="text" placeholder="YourWiFiName" class="border border-parchment-3 rounded-xl px-4 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif" />
+                <input v-model="config.ssid" type="text" placeholder="YourWiFiName" class="border border-parchment-3 rounded-xl px-4 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif" >
               </div>
               <div class="flex flex-col gap-1.5">
                 <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">WiFi password</label>
-                <input v-model="config.password" type="password" placeholder="••••••••" class="border border-parchment-3 rounded-xl px-4 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif" />
+                <input v-model="config.password" type="password" placeholder="••••••••" class="border border-parchment-3 rounded-xl px-4 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif" >
               </div>
               <div class="flex flex-col gap-1.5">
                 <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">KilnMonitor API URL</label>
-                <input v-model="config.apiUrl" type="url" placeholder="https://kilnlog.netlify.app" class="border border-parchment-3 rounded-xl px-4 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif" />
+                <input v-model="config.apiUrl" type="url" placeholder="https://kilnlog.netlify.app" class="border border-parchment-3 rounded-xl px-4 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif" >
                 <p class="text-xs text-ink-muted">Leave blank to use mDNS (same local network only)</p>
               </div>
             </div>

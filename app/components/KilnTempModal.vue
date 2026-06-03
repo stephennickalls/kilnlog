@@ -6,7 +6,8 @@
       style="background: rgba(26,18,8,0.75); backdrop-filter: blur(8px);"
       @click.self="$emit('close')"
     >
-      <div class="bg-parchment rounded-3xl flex flex-col items-center relative w-[90vw] h-[85vh] justify-center border border-parchment-3"
+      <div
+class="bg-parchment rounded-3xl flex flex-col items-center relative w-[90vw] h-[85vh] justify-center border border-parchment-3"
         style="box-shadow: 0 24px 80px rgba(26,18,8,0.4)">
 
         <!-- Close -->
@@ -22,7 +23,7 @@
         <!-- Status badge -->
         <div class="absolute top-6 left-6">
           <span v-if="isLive" class="flex items-center gap-1.5 px-4 py-1.5 text-sm font-bold rounded-full bg-green-50 text-green-700 border border-green-200">
-            <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>Live
+            <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"/>Live
           </span>
           <span v-else class="px-4 py-1.5 text-sm font-bold rounded-full bg-parchment-2 text-ink-faint border border-parchment-3">Last reading</span>
         </div>

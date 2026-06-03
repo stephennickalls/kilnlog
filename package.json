@@ -8,6 +8,11 @@
     "dev": "nuxt dev --host",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "check": "eslint .",
+    "typecheck": "nuxt typecheck",
+    "verify": "nuxt typecheck && eslint .",
     "db:migrate": "node scripts/migrate.mjs"
   },
   "dependencies": {
@@ -21,6 +26,10 @@
     "vue": "^3.5.0"
   },
   "devDependencies": {
-    "@nuxtjs/tailwindcss": "^6.14.0"
+    "@nuxt/eslint": "^1.9.0",
+    "@nuxtjs/tailwindcss": "^6.14.0",
+    "eslint": "^9.39.0",
+    "typescript": "^5.6.0",
+    "vue-tsc": "^2.1.0"
   }
 }

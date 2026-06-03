@@ -16,9 +16,10 @@
             <path d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/>
           </svg>
           <span class="text-sm font-semibold text-ink flex-1 truncate">{{ s.name }}</span>
-          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 flex items-center gap-1"
+          <span
+class="text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 flex items-center gap-1"
             :class="s.online ? 'bg-green-50 text-green-700 border-green-200' : 'bg-parchment-2 text-ink-faint border-parchment-3'">
-            <span class="w-1.5 h-1.5 rounded-full" :class="s.online ? 'bg-green-500 animate-pulse' : 'bg-parchment-4'"></span>
+            <span class="w-1.5 h-1.5 rounded-full" :class="s.online ? 'bg-green-500 animate-pulse' : 'bg-parchment-4'"/>
             {{ s.online ? 'Online' : 'Offline' }}
           </span>
           <NuxtLink to="/sensors" class="p-1.5 rounded-lg text-ink-faint hover:text-ink hover:bg-parchment-2 transition-colors shrink-0" title="Manage sensor">
@@ -45,9 +46,10 @@
             <path d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/>
           </svg>
           <span class="text-sm font-semibold text-ink flex-1 truncate">{{ s.name }}</span>
-          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 flex items-center gap-1"
+          <span
+class="text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 flex items-center gap-1"
             :class="s.online ? 'bg-green-50 text-green-700 border-green-200' : 'bg-parchment-2 text-ink-faint border-parchment-3'">
-            <span class="w-1.5 h-1.5 rounded-full" :class="s.online ? 'bg-green-500 animate-pulse' : 'bg-parchment-4'"></span>
+            <span class="w-1.5 h-1.5 rounded-full" :class="s.online ? 'bg-green-500 animate-pulse' : 'bg-parchment-4'"/>
             {{ s.online ? 'Online' : 'Offline' }}
           </span>
           <NuxtLink to="/sensors" class="p-1.5 rounded-lg text-ink-faint hover:text-ink hover:bg-parchment-2 transition-colors shrink-0" title="Manage sensor">

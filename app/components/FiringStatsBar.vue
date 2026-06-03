@@ -59,7 +59,7 @@
     </div>
 
     <!-- Spacer when no notes -->
-    <div v-else class="flex-1"></div>
+    <div v-else class="flex-1"/>
 
     <!-- Action buttons -->
     <div class="flex items-center gap-2 shrink-0">

@@ -26,9 +26,9 @@
       </button>
 
       <div class="flex items-center gap-4 mb-5 text-sm text-ink-muted">
-        <div class="flex-1 h-px bg-parchment-3"></div>
+        <div class="flex-1 h-px bg-parchment-3"/>
         <span>or</span>
-        <div class="flex-1 h-px bg-parchment-3"></div>
+        <div class="flex-1 h-px bg-parchment-3"/>
       </div>
 
       <form class="flex flex-col gap-4" @submit.prevent="signUpEmail">
@@ -41,7 +41,7 @@
             required
             autocomplete="name"
             class="w-full border border-parchment-3 rounded-lg px-3.5 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif"
-          />
+          >
         </div>
 
         <div class="flex flex-col gap-1.5">
@@ -53,7 +53,7 @@
             required
             autocomplete="email"
             class="w-full border border-parchment-3 rounded-lg px-3.5 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif"
-          />
+          >
         </div>
 
         <div class="flex flex-col gap-1.5">
@@ -66,7 +66,7 @@
             minlength="8"
             autocomplete="new-password"
             class="w-full border border-parchment-3 rounded-lg px-3.5 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif"
-          />
+          >
         </div>
 
         <div v-if="error" class="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3.5 py-2.5">
@@ -82,7 +82,7 @@
           :disabled="loading"
           class="w-full flex items-center justify-center gap-2 bg-flame text-parchment py-3 rounded-lg text-base font-bold hover:bg-flame-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-1 font-serif"
         >
-          <span v-if="loading" class="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
+          <span v-if="loading" class="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"/>
           <span v-else>Create account →</span>
         </button>
       </form>

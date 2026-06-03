@@ -7,7 +7,8 @@
       style="background: rgba(26,18,8,0.6)"
       @click.self="$emit('close')"
     >
-      <div class="bg-parchment w-full sm:w-[360px] sm:rounded-2xl rounded-t-2xl p-6 flex flex-col gap-5 border border-parchment-3"
+      <div
+class="bg-parchment w-full sm:w-[360px] sm:rounded-2xl rounded-t-2xl p-6 flex flex-col gap-5 border border-parchment-3"
         style="box-shadow: 0 -8px 40px rgba(26,18,8,0.15)">
 
         <div class="flex items-center justify-between">
@@ -44,7 +45,7 @@
               placeholder="0"
               class="flex-1 border border-parchment-3 rounded-xl px-4 py-3 text-3xl font-bold tabular-nums text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif"
               @keydown.enter="submit"
-            />
+            >
             <span class="text-xl font-bold text-ink-faint shrink-0">°C</span>
           </div>
         </div>

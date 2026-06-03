@@ -12,7 +12,7 @@
 
     <!-- Loading -->
     <div v-if="loading" class="flex items-center justify-center py-20">
-      <div class="w-7 h-7 border-[3px] border-parchment-3 border-t-flame rounded-full animate-spin"></div>
+      <div class="w-7 h-7 border-[3px] border-parchment-3 border-t-flame rounded-full animate-spin"/>
     </div>
 
     <!-- Error -->
@@ -64,7 +64,7 @@
                 @click="checkout"
               >
                 <span v-if="billingLoading" class="flex items-center justify-center gap-2">
-                  <span class="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
+                  <span class="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin"/>
                   Redirecting…
                 </span>
                 <span v-else>Subscribe now — $49 NZD/yr</span>
@@ -86,7 +86,7 @@
                 @click="portal"
               >
                 <span v-if="billingLoading" class="flex items-center justify-center gap-2">
-                  <span class="w-3.5 h-3.5 border-2 border-parchment-3 border-t-ink-muted rounded-full animate-spin"></span>
+                  <span class="w-3.5 h-3.5 border-2 border-parchment-3 border-t-ink-muted rounded-full animate-spin"/>
                   Redirecting…
                 </span>
                 <span v-else>Manage billing →</span>
@@ -105,7 +105,7 @@
                 @click="checkout"
               >
                 <span v-if="billingLoading" class="flex items-center justify-center gap-2">
-                  <span class="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin"></span>
+                  <span class="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin"/>
                   Redirecting…
                 </span>
                 <span v-else>Resubscribe — $49 NZD/yr</span>

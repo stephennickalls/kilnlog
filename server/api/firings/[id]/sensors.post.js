@@ -1,7 +1,6 @@
 // server/api/firings/[id]/sensors.post.js
 // POST /api/firings/:id/sensors — assign a sensor to a firing
 // Body: { sensorId: uuid }
-// Can be called on a firing that's already running
 
 export default defineEventHandler(async (event) => {
   const { db, user } = await useServerUser(event)
@@ -13,7 +12,6 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'firingId and sensorId required' })
   }
 
-  // Verify firing ownership
   const { data: firing } = await db
     .from('firings')
     .select('id')
@@ -23,7 +21,6 @@ export default defineEventHandler(async (event) => {
 
   if (!firing) throw createError({ statusCode: 404, statusMessage: 'Firing not found' })
 
-  // Verify sensor ownership
   const { data: sensor } = await db
     .from('sensors')
     .select('id')
@@ -33,13 +30,12 @@ export default defineEventHandler(async (event) => {
 
   if (!sensor) throw createError({ statusCode: 404, statusMessage: 'Sensor not found' })
 
-  // Upsert — safe to call even if already assigned
   const { data, error } = await db
     .from('firing_sensors')
     .upsert({ firing_id: firingId, sensor_id: sensorId }, { onConflict: 'firing_id,sensor_id' })
     .select()
     .single()
 
-  if (error) throw createError({ statusCode: 500, statusMessage: error.message })
+  if (error) throw serverError('firing_sensors.assign.failed', error, { userId: user.id, firingId, sensorId })
   return data
 })

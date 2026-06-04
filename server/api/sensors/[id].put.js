@@ -23,6 +23,6 @@ export default defineEventHandler(async (event) => {
     .select('id, name, token, created_at')
     .single()
 
-  if (error) throw createError({ statusCode: 500, statusMessage: error.message })
+  if (error) throw serverError('sensors.rename.failed', error, { userId: user.id, sensorId: id })
   return data
 })

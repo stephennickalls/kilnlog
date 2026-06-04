@@ -9,7 +9,6 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Invalid temperature value' })
   }
 
-  // Verify ownership via the firing this reading belongs to
   const { data: reading } = await db
     .from('readings')
     .select('id, firing_id')
@@ -34,6 +33,6 @@ export default defineEventHandler(async (event) => {
     .select()
     .single()
 
-  if (error) throw createError({ statusCode: 500, statusMessage: error.message })
+  if (error) throw serverError('readings.update.failed', error, { userId: user.id, readingId: id })
   return data
 })

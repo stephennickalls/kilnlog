@@ -6,7 +6,6 @@ export default defineEventHandler(async (event) => {
   const firingId = Number(getRouterParam(event, 'id'))
   const sensorId = getRouterParam(event, 'sensorId')
 
-  // Verify firing ownership
   const { data: firing } = await db
     .from('firings')
     .select('id')
@@ -22,6 +21,6 @@ export default defineEventHandler(async (event) => {
     .eq('firing_id', firingId)
     .eq('sensor_id', sensorId)
 
-  if (error) throw createError({ statusCode: 500, statusMessage: error.message })
+  if (error) throw serverError('firing_sensors.remove.failed', error, { userId: user.id, firingId, sensorId })
   return { ok: true }
 })

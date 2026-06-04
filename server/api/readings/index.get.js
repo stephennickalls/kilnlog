@@ -8,7 +8,6 @@ export default defineEventHandler(async (event) => {
 
   const firingId = Number(query.firingId)
 
-  // Verify the firing belongs to this user before returning readings
   const { data: firing } = await db
     .from('firings')
     .select('id')
@@ -24,12 +23,11 @@ export default defineEventHandler(async (event) => {
     .eq('firing_id', firingId)
     .order('timestamp', { ascending: true })
 
-  // Only fetch readings strictly newer than `since` when provided
   if (query.since !== undefined && query.since !== '') {
     q = q.gt('timestamp', Number(query.since))
   }
 
   const { data, error } = await q
-  if (error) throw createError({ statusCode: 500, statusMessage: error.message })
+  if (error) throw serverError('readings.list.failed', error, { userId: user.id, firingId })
   return data
 })

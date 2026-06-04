@@ -4,6 +4,12 @@
 //   Connected firing: no readings for 4 hours
 //   Manual firing:    no readings for 2 hours
 //   Either type:      started but never had a reading, and started > 1 hour ago
+// Paused firings (paused_at set) are EXEMPT — the user deliberately suspended
+// them (e.g. ran out of gas), so the reading gap is intentional.
+//
+// REQUIRES: the `paused_at` column on the firings table
+// (migrations/add_pause_columns.sql). If that migration has NOT been run, this
+// file will error — use the version without the paused_at guard instead.
 
 
 const FOUR_HOURS = 4 * 60 * 60
@@ -13,11 +19,11 @@ const ONE_HOUR   = 1 * 60 * 60
 export default defineEventHandler(async (event) => {
   const { db, user } = await useServerUser(event)
 
-  // Fetch all active firings with their reading timestamps
+  // Fetch all active firings with their reading timestamps + paused state
   const { data: activeFirings, error: activeError } = await db
     .from('firings')
     .select(`
-      id, mode, started_at,
+      id, mode, started_at, paused_at,
       readings:readings(timestamp)
     `)
     .eq('user_id', user.id)
@@ -26,13 +32,16 @@ export default defineEventHandler(async (event) => {
 
   if (activeError) {
     logger.error('firings.list.active_query_failed', { userId: user.id, err: activeError })
-    throw createError({ statusCode: 500, statusMessage: activeError.message })
+    throw createError({ statusCode: 500, statusMessage: 'Could not load firings.' })
   }
 
   const now = Math.floor(Date.now() / 1000)
   const toAutoEnd = []
 
   for (const firing of activeFirings ?? []) {
+    // Skip paused firings entirely — the reading gap is intentional.
+    if (firing.paused_at) continue
+
     const mode     = firing.mode ?? 'connected'
     const readings = firing.readings ?? []
 
@@ -85,7 +94,7 @@ export default defineEventHandler(async (event) => {
 
   if (error) {
     logger.error('firings.list.query_failed', { userId: user.id, err: error })
-    throw createError({ statusCode: 500, statusMessage: error.message })
+    throw createError({ statusCode: 500, statusMessage: 'Could not load firings.' })
   }
 
   return data ?? []

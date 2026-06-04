@@ -4,7 +4,6 @@ export default defineEventHandler(async (event) => {
   const id = Number(getRouterParam(event, 'id'))
   if (isNaN(id)) throw createError({ statusCode: 400, statusMessage: 'Invalid id' })
 
-  // Verify ownership via the firing this reading belongs to
   const { data: reading } = await db
     .from('readings')
     .select('id, firing_id')
@@ -23,6 +22,6 @@ export default defineEventHandler(async (event) => {
   if (!firing) throw createError({ statusCode: 403, statusMessage: 'Not authorised' })
 
   const { error } = await db.from('readings').delete().eq('id', id)
-  if (error) throw createError({ statusCode: 500, statusMessage: error.message })
+  if (error) throw serverError('readings.delete.failed', error, { userId: user.id, readingId: id })
   return { ok: true }
 })

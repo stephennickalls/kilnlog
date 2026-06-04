@@ -6,7 +6,6 @@ export default defineEventHandler(async (event) => {
   const id = getRouterParam(event, 'id')
   if (!id) throw createError({ statusCode: 400, statusMessage: 'Invalid id' })
 
-  // Verify ownership
   const { data: existing } = await db
     .from('sensors')
     .select('id')
@@ -17,6 +16,6 @@ export default defineEventHandler(async (event) => {
   if (!existing) throw createError({ statusCode: 404, statusMessage: 'Sensor not found' })
 
   const { error } = await db.from('sensors').delete().eq('id', id)
-  if (error) throw createError({ statusCode: 500, statusMessage: error.message })
+  if (error) throw serverError('sensors.delete.failed', error, { userId: user.id, sensorId: id })
   return { ok: true }
 })

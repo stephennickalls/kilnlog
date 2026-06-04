@@ -9,7 +9,6 @@ export default defineEventHandler(async (event) => {
 
   const body = await readBody(event)
   const name = body?.name?.trim()
-
   if (!name) throw createError({ statusCode: 400, statusMessage: 'Sensor name is required' })
 
   const token = randomUUID()
@@ -20,6 +19,6 @@ export default defineEventHandler(async (event) => {
     .select('id, name, token, created_at, last_seen')
     .single()
 
-  if (error) throw createError({ statusCode: 500, statusMessage: error.message })
+  if (error) throw serverError('sensors.create.failed', error, { userId: user.id })
   return data
 })

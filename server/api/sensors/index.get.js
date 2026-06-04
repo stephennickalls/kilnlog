@@ -7,10 +7,10 @@ export default defineEventHandler(async (event) => {
 
   const { data, error } = await db
     .from('sensors')
-    .select('id, name, token, created_at, last_seen') 
+    .select('id, name, token, created_at, last_seen')
     .eq('user_id', user.id)
     .order('created_at', { ascending: true })
 
-  if (error) throw createError({ statusCode: 500, statusMessage: error.message })
+  if (error) throw serverError('sensors.list.failed', error, { userId: user.id })
   return data ?? []
 })

@@ -1,96 +1,67 @@
-// server/api/firings/index.get.js
-// GET /api/firings — list all firings for the authenticated user.
-// On each call, checks for stale active firings and auto-ends them:
-//   Connected firing: no readings for 4 hours
-//   Manual firing:    no readings for 2 hours
-//   Either type:      started but never had a reading, and started > 1 hour ago
-// Paused firings (paused_at set) are exempt — the user deliberately suspended them.
+// server/api/firings/active.get.js
+//
+// Called by the ESP32 every 10s via X-Sensor-Token header.
+// Returns the active firing ONLY if this sensor is explicitly
+// assigned to it via the firing_sensors join table.
 
-
-const FOUR_HOURS = 4 * 60 * 60
-const TWO_HOURS  = 2 * 60 * 60
-const ONE_HOUR   = 1 * 60 * 60
+import { createClient } from '@supabase/supabase-js'
 
 export default defineEventHandler(async (event) => {
-  const { db, user } = await useServerUser(event)
+  const db = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_KEY
+  )
 
-  // Fetch all active firings with their reading timestamps
-  const { data: activeFirings, error: activeError } = await db
+  const token = getHeader(event, 'x-sensor-token')
+  if (!token) throw createError({ statusCode: 401, statusMessage: 'Missing X-Sensor-Token' })
+
+  // Look up sensor by token
+  const { data: sensor, error: sensorErr } = await db
+    .from('sensors')
+    .select('id, user_id, name')
+    .eq('token', token)
+    .maybeSingle()
+
+  if (sensorErr || !sensor) throw createError({ statusCode: 401, statusMessage: 'Invalid sensor token' })
+
+  // Stamp last_seen so the UI shows the sensor online even before readings flow.
+  // Best-effort — don't fail the poll if this update errors.
+  await db.from('sensors').update({ last_seen: Math.floor(Date.now() / 1000) }).eq('id', sensor.id)
+
+  // Find all firings this sensor is assigned to
+  const { data: assignments, error: assignErr } = await db
+    .from('firing_sensors')
+    .select('firing_id, role')
+    .eq('sensor_id', sensor.id)
+
+  if (assignErr) {
+    logger.error('firings.active.assignments_failed', { sensorId: sensor.id, err: assignErr })
+    throw createError({ statusCode: 500, statusMessage: 'Lookup failed' })
+  }
+  if (!assignments?.length) return { firingId: null, message: 'No active firing assigned to this sensor' }
+
+  // Find which of those firings is currently active (started but not ended)
+  const firingIds = assignments.map(a => a.firing_id)
+  const { data: firing, error: firingErr } = await db
     .from('firings')
-    .select(`
-      id, mode, started_at, paused_at,
-      readings:readings(timestamp)
-    `)
-    .eq('user_id', user.id)
-    .is('ended_at', null)
+    .select('id, name, started_at, ended_at')
+    .in('id', firingIds)
     .not('started_at', 'is', null)
+    .is('ended_at', null)
+    .limit(1)
+    .maybeSingle()
 
-  if (activeError) {
-    logger.error('firings.list.active_query_failed', { userId: user.id, err: activeError })
-    throw createError({ statusCode: 500, statusMessage: activeError.message })
+  if (firingErr) {
+    logger.error('firings.active.firing_query_failed', { sensorId: sensor.id, err: firingErr })
+    throw createError({ statusCode: 500, statusMessage: 'Lookup failed' })
   }
 
-  const now = Math.floor(Date.now() / 1000)
-  const toAutoEnd = []
+  if (!firing) return { firingId: null, message: 'No active firing assigned to this sensor' }
 
-  for (const firing of activeFirings ?? []) {
-    // Skip paused firings entirely — the gap is intentional.
-    if (firing.paused_at) continue
-
-    const mode     = firing.mode ?? 'connected'
-    const readings = firing.readings ?? []
-
-    // Safe reduce — avoids Math.max(...array) stack overflow on large arrays
-    const lastTs = readings.length
-      ? readings.reduce((max, r) => r.timestamp > max ? r.timestamp : max, readings[0].timestamp)
-      : null
-
-    if (lastTs === null) {
-      if (now - firing.started_at > ONE_HOUR) {
-        logger.info('firings.auto_end.queued', { firingId: firing.id, reason: 'no_readings', mode })
-        toAutoEnd.push(firing.id)
-      }
-    } else if (mode === 'connected') {
-      if (now - lastTs > FOUR_HOURS) {
-        logger.info('firings.auto_end.queued', { firingId: firing.id, reason: 'signal_lost_4h', mode })
-        toAutoEnd.push(firing.id)
-      }
-    } else {
-      if (now - lastTs > TWO_HOURS) {
-        logger.info('firings.auto_end.queued', { firingId: firing.id, reason: 'no_manual_readings_2h', mode })
-        toAutoEnd.push(firing.id)
-      }
-    }
+  return {
+    firingId:  firing.id,
+    name:      firing.name,
+    startedAt: firing.started_at,
+    sensorId:  sensor.id,
   }
-
-  if (toAutoEnd.length) {
-    const results = await Promise.all(
-      toAutoEnd.map(id =>
-        db.from('firings')
-          .update({ ended_at: now, auto_ended: true })
-          .eq('id', id)
-          .eq('user_id', user.id)
-      )
-    )
-    results.forEach((res, i) => {
-      if (res.error) {
-        logger.error('firings.auto_end.update_failed', { firingId: toAutoEnd[i], err: res.error })
-      } else {
-        logger.info('firings.auto_end.completed', { firingId: toAutoEnd[i] })
-      }
-    })
-  }
-
-  const { data, error } = await db
-    .from('firings')
-    .select('*')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-
-  if (error) {
-    logger.error('firings.list.query_failed', { userId: user.id, err: error })
-    throw createError({ statusCode: 500, statusMessage: error.message })
-  }
-
-  return data ?? []
 })

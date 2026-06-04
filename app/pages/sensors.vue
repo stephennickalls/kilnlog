@@ -307,6 +307,8 @@
 // app/pages/sensors.vue
 definePageMeta({ middleware: 'auth' })
 
+const { report } = useClientLog()
+
 // ── State ──────────────────────────────────────────────────────────────────────
 const sensors         = ref([])
 const loading         = ref(true)
@@ -358,7 +360,8 @@ async function loadSensors(showSpinner = false) {
   if (showSpinner) loading.value = true
   try {
     sensors.value = await $fetch('/api/sensors')
-  } catch {
+  } catch (e) {
+    report('sensors.load.failed', e)
     sensors.value = []
   } finally {
     loading.value = false
@@ -408,7 +411,9 @@ async function saveEdit(sensor) {
   try {
     await $fetch(`/api/sensors/${sensor.id}`, { method: 'PUT', body: { name } })
     sensor.name = name
-  } catch { /* silent — name stays unchanged */ }
+  } catch (e) {
+    report('sensors.rename.failed', e, { sensorId: sensor.id })
+  }
   cancelEdit()
 }
 
@@ -429,6 +434,7 @@ async function createSensor() {
     sensors.value.push(data)
     showAddModal.value = false
   } catch (e) {
+    report('sensors.create.failed', e)
     createError.value = e?.data?.message ?? 'Could not create sensor. Try again.'
   } finally {
     saving.value = false
@@ -441,7 +447,9 @@ async function deleteSensor(sensor) {
   try {
     await $fetch(`/api/sensors/${sensor.id}`, { method: 'DELETE' })
     sensors.value = sensors.value.filter(s => s.id !== sensor.id)
-  } catch { /* silent */ }
+  } catch (e) {
+    report('sensors.delete.failed', e, { sensorId: sensor.id })
+  }
   confirmDeleteId.value = null
 }
 

@@ -1,3 +1,4 @@
+<!-- app/pages/sensor-setup.vue -->
 <template>
   <div class="min-h-screen bg-parchment font-serif flex flex-col">
 
@@ -307,6 +308,8 @@ v-model="config.password" type="password" placeholder="••••••••"
 <script setup>
 definePageMeta({ middleware: ['auth'] })
 
+const { report } = useClientLog()
+
 // ── Web Serial ────────────────────────────────────────────────────────────────
 const webSerialSupported = ref(false)
 
@@ -516,6 +519,7 @@ async function fetchFirmware() {
     dbg(`firmware ready: ${(firmwareData.value.length / 1024).toFixed(0)} KB`)
     log(`✅ Firmware ready — ${(firmwareData.value.length / 1024).toFixed(0)} KB`, 'info')
   } catch (e) {
+    report('sensor.firmware.fetch_failed', e)
     firmwareLoadError.value = e.message ?? 'Download failed'
     dbg('❌ firmware fetch failed: ' + firmwareLoadError.value)
     log('❌ Firmware download failed: ' + firmwareLoadError.value, 'error')
@@ -596,6 +600,7 @@ async function flashFirmware() {
     step.value = 4
 
   } catch (e) {
+    report('sensor.flash.failed', e, { step: step.value })
     flashError.value = e.message ?? 'Flash failed'
     dbg('❌ flash error: ' + flashError.value)
     log('❌ Flash error: ' + flashError.value, 'error')
@@ -637,6 +642,7 @@ async function sendReconfigure() {
     needsReplug.value = false
     step.value        = 3  // go to flash — user can flash or skip
   } catch (e) {
+    report('sensor.reconfigure.failed', e)
     log('❌ Reconfigure failed: ' + (e.message ?? e), 'error')
     dbg('❌ sendReconfigure error: ' + e.message)
   }
@@ -678,6 +684,7 @@ async function sendConfig() {
       }
     }, 15000)
   } catch (e) {
+    report('sensor.config.send_failed', e)
     configError.value = e.message ?? 'Send failed'
     dbg('❌ sendConfig error: ' + configError.value)
     log('❌ ' + configError.value, 'error')

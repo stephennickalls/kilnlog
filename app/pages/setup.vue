@@ -1,3 +1,4 @@
+<!-- app/pages/setup.vue -->
 <template>
   <div class="min-h-screen bg-parchment font-serif flex flex-col items-center justify-start p-6 pt-10">
 
@@ -203,6 +204,8 @@
 <script setup>
 definePageMeta({ middleware: ['auth'] })
 
+const { report } = useClientLog()
+
 // ── Web Serial support ────────────────────────────────────────────────────────
 const webSerialSupported = computed(() => typeof navigator !== 'undefined' && 'serial' in navigator)
 
@@ -348,6 +351,7 @@ async function flashFirmware() {
 
     step.value = 3
   } catch (e) {
+    report('sensor.flash.failed', e, { step: step.value })
     flashError.value = e.message ?? 'Flash failed'
     log('❌ Flash error: ' + flashError.value, 'error')
     // Try to re-open for at least logging
@@ -394,6 +398,7 @@ async function sendConfig() {
       }
     }, 15000)
   } catch (e) {
+    report('sensor.config.send_failed', e)
     configError.value = e.message ?? 'Send failed'
     log('❌ ' + configError.value, 'error')
     sending.value = false

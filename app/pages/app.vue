@@ -52,6 +52,7 @@
             <button class="btn-danger !px-3 !py-1.5 !text-xs shrink-0" @click="endFiring">End</button>
           </template>
         </template>
+        <UserMenu />
       </div>
     </header>
 
@@ -588,11 +589,22 @@ async function endFiring() {
 }
 
 async function restartFiring(f) {
-  if (!f?.started_at || !f?.ended_at || activeFiring.value) return
-  await $fetch(`/api/firings/${f.id}`, { method: 'PUT', body: { endedAt: null } })
-  await refreshFirings()
-  const fresh = allFirings.value.find(fi => fi.id === f.id)
-  await selectFiring(fresh ?? f)
+  if (!f?.started_at || !f?.ended_at) {
+    toast.show('This firing can\u2019t be restarted.')
+    return
+  }
+  if (activeFiring.value) {
+    toast.show(`End "${activeFiring.value.name}" first — only one firing can be active at a time.`)
+    return
+  }
+  try {
+    await $fetch(`/api/firings/${f.id}`, { method: 'PUT', body: { endedAt: null } })
+    await refreshFirings()
+    const fresh = allFirings.value.find(fi => fi.id === f.id)
+    await selectFiring(fresh ?? f)
+  } catch (err) {
+    toast.show(`Couldn\u2019t restart: ${err?.data?.message ?? err.message ?? 'Unknown error'}`)
+  }
 }
 
 // ── Pause / Resume / Recalibrate ─────────────────────────────────────────────

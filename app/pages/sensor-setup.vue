@@ -466,7 +466,12 @@ async function startReading() {
               espReady.value = true
               alreadyConfigured.value = false
               log('✅ ESP32 ready for config', 'info')
-              if (step.value === 3) step.value = 4
+              // NEEDS_CONFIG only means "board has no saved credentials" — the
+              // firmware emits it on a fresh boot, after a clear-creds wipe, and
+              // after a WiFi failure. It is NOT a signal that flashing happened,
+              // so it must NEVER advance the Flash step. The Flash step is only
+              // ever completed by an actual flash (flashFirmware) or by the user
+              // explicitly clicking "Skip — already flashed" (skipToConfig).
             }
             if (t === 'KILN_LOG:READY') {
               if (step.value < 4) {
@@ -635,12 +640,16 @@ async function sendReconfigure() {
       reconfiguring.value = false
       return
     }
+    // The board will respond by wiping NVS and emitting KILN_LOG:NEEDS_CONFIG.
+    // We land the user on the Flash step and STOP — wiping credentials does not
+    // mean firmware is current, so we never auto-skip flashing. The user either
+    // flashes, or clicks "Skip — already flashed" if the firmware is up to date.
     const payload = JSON.stringify({ reconfigure: true }) + '\n'
     await writer.write(new TextEncoder().encode(payload))
     dbg('sent {"reconfigure":true}')
     log('→ Clearing saved credentials on ESP32…', 'info')
     needsReplug.value = false
-    step.value        = 3  // go to flash — user can flash or skip
+    step.value        = 3  // go to Flash and wait — flash, or skip if already flashed
   } catch (e) {
     report('sensor.reconfigure.failed', e)
     log('❌ Reconfigure failed: ' + (e.message ?? e), 'error')

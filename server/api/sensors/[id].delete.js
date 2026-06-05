@@ -1,6 +1,5 @@
 // server/api/sensors/[id].delete.js
 // DELETE /api/sensors/:id — delete a sensor (ownership checked)
-
 export default defineEventHandler(async (event) => {
   const { db, user } = await useServerUser(event)
   const id = getRouterParam(event, 'id')
@@ -16,6 +15,6 @@ export default defineEventHandler(async (event) => {
   if (!existing) throw createError({ statusCode: 404, statusMessage: 'Sensor not found' })
 
   const { error } = await db.from('sensors').delete().eq('id', id)
-  if (error) throw serverError('sensors.delete.failed', error, { userId: user.id, sensorId: id })
+  if (error) throw await serverError('sensors.delete.failed', error, { userId: user.id, sensorId: id })
   return { ok: true }
 })

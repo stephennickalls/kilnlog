@@ -35,7 +35,7 @@ async function upsertReading(db, row, logCtx) {
     .upsert(row, { onConflict: 'firing_id,timestamp', ignoreDuplicates: false })
     .select('id')
     .single()
-  if (error) throw serverError('readings.insert.failed', error, logCtx)
+  if (error) throw await serverError('readings.insert.failed', error, logCtx)
   return data
 }
 

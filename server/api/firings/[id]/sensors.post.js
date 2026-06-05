@@ -1,7 +1,6 @@
 // server/api/firings/[id]/sensors.post.js
 // POST /api/firings/:id/sensors — assign a sensor to a firing
 // Body: { sensorId: uuid }
-
 export default defineEventHandler(async (event) => {
   const { db, user } = await useServerUser(event)
   const firingId = Number(getRouterParam(event, 'id'))
@@ -36,6 +35,6 @@ export default defineEventHandler(async (event) => {
     .select()
     .single()
 
-  if (error) throw serverError('firing_sensors.assign.failed', error, { userId: user.id, firingId, sensorId })
+  if (error) throw await serverError('firing_sensors.assign.failed', error, { userId: user.id, firingId, sensorId })
   return data
 })

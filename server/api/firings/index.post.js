@@ -13,7 +13,7 @@ export default defineEventHandler(async (event) => {
     .select()
     .single()
 
-  if (error) throw serverError('firings.create.failed', error, { userId: user.id })
+  if (error) throw await serverError('firings.create.failed', error, { userId: user.id })
 
   if (Array.isArray(schedulePoints) && schedulePoints.length > 0) {
     const points = schedulePoints
@@ -21,14 +21,14 @@ export default defineEventHandler(async (event) => {
       .map(p => ({ firing_id: firing.id, offset_minutes: Number(p.offsetMinutes), target_temp: Number(p.targetTemp) }))
     if (points.length) {
       const { error: schedErr } = await db.from('schedule').insert(points)
-      if (schedErr) throw serverError('firings.create.schedule_failed', schedErr, { userId: user.id, firingId: firing.id })
+      if (schedErr) throw await serverError('firings.create.schedule_failed', schedErr, { userId: user.id, firingId: firing.id })
     }
   }
 
   if (Array.isArray(sensorIds) && sensorIds.length > 0) {
     const rows = sensorIds.map(id => ({ firing_id: firing.id, sensor_id: id }))
     const { error: sensorErr } = await db.from('firing_sensors').insert(rows)
-    if (sensorErr) throw serverError('firings.create.sensor_assign_failed', sensorErr, { userId: user.id, firingId: firing.id })
+    if (sensorErr) throw await serverError('firings.create.sensor_assign_failed', sensorErr, { userId: user.id, firingId: firing.id })
   }
 
   return firing

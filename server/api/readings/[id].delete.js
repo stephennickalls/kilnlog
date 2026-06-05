@@ -22,6 +22,6 @@ export default defineEventHandler(async (event) => {
   if (!firing) throw createError({ statusCode: 403, statusMessage: 'Not authorised' })
 
   const { error } = await db.from('readings').delete().eq('id', id)
-  if (error) throw serverError('readings.delete.failed', error, { userId: user.id, readingId: id })
+  if (error) throw await serverError('readings.delete.failed', error, { userId: user.id, readingId: id })
   return { ok: true }
 })

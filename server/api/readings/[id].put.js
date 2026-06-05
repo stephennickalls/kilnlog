@@ -33,6 +33,6 @@ export default defineEventHandler(async (event) => {
     .select()
     .single()
 
-  if (error) throw serverError('readings.update.failed', error, { userId: user.id, readingId: id })
+  if (error) throw await serverError('readings.update.failed', error, { userId: user.id, readingId: id })
   return data
 })

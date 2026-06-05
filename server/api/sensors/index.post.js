@@ -1,7 +1,6 @@
 // server/api/sensors/index.post.js
 // POST /api/sensors — create a new sensor for the authenticated user.
 // Generates a UUID token server-side — never trust the client for this.
-
 import { randomUUID } from 'node:crypto'
 
 export default defineEventHandler(async (event) => {
@@ -19,6 +18,6 @@ export default defineEventHandler(async (event) => {
     .select('id, name, token, created_at, last_seen')
     .single()
 
-  if (error) throw serverError('sensors.create.failed', error, { userId: user.id })
+  if (error) throw await serverError('sensors.create.failed', error, { userId: user.id })
   return data
 })

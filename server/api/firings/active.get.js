@@ -7,40 +7,31 @@
 import { createClient } from '@supabase/supabase-js'
 
 export default defineEventHandler(async (event) => {
-  const db = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SERVICE_KEY
-  )
+  const db = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY)
 
   const token = getHeader(event, 'x-sensor-token')
   if (!token) throw createError({ statusCode: 401, statusMessage: 'Missing X-Sensor-Token' })
 
-  // Look up sensor by token
   const { data: sensor, error: sensorErr } = await db
     .from('sensors')
     .select('id, user_id, name')
     .eq('token', token)
     .maybeSingle()
 
-  if (sensorErr || !sensor) throw createError({ statusCode: 401, statusMessage: 'Invalid sensor token' })
+  if (sensorErr) throw await serverError('firings.active.sensor_lookup_failed', sensorErr)
+  if (!sensor) throw createError({ statusCode: 401, statusMessage: 'Invalid sensor token' })
 
-  // Stamp last_seen so the UI shows the sensor online even before readings flow.
-  // Best-effort — don't fail the poll if this update errors.
+  // Best-effort last_seen stamp
   await db.from('sensors').update({ last_seen: Math.floor(Date.now() / 1000) }).eq('id', sensor.id)
 
-  // Find all firings this sensor is assigned to
   const { data: assignments, error: assignErr } = await db
     .from('firing_sensors')
     .select('firing_id, role')
     .eq('sensor_id', sensor.id)
 
-  if (assignErr) {
-    logger.error('firings.active.assignments_failed', { sensorId: sensor.id, err: assignErr })
-    throw createError({ statusCode: 500, statusMessage: 'Lookup failed' })
-  }
+  if (assignErr) throw await serverError('firings.active.assignments_failed', assignErr, { sensorId: sensor.id })
   if (!assignments?.length) return { firingId: null, message: 'No active firing assigned to this sensor' }
 
-  // Find which of those firings is currently active (started but not ended)
   const firingIds = assignments.map(a => a.firing_id)
   const { data: firing, error: firingErr } = await db
     .from('firings')
@@ -51,10 +42,7 @@ export default defineEventHandler(async (event) => {
     .limit(1)
     .maybeSingle()
 
-  if (firingErr) {
-    logger.error('firings.active.firing_query_failed', { sensorId: sensor.id, err: firingErr })
-    throw createError({ statusCode: 500, statusMessage: 'Lookup failed' })
-  }
+  if (firingErr) throw await serverError('firings.active.firing_query_failed', firingErr, { sensorId: sensor.id })
 
   if (!firing) return { firingId: null, message: 'No active firing assigned to this sensor' }
 

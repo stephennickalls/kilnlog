@@ -20,6 +20,6 @@ export default defineEventHandler(async (event) => {
   ])
 
   const { error } = await db.from('firings').delete().eq('id', id)
-  if (error) throw serverError('firings.delete.failed', error, { userId: user.id, firingId: id })
+  if (error) throw await serverError('firings.delete.failed', error, { userId: user.id, firingId: id })
   return { ok: true }
 })

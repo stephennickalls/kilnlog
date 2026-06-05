@@ -1,6 +1,5 @@
 // server/api/sensors/[id].put.js
 // PUT /api/sensors/:id — rename a sensor (ownership checked)
-
 export default defineEventHandler(async (event) => {
   const { db, user } = await useServerUser(event)
   const id   = getRouterParam(event, 'id')
@@ -23,6 +22,6 @@ export default defineEventHandler(async (event) => {
     .select('id, name, token, created_at')
     .single()
 
-  if (error) throw serverError('sensors.rename.failed', error, { userId: user.id, sensorId: id })
+  if (error) throw await serverError('sensors.rename.failed', error, { userId: user.id, sensorId: id })
   return data
 })

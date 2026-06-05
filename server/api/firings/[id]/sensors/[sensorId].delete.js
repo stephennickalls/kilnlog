@@ -1,6 +1,5 @@
 // server/api/firings/[id]/sensors/[sensorId].delete.js
 // DELETE /api/firings/:id/sensors/:sensorId — remove a sensor from a firing
-
 export default defineEventHandler(async (event) => {
   const { db, user } = await useServerUser(event)
   const firingId = Number(getRouterParam(event, 'id'))
@@ -21,6 +20,6 @@ export default defineEventHandler(async (event) => {
     .eq('firing_id', firingId)
     .eq('sensor_id', sensorId)
 
-  if (error) throw serverError('firing_sensors.remove.failed', error, { userId: user.id, firingId, sensorId })
+  if (error) throw await serverError('firing_sensors.remove.failed', error, { userId: user.id, firingId, sensorId })
   return { ok: true }
 })

@@ -11,6 +11,8 @@ CREATE TABLE public.firings (
   mode text NOT NULL DEFAULT 'connected'::text,
   user_id uuid NOT NULL,
   auto_ended boolean NOT NULL DEFAULT false,
+  schedule_offset integer NOT NULL DEFAULT 0,
+  paused_at bigint,
   CONSTRAINT firings_pkey PRIMARY KEY (id),
   CONSTRAINT firings_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
@@ -62,6 +64,8 @@ CREATE TABLE public.profiles (
   subscription_ends_at timestamp with time zone,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
+  last_stripe_event_at timestamp with time zone,
+  role text NOT NULL DEFAULT 'user'::text CHECK (role = ANY (ARRAY['user'::text, 'admin'::text])),
   CONSTRAINT profiles_pkey PRIMARY KEY (id),
   CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id)
 );
@@ -83,4 +87,15 @@ CREATE TABLE public.firing_sensors (
   CONSTRAINT firing_sensors_pkey PRIMARY KEY (id),
   CONSTRAINT firing_sensors_firing_id_fkey FOREIGN KEY (firing_id) REFERENCES public.firings(id),
   CONSTRAINT firing_sensors_sensor_id_fkey FOREIGN KEY (sensor_id) REFERENCES public.sensors(id)
+);
+CREATE TABLE public.logs (
+  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  level text NOT NULL DEFAULT 'error'::text CHECK (level = ANY (ARRAY['info'::text, 'warn'::text, 'error'::text])),
+  source text NOT NULL DEFAULT 'server'::text CHECK (source = ANY (ARRAY['server'::text, 'client'::text])),
+  event text,
+  message text,
+  context jsonb,
+  user_id uuid,
+  CONSTRAINT logs_pkey PRIMARY KEY (id)
 );

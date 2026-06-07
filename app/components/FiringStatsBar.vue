@@ -15,29 +15,27 @@
       <span class="text-base font-medium text-flame-light mt-1">°C</span>
     </button>
 
-    <!-- Peak -->
-    <div class="bg-white border border-parchment-3 rounded-xl flex flex-col items-center justify-center px-6 py-3 min-w-[120px]" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
-      <span class="text-xs font-semibold uppercase tracking-widest text-ink-faint mb-1">Peak</span>
-      <span class="text-5xl font-bold tabular-nums leading-none text-ink">{{ peakTemp !== null ? Math.round(peakTemp) : '—' }}</span>
+    <!-- Target temp — interpolated from schedule -->
+    <div v-if="isLive && targetTemp !== null" class="bg-white border border-parchment-3 rounded-xl flex flex-col items-center justify-center px-6 py-3 min-w-[130px]" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
+      <span class="text-xs font-semibold uppercase tracking-widest text-ink-faint mb-1">Target</span>
+      <span class="text-5xl font-bold tabular-nums leading-none text-ink-muted">{{ targetTemp }}</span>
       <span class="text-base font-medium text-ink-faint mt-1">°C</span>
     </div>
 
-    <!-- Rate — connected live only -->
-    <div v-if="isLive && !isManual" class="bg-white border border-parchment-3 rounded-xl flex flex-col items-center justify-center px-6 py-3 min-w-[120px]" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
-      <span class="text-xs font-semibold uppercase tracking-widest text-ink-faint mb-1">Rate</span>
-      <span class="text-4xl font-bold tabular-nums leading-none" :class="rateOfChange !== '—' ? 'text-green-600' : 'text-ink-faint'">{{ rateOfChange }}</span>
-    </div>
-
-    <!-- Target rate — live, when schedule provides one -->
-    <div v-if="isLive && targetRate !== '—'" class="bg-white border border-parchment-3 rounded-xl flex flex-col items-center justify-center px-6 py-3 min-w-[120px]" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
-      <span class="text-xs font-semibold uppercase tracking-widest text-ink-faint mb-1">Target</span>
-      <span class="text-4xl font-bold tabular-nums leading-none text-ink-muted">{{ targetRate }}</span>
-    </div>
-
-    <!-- Elapsed — connected live only -->
-    <div v-if="isLive && !isManual" class="bg-white border border-parchment-3 rounded-xl flex flex-col items-center justify-center px-6 py-3 min-w-[120px]" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
-      <span class="text-xs font-semibold uppercase tracking-widest text-ink-faint mb-1">Elapsed</span>
-      <span class="text-4xl font-bold tabular-nums leading-none text-ink">{{ elapsed }}</span>
+    <!-- Rate — actual and target stacked equally, both labelled.
+         Shown in connected AND manual mode (matters most when hand-adjusting). -->
+    <div v-if="isLive" class="bg-white border border-parchment-3 rounded-xl flex flex-col items-center justify-center px-6 py-3 min-w-[140px]" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
+      <span class="text-xs font-semibold uppercase tracking-widest text-ink-faint mb-1.5">Rate</span>
+      <div class="flex flex-col items-center gap-1">
+        <div class="flex items-baseline gap-1.5">
+          <span class="text-[10px] font-semibold uppercase tracking-wide text-ink-faint">act</span>
+          <span class="text-2xl font-bold tabular-nums leading-none" :class="rateColorClass">{{ rateOfChange }}</span>
+        </div>
+        <div class="flex items-baseline gap-1.5">
+          <span class="text-[10px] font-semibold uppercase tracking-wide text-ink-faint">tgt</span>
+          <span class="text-2xl font-bold tabular-nums leading-none text-ink-muted">{{ targetRate }}</span>
+        </div>
+      </div>
     </div>
 
     <!-- Duration — past firings -->
@@ -52,14 +50,7 @@
       <span class="text-5xl font-bold tabular-nums leading-none text-ink">{{ readingCount }}</span>
     </div>
 
-    <!-- Notes — fills remaining space -->
-    <div v-if="notes" class="bg-white border border-parchment-3 rounded-xl flex flex-col justify-center px-6 py-3 flex-1 min-w-0" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
-      <span class="text-xs font-semibold uppercase tracking-widest text-ink-faint mb-1">Notes</span>
-      <span class="text-sm font-medium text-ink-muted truncate">{{ notes }}</span>
-    </div>
-
-    <!-- Spacer when no notes -->
-    <div v-else class="flex-1"/>
+    <div class="flex-1"/>
 
     <!-- Action buttons -->
     <div class="flex items-center gap-2 shrink-0">
@@ -77,7 +68,7 @@
         <span class="text-xs font-semibold uppercase tracking-widest">Log Reading</span>
       </button>
 
-      <!-- Sensors toggle — always shown when a firing is selected -->
+      <!-- Sensors toggle -->
       <button
         class="bg-white border rounded-xl flex flex-col items-center justify-center px-5 py-3 transition-colors relative"
         :class="showSensorPanel
@@ -101,20 +92,41 @@
 </template>
 
 <script setup>
-defineProps({
-  peakTemp:       { type: Number,  default: null },
-  duration:       { type: String,  default: null },
-  rateOfChange:   { type: String,  default: '—' },
-  targetRate:     { type: String,  default: '—' },
-  elapsed:        { type: String,  default: '—' },
-  readingCount:   { type: Number,  default: 0 },
-  notes:          { type: String,  default: null },
-  isLive:         Boolean,
-  isManual:       Boolean,
-  currentTemp:    { type: Number,  default: null },
-  assignedCount:  { type: Number,  default: 0 },
+import { computed } from 'vue'
+
+const props = defineProps({
+  targetTemp:      { type: Number,  default: null },
+  duration:        { type: String,  default: null },
+  rateOfChange:    { type: String,  default: '—' },
+  targetRate:      { type: String,  default: '—' },
+  readingCount:    { type: Number,  default: 0 },
+  isLive:          Boolean,
+  isManual:        Boolean,
+  currentTemp:     { type: Number,  default: null },
+  assignedCount:   { type: Number,  default: 0 },
   showSensorPanel: { type: Boolean, default: false },
 })
 
 defineEmits(['open-temp', 'log-reading', 'sensors-toggle'])
+
+// Colour the actual rate by how it compares to target:
+//   within 1.5°/m  → green (on track)
+//   >1.5 over      → amber (too fast — ease off)
+//   >1.5 under     → blue  (too slow — push harder)
+function parseRate(str) {
+  if (!str || str === '—') return null
+  const n = parseFloat(str.replace('°/m', ''))
+  return isFinite(n) ? n : null
+}
+
+const rateColorClass = computed(() => {
+  const actual = parseRate(props.rateOfChange)
+  const target = parseRate(props.targetRate)
+  if (actual === null) return 'text-ink-faint'
+  if (target === null) return 'text-green-600'
+  const diff = actual - target
+  if (diff > 1.5)  return 'text-amber-600'
+  if (diff < -1.5) return 'text-blue-600'
+  return 'text-green-600'
+})
 </script>

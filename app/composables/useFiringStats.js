@@ -1,12 +1,4 @@
 // app/composables/useFiringStats.js
-//
-// Pure, side-effect-free derivations for a firing.
-// Takes refs for the selected firing and the current unix time;
-// returns computed stats. No intervals, no fetches — safe to test in isolation.
-//
-// Usage:
-//   const { peakTemp, duration, readingCount, elapsed, rateOfChange, targetRate }
-//     = useFiringStats(selectedFiring, nowUnix)
 
 import { computed } from 'vue'
 
@@ -19,6 +11,21 @@ function fmtDur(mins) {
 
 function fmtRate(rate) {
   return rate >= 0 ? `+${rate}°/m` : `${rate}°/m`
+}
+
+function interpolateSchedule(schedule, elapsedMins) {
+  if (!schedule?.length) return null
+  const sorted = [...schedule].sort((a, b) => a.offset_minutes - b.offset_minutes)
+  if (elapsedMins <= sorted[0].offset_minutes) return sorted[0].target_temp
+  if (elapsedMins >= sorted.at(-1).offset_minutes) return sorted.at(-1).target_temp
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const a = sorted[i], b = sorted[i + 1]
+    if (elapsedMins >= a.offset_minutes && elapsedMins <= b.offset_minutes) {
+      const frac = (elapsedMins - a.offset_minutes) / (b.offset_minutes - a.offset_minutes)
+      return a.target_temp + frac * (b.target_temp - a.target_temp)
+    }
+  }
+  return null
 }
 
 export function useFiringStats(selectedFiring, nowUnix) {
@@ -59,24 +66,64 @@ export function useFiringStats(selectedFiring, nowUnix) {
 
   const targetRate = computed(() => {
     const f = selectedFiring.value
-    if (!f?.started_at || !f?.schedule?.length) return '—'
-    // schedule_offset shifts the planned curve right; equivalently we compare
-    // against elapsed time minus the offset so waypoints line up with the shift.
+    if (!f?.started_at || !f?.schedule?.length) {
+      console.warn('[targetRate] no firing or no schedule', {
+        hasFiring: !!f,
+        hasStartedAt: !!f?.started_at,
+        scheduleLength: f?.schedule?.length ?? 0,
+      })
+      return '—'
+    }
+    if (f.schedule.length < 2) {
+      console.warn('[targetRate] schedule has fewer than 2 points — cannot compute rate', f.schedule)
+      return '—'
+    }
     const offset = f.schedule_offset ?? 0
     const elapsedMins = (nowUnix.value - f.started_at) / 60 - offset
     const schedule = [...f.schedule].sort((a, b) => a.offset_minutes - b.offset_minutes)
-    let before = null, after = null
+
+    console.log('[targetRate]', {
+      elapsedMins: Math.round(elapsedMins),
+      offset,
+      scheduleLength: schedule.length,
+      firstPoint: schedule[0],
+      lastPoint: schedule.at(-1),
+    })
+
+    // Past the end — plan is flat
+    if (elapsedMins >= schedule.at(-1).offset_minutes) {
+      console.log('[targetRate] past schedule end → +0°/m')
+      return fmtRate(0)
+    }
+
+    // Default to opening segment; override if elapsed falls inside a segment
+    let before = schedule[0], after = schedule[1]
     for (let i = 0; i < schedule.length - 1; i++) {
       if (schedule[i].offset_minutes <= elapsedMins && schedule[i + 1].offset_minutes >= elapsedMins) {
-        before = schedule[i]; after = schedule[i + 1]; break
+        before = schedule[i]; after = schedule[i + 1]
+        break
       }
     }
-    if (!before || !after) return '—'
+
     const deltaTemp = after.target_temp - before.target_temp
     const deltaMins = after.offset_minutes - before.offset_minutes
-    if (deltaMins === 0) return '—'
+    console.log('[targetRate] segment', { before, after, deltaTemp, deltaMins })
+
+    if (deltaMins === 0) {
+      console.warn('[targetRate] zero-width segment (duplicate offsets?)', { before, after })
+      return fmtRate(0)
+    }
     return fmtRate(Math.round(deltaTemp / deltaMins))
   })
 
-  return { peakTemp, duration, readingCount, elapsed, rateOfChange, targetRate }
+  const targetTemp = computed(() => {
+    const f = selectedFiring.value
+    if (!f?.started_at || !f?.schedule?.length) return null
+    const offset = f.schedule_offset ?? 0
+    const elapsedMins = (nowUnix.value - f.started_at) / 60 - offset
+    const temp = interpolateSchedule(f.schedule, elapsedMins)
+    return temp !== null ? Math.round(temp) : null
+  })
+
+  return { peakTemp, duration, readingCount, elapsed, rateOfChange, targetRate, targetTemp }
 }

@@ -82,12 +82,12 @@
           <FiringStatsBar
             v-if="selectedFiring && !selectedFiring.ended_at"
             :peak-temp="peakTemp"
+            :target-temp="targetTemp"
+            :target-rate="targetRate"
             :duration="duration"
             :rate-of-change="rateOfChange"
-            :target-rate="targetRate"
             :elapsed="elapsed"
             :reading-count="readingCount"
-            :notes="selectedFiring.notes"
             :is-live="isLive"
             :is-manual="isManual"
             :current-temp="currentTemp"
@@ -383,7 +383,7 @@ const { init: initMobile, setSchedule: setScheduleMobile, setReadings: setReadin
 const activeFiring = computed(() => allFirings.value.find(f => f.started_at && !f.ended_at) ?? null)
 const pastFirings  = computed(() => allFirings.value.filter(f => f.ended_at).sort((a, b) => b.created_at - a.created_at))
 
-const { peakTemp, duration, readingCount, elapsed, rateOfChange, targetRate }
+const { peakTemp, duration, readingCount, elapsed, rateOfChange, targetRate, targetTemp }
   = useFiringStats(selectedFiring, nowUnix)
 
 const assignedSensors = computed(() => {
@@ -755,6 +755,7 @@ async function reloadReadings() {
   try {
     const data = await $fetch(`/api/firings/${selectedFiring.value.id}`)
     selectedFiring.value.readings = data.readings
+    selectedFiring.value.schedule = data.schedule 
     setReadings(data.readings, selectedFiring.value.started_at)
     setReadingsMobile(data.readings, selectedFiring.value.started_at)
     if (!isSaving.value && data.readings?.length) {

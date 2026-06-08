@@ -1,8 +1,9 @@
 {
   "name": "kiln-monitor",
   "version": "1.0.0",
-  "description": "Open source kiln temperature monitoring — real-time chart of planned vs actual firing",
-  "license": "MIT",
+  "description": "Kiln temperature monitoring — real-time chart of planned vs actual firing",
+  "private": true,
+  "license": "UNLICENSED",
   "scripts": {
     "build": "nuxt build",
     "dev": "nuxt dev --host",
@@ -19,7 +20,6 @@
     "@supabase/supabase-js": "^2.101.0",
     "chart.js": "^4.4.2",
     "chartjs-plugin-zoom": "^2.2.0",
-    "esptool-js": "^0.6.0",
     "hammerjs": "^2.0.8",
     "nuxt": "^4.0.0",
     "stripe": "^22.0.0",

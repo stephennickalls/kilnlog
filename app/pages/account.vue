@@ -120,23 +120,6 @@
           </div>
         </div>
 
-        <!-- Sensor -->
-        <div class="bg-white border border-parchment-3 rounded-2xl overflow-hidden" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
-          <div class="px-5 py-4 border-b border-parchment-3">
-            <p class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Kiln Sensor</p>
-          </div>
-          <div class="px-5 py-4 flex items-center justify-between">
-            <div>
-              <p class="text-sm font-semibold text-ink">ESP32 Setup</p>
-              <p class="text-xs text-ink-muted mt-0.5">Flash firmware and configure WiFi</p>
-            </div>
-            <NuxtLink to="/sensor-setup" class="px-4 py-2 border border-parchment-3 text-ink-muted text-sm font-semibold rounded-xl hover:bg-parchment-2 transition-colors flex items-center gap-1.5">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-              Set up →
-            </NuxtLink>
-          </div>
-        </div>
-
         <!-- Sign out -->
         <div class="bg-white border border-parchment-3 rounded-2xl overflow-hidden" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
           <div class="px-5 py-4">

@@ -19,7 +19,7 @@ v-if="mounted"
         <!-- Trial expired notice -->
         <div class="text-center mb-6">
           <p class="text-base font-bold text-ink">Your free trial has ended</p>
-          <p class="text-sm text-ink-muted mt-1">Subscribe to keep monitoring your kiln firings.</p>
+          <p class="text-sm text-ink-muted mt-1">Subscribe to keep logging and charting your firings.</p>
         </div>
 
         <!-- Plan card -->
@@ -28,11 +28,11 @@ v-if="mounted"
           <div class="text-center mb-5">
             <p class="text-xs font-bold uppercase tracking-widest text-flame mb-2">Annual Plan</p>
             <div class="flex items-baseline justify-center gap-1">
-              <span class="text-6xl font-extrabold text-ink tracking-tight leading-none">$27</span>
+              <span class="text-6xl font-extrabold text-ink tracking-tight leading-none">$49</span>
               <span class="text-lg font-bold text-ink-muted">NZD</span>
               <span class="text-base text-ink-faint">/ year</span>
             </div>
-            <p class="text-xs text-ink-muted mt-1">That's just $2.25/month</p>
+            <p class="text-xs text-ink-muted mt-1">That's just $4.08/month</p>
           </div>
 
           <ul class="flex flex-col gap-2 mb-6">
@@ -74,9 +74,9 @@ class="hidden lg:flex flex-1 bg-ink items-center justify-center px-16"
       style="background-image: radial-gradient(ellipse at 20% 50%, rgba(176,92,26,0.18) 0%, transparent 60%)"
     >
       <div class="max-w-md">
-        <p class="text-flame-light font-semibold tracking-[0.16em] uppercase text-xs mb-4">Your kiln deserves better</p>
+        <p class="text-flame-light font-semibold tracking-[0.16em] uppercase text-xs mb-4">Your firings, all in one place</p>
         <h2 class="text-4xl font-bold text-parchment leading-tight tracking-tight mb-6">
-          Monitor every firing.<br>Master your craft.
+          Plan it. Log it.<br>Learn from it.
         </h2>
         <ul class="flex flex-col gap-4 mb-8">
           <li v-for="point in pitch" :key="point.title" class="flex items-start gap-3">
@@ -112,17 +112,17 @@ onMounted(() => { mounted.value = true })
 
 const features = [
   'Unlimited kiln firings',
-  'ESP32 connected mode',
-  'Manual logging mode',
+  'Planned vs actual chart',
+  'Tap-to-log readings',
   'Schedule library',
   'Full firing history',
-  'Mobile & desktop',
+  'Works on phone & desktop',
 ]
 
 const pitch = [
-  { icon: '📡', title: 'Live temperature streaming', body: 'ESP32 sends readings every 5 seconds over WiFi. Watch the curve climb in real time.' },
-  { icon: '✏️', title: 'Manual logging too', body: 'No sensor? Log readings by hand at your own pace. Every firing tracked.' },
-  { icon: '📚', title: 'Schedule library', body: 'Built-in firing schedules for earthenware, stoneware, and porcelain. Customise as needed.' },
+  { icon: '📈', title: 'Planned vs actual', body: 'Draw your curve, then watch real readings track against it. Adjust while it still matters.' },
+  { icon: '✏️', title: 'Log in a tap', body: 'Check the kiln, tap in the temperature. The chart draws itself — no hardware needed.' },
+  { icon: '📚', title: 'Every firing saved', body: 'Build your library, keep your full history, and repeat the firings that worked.' },
 ]
 
 async function checkout() {

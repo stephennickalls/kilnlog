@@ -19,11 +19,11 @@ export default defineEventHandler(async (event) => {
   if (body.startedAt      !== undefined) updates.started_at      = body.startedAt
   if ('endedAt' in body)                 updates.ended_at        = body.endedAt ?? null
   if (body.notes          !== undefined) updates.notes           = body.notes
-  if (body.mode           !== undefined) updates.mode            = body.mode
   if (body.autoEnded      !== undefined) updates.auto_ended      = body.autoEnded
   if (body.scheduleOffset !== undefined) updates.schedule_offset = body.scheduleOffset ?? 0
   if ('pausedAt' in body)                updates.paused_at       = body.pausedAt ?? null
 
+  // Clearing ended_at (a restart) also clears the auto-ended flag.
   if ('endedAt' in body && body.endedAt === null) {
     updates.auto_ended = false
   }
@@ -35,7 +35,7 @@ export default defineEventHandler(async (event) => {
     .select()
     .single()
 
-  if (error) throw serverError('firings.update.failed', error, { userId: user.id, firingId: id, updates })
+  if (error) throw await serverError('firings.update.failed', error, { userId: user.id, firingId: id, updates })
 
   logger.info('firings.update.success', { firingId: id, userId: user.id, updates })
   return data

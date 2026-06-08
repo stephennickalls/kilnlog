@@ -12,8 +12,10 @@ v-if="mounted"
 
         <!-- Brand -->
         <div class="text-center mb-6">
-          <span class="text-5xl block mb-2">🔥</span>
-          <h1 class="text-2xl font-bold text-ink tracking-tight">KilnMonitor</h1>
+          <NuxtLink to="/" class="inline-block hover:opacity-80 transition-opacity">
+            <span class="text-5xl block mb-2">🔥</span>
+            <h1 class="text-2xl font-bold text-ink tracking-tight">KilnMonitor</h1>
+          </NuxtLink>
         </div>
 
         <!-- Trial expired notice -->
@@ -63,6 +65,13 @@ v-if="mounted"
           <button class="text-flame font-semibold hover:underline bg-transparent border-none cursor-pointer font-serif text-sm" @click="signOut">
             Sign out
           </button>
+        </p>
+
+        <p class="text-center mt-2">
+          <NuxtLink to="/" class="inline-flex items-center gap-1 text-sm text-ink-muted hover:text-ink transition-colors">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+            Back to KilnMonitor
+          </NuxtLink>
         </p>
 
       </div>

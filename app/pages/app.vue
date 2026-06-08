@@ -422,13 +422,21 @@ async function refreshFirings() {
   allFirings.value = await $fetch('/api/firings')
 }
 
-async function selectFiring(f) {
+// selectFiring accepts an optional `preloaded` firing. When the caller already
+// has a full firing object (with schedule + readings), we use it directly and
+// skip the GET — this removes a network round-trip AND removes the stale-read
+// race where a just-restarted firing could be re-selected as still-ended.
+async function selectFiring(f, preloaded = null) {
   stopAllIntervals()
   isLive.value = false
   isPaused.value = false
   currentTemp.value = null
 
-  const data = await $fetch(`/api/firings/${f.id}`)
+  let data = preloaded
+  if (!data || data.schedule === undefined || data.readings === undefined) {
+    data = await $fetch(`/api/firings/${f.id}`)
+  }
+
   selectedFiring.value = data
   setSchedule(data.schedule ?? [], data.schedule_offset ?? 0)
   setReadings(data.readings ?? [], data.started_at)
@@ -458,37 +466,42 @@ async function createFiring(payload) {
   const firing = await $fetch('/api/firings', { method: 'POST', body: payload })
   await $fetch(`/api/firings/${firing.id}`, { method: 'PUT', body: { startedAt: Math.floor(Date.now() / 1000) } })
   showStartModal.value = false
-  await refreshFirings()
-  const fresh = allFirings.value.find(f => f.id === firing.id)
-  await selectFiring(fresh ?? firing)
+  refreshFirings()                          // background — don't block the UI
+  await selectFiring({ id: firing.id })     // fresh firing: fetch full record
 }
 
 async function endFiring() {
   if (!activeFiring.value) return
   const id = activeFiring.value.id
-  await $fetch(`/api/firings/${id}`, { method: 'PUT', body: { endedAt: Math.floor(Date.now() / 1000) } })
+  const updated = await $fetch(`/api/firings/${id}`, {
+    method: 'PUT',
+    body: { endedAt: Math.floor(Date.now() / 1000) },
+  })
   stopAllIntervals()
   isLive.value = isPaused.value = false
   currentTemp.value = null
-  await refreshFirings()
+
+  // Update the selected firing in place from the PUT response — instant, no race.
   if (selectedFiring.value?.id === id) {
-    const data = await $fetch(`/api/firings/${id}`)
-    selectedFiring.value = data
-    setSchedule(data.schedule ?? [], data.schedule_offset ?? 0)
-    setReadings(data.readings ?? [], data.started_at)
-    setScheduleMobile(data.schedule ?? [], data.schedule_offset ?? 0)
-    setReadingsMobile(data.readings ?? [], data.started_at)
+    selectedFiring.value = {
+      ...selectedFiring.value,
+      ended_at:   updated.ended_at,
+      auto_ended: updated.auto_ended,
+    }
   }
+  refreshFirings()                          // background — refresh sidebar
 }
 
 async function restartFiring(f) {
   if (!f?.started_at || !f?.ended_at) { toast.show('This firing can\u2019t be restarted.'); return }
   if (activeFiring.value) { toast.show(`End "${activeFiring.value.name}" first — only one firing can be active at a time.`); return }
   try {
-    await $fetch(`/api/firings/${f.id}`, { method: 'PUT', body: { endedAt: null } })
-    await refreshFirings()
-    const fresh = allFirings.value.find(fi => fi.id === f.id)
-    await selectFiring(fresh ?? f)
+    const updated = await $fetch(`/api/firings/${f.id}`, { method: 'PUT', body: { endedAt: null } })
+    // Trust the PUT's returned row (ended_at is null) — never re-read and risk a
+    // stale GET. Merge onto the firing we already have so its children are kept.
+    const restored = { ...f, ended_at: updated.ended_at, auto_ended: updated.auto_ended }
+    refreshFirings()                        // background — refresh sidebar
+    await selectFiring(restored, restored)
   } catch (err) {
     toast.show(`Couldn\u2019t restart: ${err?.data?.message ?? err.message ?? 'Unknown error'}`)
   }

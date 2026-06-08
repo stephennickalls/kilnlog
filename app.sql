@@ -8,7 +8,6 @@ CREATE TABLE public.firings (
   started_at integer,
   ended_at integer,
   created_at integer DEFAULT (EXTRACT(epoch FROM now()))::integer,
-  mode text NOT NULL DEFAULT 'connected'::text,
   user_id uuid NOT NULL,
   auto_ended boolean NOT NULL DEFAULT false,
   schedule_offset integer NOT NULL DEFAULT 0,
@@ -30,10 +29,8 @@ CREATE TABLE public.readings (
   temperature real NOT NULL,
   timestamp integer NOT NULL,
   created_at integer DEFAULT (EXTRACT(epoch FROM now()))::integer,
-  sensor_id uuid,
   CONSTRAINT readings_pkey PRIMARY KEY (id),
-  CONSTRAINT readings_firing_id_fkey FOREIGN KEY (firing_id) REFERENCES public.firings(id),
-  CONSTRAINT readings_sensor_id_fkey FOREIGN KEY (sensor_id) REFERENCES public.sensors(id)
+  CONSTRAINT readings_firing_id_fkey FOREIGN KEY (firing_id) REFERENCES public.firings(id)
 );
 CREATE TABLE public.schedule_library (
   id integer NOT NULL DEFAULT nextval('schedule_library_id_seq'::regclass),
@@ -68,25 +65,6 @@ CREATE TABLE public.profiles (
   role text NOT NULL DEFAULT 'user'::text CHECK (role = ANY (ARRAY['user'::text, 'admin'::text])),
   CONSTRAINT profiles_pkey PRIMARY KEY (id),
   CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id)
-);
-CREATE TABLE public.sensors (
-  id uuid NOT NULL DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL,
-  name text NOT NULL DEFAULT 'My Sensor'::text,
-  token uuid NOT NULL DEFAULT gen_random_uuid() UNIQUE,
-  created_at timestamp with time zone DEFAULT now(),
-  last_seen integer,
-  CONSTRAINT sensors_pkey PRIMARY KEY (id),
-  CONSTRAINT sensors_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
-);
-CREATE TABLE public.firing_sensors (
-  id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,
-  firing_id integer NOT NULL,
-  sensor_id uuid NOT NULL,
-  role text,
-  CONSTRAINT firing_sensors_pkey PRIMARY KEY (id),
-  CONSTRAINT firing_sensors_firing_id_fkey FOREIGN KEY (firing_id) REFERENCES public.firings(id),
-  CONSTRAINT firing_sensors_sensor_id_fkey FOREIGN KEY (sensor_id) REFERENCES public.sensors(id)
 );
 CREATE TABLE public.logs (
   id bigint GENERATED ALWAYS AS IDENTITY NOT NULL,

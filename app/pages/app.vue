@@ -511,6 +511,9 @@ function startSensorPolling() {
 async function onVisibilityChange() {
   if (document.hidden) return
   if (!selectedFiring.value) return
+  // Returning to a foregrounded PWA: the canvas may have been resized or
+  // detached while hidden. Reloading readings runs setReadings, which now
+  // self-heals the chart (rebuilding if the canvas was recreated).
   await reloadReadings()
   if (isLive.value && !isManual.value) startPolling()
   if (isLive.value && !elapsedTickInterval) {

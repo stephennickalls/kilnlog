@@ -43,10 +43,6 @@ class="bg-parchment rounded-3xl flex flex-col items-center relative w-[90vw] h-[
 
         <!-- Supporting stats -->
         <div class="flex gap-8 mt-10 flex-wrap justify-center">
-          <div v-if="peakTemp !== null" class="flex flex-col items-center gap-1">
-            <span class="text-[10px] font-bold uppercase tracking-[0.12em] text-ink-faint">Peak</span>
-            <span class="text-4xl font-bold text-ink tabular-nums">{{ Math.round(peakTemp) }}°C</span>
-          </div>
           <div v-if="isLive && rateOfChange !== '—'" class="flex flex-col items-center gap-1">
             <span class="text-[10px] font-bold uppercase tracking-[0.12em] text-ink-faint">Rate</span>
             <span class="text-4xl font-bold text-ink tabular-nums">{{ rateOfChange }}</span>
@@ -66,7 +62,6 @@ class="bg-parchment rounded-3xl flex flex-col items-center relative w-[90vw] h-[
 defineProps({
   open:         Boolean,
   temp:         { type: Number, default: null },
-  peakTemp:     { type: Number, default: null },
   rateOfChange: { type: String, default: '—' },
   elapsed:      { type: String, default: '—' },
   isLive:       Boolean,

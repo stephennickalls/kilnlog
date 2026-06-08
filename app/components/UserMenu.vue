@@ -29,10 +29,6 @@ class="w-3.5 h-3.5 text-ink-faint transition-transform" :class="open ? 'rotate-1
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
             Account &amp; billing
           </NuxtLink>
-          <NuxtLink to="/sensors" class="menu-item" @click="open = false">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12.55a11 11 0 0114 0M8.5 16.4a6 6 0 017 0M2 8.82a15 15 0 0120 0"/><line x1="12" y1="20" x2="12" y2="20"/></svg>
-            Sensors
-          </NuxtLink>
         </nav>
 
         <div class="border-t border-parchment-3 py-1">

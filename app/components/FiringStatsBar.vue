@@ -22,8 +22,7 @@
       <span class="text-base font-medium text-ink-faint mt-1">°C</span>
     </div>
 
-    <!-- Rate — actual and target stacked equally, both labelled.
-         Shown in connected AND manual mode (matters most when hand-adjusting). -->
+    <!-- Rate — actual and target stacked equally, both labelled. -->
     <div v-if="isLive" class="bg-white border border-parchment-3 rounded-xl flex flex-col items-center justify-center px-6 py-3 min-w-[140px]" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
       <span class="text-xs font-semibold uppercase tracking-widest text-ink-faint mb-1.5">Rate</span>
       <div class="flex flex-col items-center gap-1">
@@ -55,9 +54,9 @@
     <!-- Action buttons -->
     <div class="flex items-center gap-2 shrink-0">
 
-      <!-- Log reading — manual live only -->
+      <!-- Log reading — live only -->
       <button
-        v-if="isManual && isLive"
+        v-if="isLive"
         class="bg-flame hover:bg-flame-dark text-parchment rounded-xl flex flex-col items-center justify-center px-6 py-3 min-w-[130px] transition-colors"
         style="box-shadow:0 2px 12px rgba(58,30,8,0.06)"
         @click="$emit('log-reading')"
@@ -66,25 +65,6 @@
           <path d="M12 5v14M5 12h14"/>
         </svg>
         <span class="text-xs font-semibold uppercase tracking-widest">Log Reading</span>
-      </button>
-
-      <!-- Sensors toggle -->
-      <button
-        class="bg-white border rounded-xl flex flex-col items-center justify-center px-5 py-3 transition-colors relative"
-        :class="showSensorPanel
-          ? 'border-blue-200 bg-blue-50 text-blue-700'
-          : 'border-parchment-3 text-ink-muted hover:bg-parchment'"
-        style="box-shadow:0 2px 12px rgba(58,30,8,0.06)"
-        @click="$emit('sensors-toggle')"
-      >
-        <svg class="w-5 h-5 mb-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/>
-        </svg>
-        <span class="text-xs font-semibold uppercase tracking-widest">Sensors</span>
-        <span
-          v-if="assignedCount"
-          class="absolute -top-1.5 -right-1.5 text-[9px] bg-flame text-parchment rounded-full w-4 h-4 flex items-center justify-center font-bold"
-        >{{ assignedCount }}</span>
       </button>
 
     </div>
@@ -101,13 +81,10 @@ const props = defineProps({
   targetRate:      { type: String,  default: '—' },
   readingCount:    { type: Number,  default: 0 },
   isLive:          Boolean,
-  isManual:        Boolean,
   currentTemp:     { type: Number,  default: null },
-  assignedCount:   { type: Number,  default: 0 },
-  showSensorPanel: { type: Boolean, default: false },
 })
 
-defineEmits(['open-temp', 'log-reading', 'sensors-toggle'])
+defineEmits(['open-temp', 'log-reading'])
 
 // Colour the actual rate by how it compares to target:
 //   within 1.5°/m  → green (on track)

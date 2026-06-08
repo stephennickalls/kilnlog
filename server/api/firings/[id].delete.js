@@ -16,7 +16,6 @@ export default defineEventHandler(async (event) => {
   await Promise.all([
     db.from('readings').delete().eq('firing_id', id),
     db.from('schedule').delete().eq('firing_id', id),
-    db.from('firing_sensors').delete().eq('firing_id', id),
   ])
 
   const { error } = await db.from('firings').delete().eq('id', id)

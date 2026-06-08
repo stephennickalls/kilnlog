@@ -30,12 +30,9 @@ const show = computed(() =>
   props.firing?.auto_ended && props.firing?.ended_at && !isDismissed(props.firing.id)
 )
 
-const message = computed(() => {
-  const mode = props.firing?.mode ?? 'connected'
-  return mode === 'manual'
-    ? 'This firing was automatically ended after 2 hours with no new readings.'
-    : 'This firing was automatically ended after 4 hours with no sensor signal. You can restart it if needed.'
-})
+const message = computed(() =>
+  'This firing was automatically ended after 2 hours with no new readings. You can restart it if needed.'
+)
 
 function dismiss() {
   dismissId(props.firing.id)

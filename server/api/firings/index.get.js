@@ -1,15 +1,13 @@
 // server/api/firings/index.get.js
 // GET /api/firings — list all firings for the authenticated user.
 // On each call, checks for stale active firings and auto-ends them:
-//   Connected firing: no readings for 4 hours
-//   Manual firing:    no readings for 2 hours
-//   Either type:      started but never had a reading, and started > 1 hour ago
+//   No readings for 2 hours, OR
+//   Started but never had a reading, and started > 1 hour ago.
 // Paused firings (paused_at set) are EXEMPT — the user deliberately suspended
 // them, so the reading gap is intentional.
 
-const FOUR_HOURS = 4 * 60 * 60
-const TWO_HOURS  = 2 * 60 * 60
-const ONE_HOUR   = 1 * 60 * 60
+const TWO_HOURS = 2 * 60 * 60
+const ONE_HOUR  = 1 * 60 * 60
 
 export default defineEventHandler(async (event) => {
   const { db, user } = await useServerUser(event)
@@ -17,7 +15,7 @@ export default defineEventHandler(async (event) => {
   const { data: activeFirings, error: activeError } = await db
     .from('firings')
     .select(`
-      id, mode, started_at, paused_at,
+      id, started_at, paused_at,
       readings:readings(timestamp)
     `)
     .eq('user_id', user.id)
@@ -32,19 +30,15 @@ export default defineEventHandler(async (event) => {
   for (const firing of activeFirings ?? []) {
     if (firing.paused_at) continue
 
-    const mode     = firing.mode ?? 'connected'
     const readings = firing.readings ?? []
-
     const lastTs = readings.length
       ? readings.reduce((max, r) => r.timestamp > max ? r.timestamp : max, readings[0].timestamp)
       : null
 
     if (lastTs === null) {
       if (now - firing.started_at > ONE_HOUR) toAutoEnd.push(firing.id)
-    } else if (mode === 'connected') {
-      if (now - lastTs > FOUR_HOURS) toAutoEnd.push(firing.id)
-    } else {
-      if (now - lastTs > TWO_HOURS) toAutoEnd.push(firing.id)
+    } else if (now - lastTs > TWO_HOURS) {
+      toAutoEnd.push(firing.id)
     }
   }
 

@@ -1,6 +1,6 @@
 // server/api/firings/[id].get.js
-// Single query with nested selects — schedule, readings, and sensors
-// all come back in one round trip instead of three.
+// Single query with nested selects — schedule and readings
+// come back in one round trip instead of two.
 export default defineEventHandler(async (event) => {
   const { db, user } = await useServerUser(event)
   const id = Number(getRouterParam(event, 'id'))
@@ -11,8 +11,7 @@ export default defineEventHandler(async (event) => {
     .select(`
       *,
       schedule:schedule(*),
-      readings:readings(*),
-      sensors:firing_sensors(sensor_id, role, sensors(id, name))
+      readings:readings(*)
     `)
     .eq('id', id)
     .eq('user_id', user.id)
@@ -23,7 +22,6 @@ export default defineEventHandler(async (event) => {
   // Nested rows aren't guaranteed ordered — sort client-side after the single fetch
   firing.schedule = (firing.schedule ?? []).sort((a, b) => a.offset_minutes - b.offset_minutes)
   firing.readings = (firing.readings ?? []).sort((a, b) => a.timestamp - b.timestamp)
-  firing.sensors  = firing.sensors ?? []
 
   return firing
 })

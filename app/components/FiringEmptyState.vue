@@ -3,6 +3,10 @@
   Shown when no firing is selected. Doubles as first-run welcome and a
   returning-user launchpad. `recentFiring` (optional) surfaces a one-tap
   path back into context; absent for brand-new users.
+
+  "Browse schedules" carries a celadon hint — it's the entry point to the
+  schedules world (which is celadon-accented), so the colour telegraphs the
+  destination before the user arrives.
 -->
 <template>
   <div class="flex flex-col items-center justify-center text-center gap-5 px-6 py-10 sm:py-16 h-full">
@@ -27,7 +31,8 @@
         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
         Start a firing
       </button>
-      <button class="flex items-center justify-center gap-2 px-6 py-3 border border-parchment-3 text-ink-muted hover:bg-parchment-2 text-sm font-semibold rounded-xl transition-colors" @click="$emit('browse-schedules')">
+      <!-- Celadon hint: this button leads to the schedules world -->
+      <button class="flex items-center justify-center gap-2 px-6 py-3 border border-celadon/40 bg-celadon-bg/60 text-celadon-dark hover:bg-celadon-bg text-sm font-semibold rounded-xl transition-colors" @click="$emit('browse-schedules')">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
         Browse schedules
       </button>

@@ -1,3 +1,11 @@
+<!-- app/pages/index.vue -->
+<!--
+  Marketing landing page. Celadon appears in three meaningful places:
+  1. Hero chart planned/schedule line — the schedule IS the celadon world
+  2. Active pill + rate chip — on-track/good state = celadon (matches the app)
+  3. Schedule library feature card icon — the one feature in the celadon world
+  Everything else stays warm (flame/parchment/ink). No decoration.
+-->
 <template>
   <div class="bg-parchment text-ink font-serif min-h-screen text-lg">
 
@@ -65,15 +73,17 @@
           <div class="bg-white border border-parchment-3 rounded-[14px] p-7 shadow-[0_8px_40px_rgba(58,30,8,0.09),0_2px_8px_rgba(58,30,8,0.05)]">
             <div class="flex justify-between items-center mb-[0.875rem]">
               <span class="text-[0.875rem] font-semibold text-ink-2">Cone 10 Reduction</span>
-              <span class="flex items-center gap-[5px] bg-green-50 border border-green-200 rounded-full px-[10px] py-[3px] text-[0.75rem] font-bold text-green-700">
-                <span class="w-[6px] h-[6px] bg-green-500 rounded-full animate-pulse"/>
+              <!-- Active = on-track = celadon (matches app state language) -->
+              <span class="flex items-center gap-[5px] bg-celadon-bg border border-celadon/30 rounded-full px-[10px] py-[3px] text-[0.75rem] font-bold text-celadon-dark">
+                <span class="w-[6px] h-[6px] bg-celadon rounded-full animate-pulse"/>
                 Active
               </span>
             </div>
             <div class="flex items-baseline gap-[6px] mb-4">
               <span class="text-[2.75rem] font-bold text-flame leading-none tracking-[-0.04em]">1,247</span>
               <span class="text-[1.2rem] font-semibold text-flame-light">°C</span>
-              <span class="text-[0.8rem] text-green-700 bg-green-50 border border-green-200 rounded px-[7px] py-[2px] ml-1">+8°/min</span>
+              <!-- Rate on-track = celadon -->
+              <span class="text-[0.8rem] text-celadon-dark bg-celadon-bg border border-celadon/30 rounded px-[7px] py-[2px] ml-1">+8°/min</span>
             </div>
             <svg class="w-full mb-4" viewBox="0 0 340 120" fill="none">
               <line x1="0" y1="95" x2="340" y2="95" stroke="#d4c9b0" stroke-width="0.5"/>
@@ -82,7 +92,9 @@
               <text x="2" y="98" font-size="9" fill="#a08060" font-family="Georgia, serif">0°C</text>
               <text x="2" y="65" font-size="9" fill="#a08060" font-family="Georgia, serif">640°C</text>
               <text x="2" y="31" font-size="9" fill="#a08060" font-family="Georgia, serif">1280°C</text>
-              <polyline points="30,110 70,88 110,62 155,28 195,20 230,23 265,75 310,108" stroke="#c8a87a" stroke-width="1.5" stroke-dasharray="5 4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+              <!-- Planned/schedule line — celadon (the schedule world) -->
+              <polyline points="30,110 70,88 110,62 155,28 195,20 230,23 265,75 310,108" stroke="#5f8a78" stroke-width="1.5" stroke-dasharray="5 4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+              <!-- Actual line — flame (the firing itself) -->
               <path d="M30,110 L65,92 L105,65 L148,30 L188,21 L220,24 L248,48 L248,120 L30,120 Z" fill="#b05c1a" fill-opacity="0.08"/>
               <polyline points="30,110 65,92 105,65 148,30 188,21 220,24 248,48" stroke="#b05c1a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
               <circle cx="248" cy="48" r="4" fill="#b05c1a"/>
@@ -92,7 +104,8 @@
               <text x="308" y="118" font-size="9" fill="#a08060" font-family="Georgia, serif">8h</text>
               <line x1="258" y1="14" x2="275" y2="14" stroke="#b05c1a" stroke-width="2"/>
               <text x="278" y="17" font-size="9" fill="#7a5c3a" font-family="Georgia, serif">Actual</text>
-              <line x1="258" y1="26" x2="275" y2="26" stroke="#c8a87a" stroke-width="1.5" stroke-dasharray="4 3"/>
+              <!-- Planned legend — celadon to match the planned line -->
+              <line x1="258" y1="26" x2="275" y2="26" stroke="#5f8a78" stroke-width="1.5" stroke-dasharray="4 3"/>
               <text x="278" y="29" font-size="9" fill="#7a5c3a" font-family="Georgia, serif">Planned</text>
             </svg>
             <div class="grid grid-cols-3 border-t border-parchment-2 pt-4">
@@ -164,9 +177,10 @@
             <p class="text-[0.925rem] text-ink-muted leading-[1.65]">Check the kiln, tap in the temperature, done. The chart draws itself. Mis-typed a reading? Edit or delete it in a second.</p>
           </div>
 
+          <!-- Schedule library — celadon icon (this is the celadon/schedule world) -->
           <div class="bg-parchment p-8 flex flex-col gap-[0.875rem]">
-            <div class="w-11 h-11 bg-flame/10 rounded-lg flex items-center justify-center">
-              <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="3" y="3" width="16" height="16" rx="2" stroke="#b05c1a" stroke-width="1.25"/><path d="M7 8h8M7 12h5" stroke="#b05c1a" stroke-width="1.25" stroke-linecap="round"/><path d="M14 15l2-2 2 2" stroke="#b05c1a" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <div class="w-11 h-11 bg-celadon-bg rounded-lg flex items-center justify-center">
+              <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="3" y="3" width="16" height="16" rx="2" stroke="#5f8a78" stroke-width="1.25"/><path d="M7 8h8M7 12h5" stroke="#5f8a78" stroke-width="1.25" stroke-linecap="round"/><path d="M14 15l2-2 2 2" stroke="#5f8a78" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </div>
             <h3 class="text-[1.05rem] font-bold text-ink tracking-tight">Schedule library</h3>
             <p class="text-[0.925rem] text-ink-muted leading-[1.65]">Start from a built-in bisque or glaze curve, or save your own and reuse it. No re-drawing the same firing twice.</p>

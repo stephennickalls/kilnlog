@@ -1,3 +1,11 @@
+<!-- app/components/StartFiringModal.vue -->
+<!--
+  Start firing modal. Emits @create { name, notes, schedulePoints } — FROZEN
+  contract, app.vue createFiring depends on this exactly.
+
+  Glaze quick-start is celadon when active (category encoding: glaze = celadon
+  world). Bisque stays flame. Everything else unchanged.
+-->
 <template>
   <Teleport to="body">
     <div v-if="open" class="fixed inset-0 flex items-end sm:items-center justify-center z-50 font-serif" style="background: rgba(26,18,8,0.6)" @click.self="$emit('close')">
@@ -16,7 +24,7 @@
           <!-- Name -->
           <div class="flex flex-col gap-1.5">
             <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Name</label>
-            <input v-model="form.name" type="text" placeholder="e.g. Cone 10 reduction" class="w-full border border-parchment-3 rounded-xl px-4 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif" >
+            <input v-model="form.name" type="text" placeholder="e.g. Cone 10 reduction" class="w-full border border-parchment-3 rounded-xl px-4 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif">
           </div>
 
           <!-- Notes -->
@@ -32,7 +40,7 @@
             <!-- Controls row -->
             <div class="flex items-center gap-2 flex-wrap">
 
-              <!-- Bisque / Glaze quick-start -->
+              <!-- Bisque / Glaze quick-start — bisque=flame, glaze=celadon -->
               <div class="flex rounded-lg border border-parchment-3 overflow-hidden text-xs font-semibold shrink-0">
                 <button
                   class="px-3 py-1.5 transition-colors"
@@ -41,7 +49,7 @@
                 >🏺 Bisque</button>
                 <button
                   class="px-3 py-1.5 border-l border-parchment-3 transition-colors"
-                  :class="quickType === 'glaze' ? 'bg-flame text-parchment' : 'bg-white text-ink-muted hover:bg-parchment-2'"
+                  :class="quickType === 'glaze' ? 'bg-celadon text-parchment' : 'bg-white text-ink-muted hover:bg-celadon-bg'"
                   @click="applyQuick('glaze')"
                 >✨ Glaze</button>
               </div>
@@ -113,7 +121,6 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'create'])
 
-// ── Quick-start curve defaults ────────────────────────────────────────────────
 const BISQUE_POINTS = [
   { offsetMinutes: 0,   targetTemp: 20   },
   { offsetMinutes: 60,  targetTemp: 120  },
@@ -185,11 +192,10 @@ function formatDate(unix) {
   return new Date(unix * 1000).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })
 }
 
-// ── Form ──────────────────────────────────────────────────────────────────────
 const form = reactive({
-  name:            '',
-  notes:           '',
-  schedulePoints:  BISQUE_POINTS.map(p => ({ ...p })),
+  name:           '',
+  notes:          '',
+  schedulePoints: BISQUE_POINTS.map(p => ({ ...p })),
 })
 
 watch(() => props.open, (val) => {

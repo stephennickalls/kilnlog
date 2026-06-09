@@ -109,7 +109,7 @@
           <p class="text-sm font-bold text-ink mb-1.5">When to recalibrate</p>
           <p class="text-sm text-ink-muted leading-relaxed">Use this when your kiln has fallen behind the planned curve — a weak burner, a stall, or after a gas-out. It slides the rest of your schedule to start from your <strong>current temperature</strong>, keeping every ramp rate intact. Your firing just finishes later.</p>
           <div class="flex gap-2 mt-4">
-            <button class="flex-1 py-2.5 bg-flame hover:bg-flame-dark text-parchment text-sm font-bold rounded-lg transition-colors" @click="recalibrate">Recalibrate now</button>
+            <button class="flex-1 py-2.5 bg-celadon hover:bg-celadon-dark text-white text-sm font-bold rounded-lg transition-colors" @click="recalibrate">Recalibrate now</button>
             <button class="px-4 py-2.5 border border-parchment-3 text-ink-muted text-sm font-semibold rounded-lg hover:bg-parchment-2 transition-colors" @click="showRecalibrateInfo = false">Cancel</button>
           </div>
         </div>
@@ -147,7 +147,7 @@
           </div>
           <ul class="overflow-y-auto flex-1 divide-y divide-parchment-3">
             <li v-if="activeFiring">
-              <button class="w-full flex items-center gap-3 px-4 py-4 text-left active:bg-parchment-2 transition-colors" :class="selectedFiring?.id === activeFiring.id ? 'bg-flame-bg border-l-2 border-flame' : ''" @click="selectFiring(activeFiring); showFiringSheet = false">
+              <button class="w-full flex items-center gap-3 px-4 py-4 text-left active:bg-parchment-2 transition-colors" :class="selectedFiring?.id === activeFiring.id ? 'bg-celadon-bg border-l-2 border-celadon' : ''" @click="selectFiring(activeFiring); showFiringSheet = false">
                 <div class="w-2 h-2 rounded-full bg-green-500 shrink-0 animate-pulse"/>
                 <div class="flex-1 min-w-0">
                   <p class="text-sm font-bold text-ink truncate">{{ activeFiring.name }}</p>
@@ -158,7 +158,7 @@
             </li>
             <li v-if="!pastFirings.length && !activeFiring" class="px-4 py-8 text-sm text-ink-muted text-center">No firings yet</li>
             <li v-for="f in pastFirings" :key="f.id" class="relative">
-              <button class="w-full flex items-center gap-3 px-4 py-4 text-left active:bg-parchment-2 pr-16 transition-colors" :class="selectedFiring?.id === f.id ? 'bg-flame-bg border-l-2 border-flame' : ''" @click="selectFiring(f); showFiringSheet = false">
+              <button class="w-full flex items-center gap-3 px-4 py-4 text-left active:bg-parchment-2 pr-16 transition-colors" :class="selectedFiring?.id === f.id ? 'bg-celadon-bg border-l-2 border-celadon' : ''" @click="selectFiring(f); showFiringSheet = false">
                 <div class="w-2 h-2 rounded-full bg-parchment-4 shrink-0"/>
                 <div class="flex-1 min-w-0">
                   <p class="text-sm font-semibold text-ink truncate">{{ f.name }}</p>
@@ -174,7 +174,6 @@
             </li>
           </ul>
           <div class="p-3 border-t border-parchment-3 shrink-0">
-            <!-- TEST: celadon button to verify custom palette is working -->
             <button class="w-full py-3 bg-celadon hover:bg-celadon-dark text-white text-sm font-bold rounded-lg transition-colors" @click="openStartModal(); showFiringSheet = false">+ Start firing</button>
           </div>
         </div>
@@ -423,12 +422,8 @@ async function restartFiring(f) {
   }
 }
 
-function fireAgain(f) {
-  openStartModal({ fromFiringId: f.id, name: f.name })
-}
-function saveAsSchedule(f) {
-  router.push(`/schedules/new?fromFiring=${f.id}`)
-}
+function fireAgain(f) { openStartModal({ fromFiringId: f.id, name: f.name }) }
+function saveAsSchedule(f) { router.push(`/schedules/new?fromFiring=${f.id}`) }
 
 async function pauseFiring() {
   const f = selectedFiring.value
@@ -558,10 +553,10 @@ async function sheetDeleteFiring(f) {
 </script>
 
 <style>
-.btn-primary { @apply px-4 py-1.5 bg-flame hover:bg-flame-dark text-parchment text-sm font-semibold rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed; }
+.btn-primary { @apply px-4 py-1.5 bg-celadon hover:bg-celadon-dark text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed; }
 .btn-danger  { @apply px-4 py-1.5 border border-red-300 text-red-500 hover:bg-red-50 text-sm font-medium rounded-lg transition-colors; }
 .btn-ghost   { @apply px-4 py-1.5 border border-parchment-3 text-ink-muted hover:bg-parchment-2 text-sm font-medium rounded-lg transition-colors; }
-.input       { @apply w-full border border-parchment-3 rounded-lg px-3 py-1.5 text-sm text-ink bg-white focus:outline-none focus:ring-2 focus:ring-flame/20 focus:border-flame font-serif; }
+.input       { @apply w-full border border-parchment-3 rounded-lg px-3 py-1.5 text-sm text-ink bg-white focus:outline-none focus:ring-2 focus:ring-celadon/20 focus:border-celadon font-serif; }
 .label       { @apply text-xs font-bold uppercase tracking-widest text-ink-faint; }
 .toast-enter-active, .toast-leave-active { transition: all 0.2s ease; }
 .toast-enter-from, .toast-leave-to       { opacity: 0; transform: translate(-50%, 1rem); }

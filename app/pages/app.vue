@@ -191,10 +191,12 @@
       @close="showTempModal = false"
     />
 
+    <!-- D1/D2: preselect prop wired; cleared on close so next open starts fresh -->
     <StartFiringModal
       :open="showStartModal"
       :library="library"
-      @close="showStartModal = false"
+      :preselect="preselect"
+      @close="showStartModal = false; preselect = null"
       @create="createFiring"
     />
 
@@ -236,6 +238,7 @@ definePageMeta({ middleware: ['auth'] })
 
 const toast  = useToast()
 const router = useRouter()
+const route  = useRoute()          // D2: needed for ?startSchedule param
 
 const chartCanvas          = ref(null)
 const consoleRef           = ref(null)
@@ -244,6 +247,7 @@ const showReadingModal     = ref(false)
 const showFiringSheet      = ref(false)
 const sheetConfirmDeleteId = ref(null)
 const showStartModal       = ref(false)
+const preselect            = ref(null) // D1/D2: points + name to pre-load into modal
 const showTempModal        = ref(false)
 const showEndConfirm       = ref(false)
 const allFirings           = ref([])
@@ -295,6 +299,21 @@ onMounted(async () => {
   await init()
   await refreshFirings()
   if (activeFiring.value) await selectFiring(activeFiring.value)
+
+  // D2: handle ?startSchedule=id coming from the schedules page
+  if (route.query.startSchedule) {
+    try {
+      const sched = await $fetch(`/api/schedules/${route.query.startSchedule}`)
+      const points = (sched.points ?? []).map(p => ({
+        offsetMinutes: p.offset_minutes,
+        targetTemp:    p.target_temp,
+      }))
+      preselect.value = { name: sched.name, schedulePoints: points }
+    } catch { /* silent — modal opens with bisque default */ }
+    router.replace('/app')
+    await openStartModal()
+  }
+
   document.addEventListener('visibilitychange', onVisibilityChange)
   window.addEventListener('resize', onWindowResize)
   requestAnimationFrame(() => requestAnimationFrame(() => resize()))
@@ -386,6 +405,7 @@ async function createFiring(payload) {
   const firing = await $fetch('/api/firings', { method: 'POST', body: payload })
   await $fetch(`/api/firings/${firing.id}`, { method: 'PUT', body: { startedAt: Math.floor(Date.now() / 1000) } })
   showStartModal.value = false
+  preselect.value = null
   refreshFirings()
   await selectFiring({ id: firing.id })
 }
@@ -422,7 +442,16 @@ async function restartFiring(f) {
   }
 }
 
-function fireAgain(f) { openStartModal({ fromFiringId: f.id, name: f.name }) }
+// D1: populate preselect from the firing's saved schedule, then open modal
+function fireAgain(f) {
+  const points = (f.schedule ?? []).map(p => ({
+    offsetMinutes: p.offset_minutes,
+    targetTemp:    p.target_temp,
+  }))
+  preselect.value = { name: f.name, schedulePoints: points }
+  openStartModal()
+}
+
 function saveAsSchedule(f) { router.push(`/schedules/new?fromFiring=${f.id}`) }
 
 async function pauseFiring() {
@@ -487,7 +516,7 @@ async function deleteFiring(f) {
   await refreshFirings()
 }
 
-async function openStartModal(opts) {
+async function openStartModal() {
   if (!library.value.length) library.value = await $fetch('/api/library')
   showStartModal.value = true
 }

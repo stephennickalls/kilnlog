@@ -117,6 +117,7 @@ const props = defineProps({
   open:        Boolean,
   library:     { type: Array, default: () => [] },
   pastFirings: { type: Array, default: () => [] },
+  preselect:   { type: Object, default: null },  // { name?, schedulePoints }
 })
 
 const emit = defineEmits(['close', 'create'])
@@ -200,14 +201,25 @@ const form = reactive({
 
 watch(() => props.open, (val) => {
   if (val) {
-    form.name            = ''
-    form.notes           = ''
-    form.schedulePoints  = BISQUE_POINTS.map(p => ({ ...p }))
-    quickType.value         = 'bisque'
-    selectedLibraryId.value = null
-    selectedPastId.value    = null
-    appliedLabel.value      = ''
-    loadingPast.value       = false
+    if (props.preselect) {
+      form.name           = props.preselect.name ?? ''
+      form.notes          = ''
+      form.schedulePoints = (props.preselect.schedulePoints ?? []).map(p => ({ ...p }))
+      quickType.value         = null
+      selectedLibraryId.value = null
+      selectedPastId.value    = null
+      appliedLabel.value      = props.preselect.name ?? ''
+      loadingPast.value       = false
+    } else {
+      form.name            = ''
+      form.notes           = ''
+      form.schedulePoints  = BISQUE_POINTS.map(p => ({ ...p }))
+      quickType.value         = 'bisque'
+      selectedLibraryId.value = null
+      selectedPastId.value    = null
+      appliedLabel.value      = ''
+      loadingPast.value       = false
+    }
   }
 })
 

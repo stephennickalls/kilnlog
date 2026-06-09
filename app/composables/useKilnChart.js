@@ -1,15 +1,33 @@
 // app/composables/useKilnChart.js
 
+import { nextTick } from 'vue'
 import { Chart, registerables } from 'chart.js'
+
 Chart.register(...registerables)
 
-let zoomPluginRegistered = false
+// ── Zoom plugin: browser-only, lazy registration ──────────────────────────────
+// chartjs-plugin-zoom depends on hammerjs, which references `window` at module
+// load — so a static top-level import crashes SSR. We register it lazily on the
+// first init(), guarded by import.meta.client. Crucially this keeps the module
+// SYNCHRONOUS (no top-level await): a top-level await turns the composable into
+// an async module, which shifts Nuxt's <Suspense> mount timing so onMounted can
+// fire before the canvas ref resolves ("init() called with no canvas ref").
+// Registering inside the awaited init() avoids that entirely.
+let zoomReady = false
+let zoomRegisterPromise = null
 
-async function ensureZoomPlugin() {
-  if (zoomPluginRegistered) return
-  const { default: zoomPlugin } = await import('chartjs-plugin-zoom')
-  Chart.register(zoomPlugin)
-  zoomPluginRegistered = true
+function ensureZoomPlugin() {
+  if (zoomReady) return Promise.resolve()
+  if (!import.meta.client) return Promise.resolve()        // never on server
+  if (zoomRegisterPromise) return zoomRegisterPromise
+  zoomRegisterPromise = import('chartjs-plugin-zoom')
+    .then(({ default: zoomPlugin }) => {
+      Chart.register(zoomPlugin)
+      zoomReady = true
+      console.debug('[useKilnChart] zoom plugin registered (lazy)')
+    })
+    .catch(err => console.error('[useKilnChart] FAILED to register zoom plugin:', err))
+  return zoomRegisterPromise
 }
 
 // ── Inline label plugin ───────────────────────────────────────────────────────
@@ -58,52 +76,32 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
   let chart = null
   let xMax  = 120
 
-  // Remember the latest data pushed in, so if we have to rebuild the chart
-  // (e.g. Vue recreated the canvas during a long session) we can restore it.
   let lastSchedule = { points: [], offset: 0 }
   let lastReadings = { rows: [], startedAt: 0 }
 
-  // True only when `chart` exists AND is still bound to the canvas that is
-  // currently in the DOM. Over a long session Vue can tear down and recreate
-  // the <canvas> (v-if branches flipping, etc.), leaving the Chart.js instance
-  // pointing at a detached element — it goes unresponsive and the surrounding
-  // controls (reset button) blink out. We detect that and rebuild.
   function isAlive() {
     if (!chart || !canvasRef.value) return false
-    // chart.canvas is the element Chart.js is actually drawing to.
     if (chart.canvas !== canvasRef.value) return false
-    // If the canvas is no longer in the document, it's detached.
     if (!canvasRef.value.isConnected) return false
     return true
   }
 
-  // Guard run at the top of every mutating call. If the chart died, rebuild it
-  // synchronously and replay the last schedule/readings so nothing is lost.
-  // Returns false if we genuinely can't draw yet (no canvas in DOM).
   function ensureAlive() {
     if (isAlive()) return true
     if (!canvasRef.value || !canvasRef.value.isConnected) return false
+    console.debug('[useKilnChart] chart not alive — rebuilding')
     rebuild()
     return isAlive()
   }
 
-  // Synchronous rebuild — assumes the zoom plugin is already registered
-  // (it always is after the first init()).
   function rebuild() {
     try { chart?.destroy() } catch {}
     chart = null
     buildChart()
-    // Replay data
     if (lastSchedule.points.length) setSchedule(lastSchedule.points, lastSchedule.offset)
     if (lastReadings.rows.length)   setReadings(lastReadings.rows, lastReadings.startedAt)
   }
 
-  // ── Auto-fit y-axis to the visible data range ─────────────────────────────
-  // Instead of always showing 0–1500, we look at what's actually plotted and
-  // give it 15% headroom above and a 50°C floor below, so the curve fills the
-  // chart area rather than sitting in a thin strip at the bottom.
-  // During the flat early stage (all points < 300°C) this is especially
-  // important — without it a 129°C reading is invisible on a 1500°C axis.
   function autoFitY() {
     if (!chart) return
     const allPoints = [
@@ -116,7 +114,6 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     const dataMax = Math.max(...allPoints)
     const dataMin = Math.min(...allPoints)
 
-    // Always show at least a 200°C window so low-temp early stages look right.
     const range      = Math.max(dataMax - dataMin, 200)
     const headroom   = range * 0.15
     const yMax       = Math.min(Math.ceil(dataMax + headroom), 1500)
@@ -127,9 +124,21 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     chart.options.scales.y.max          = yMax
   }
 
+  // Async: awaits zoom plugin registration before the first build. The caller
+  // already does `await init()`, so this slots in cleanly.
   async function init() {
-    if (!canvasRef.value) return
     await ensureZoomPlugin()
+    // The canvas ref may not be populated on the exact tick onMounted runs
+    // (Suspense / async-component timing). Wait one tick and re-check rather
+    // than bailing — buildChart still guards on canvasRef.value internally.
+    if (!canvasRef.value) {
+      await nextTick()
+    }
+    if (!canvasRef.value) {
+      console.warn('[useKilnChart] init() — canvas ref still null after nextTick; skipping build')
+      return
+    }
+    console.debug('[useKilnChart] init() — zoomReady?', zoomReady, '| canvas present')
     buildChart()
   }
 
@@ -251,7 +260,7 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
             ticks: { color: '#a8a29e', maxTicksLimit: showLabels ? 4 : 6 },
             grid:  { color: '#f5f5f4' },
             min: 0,
-            max: 300,           // sensible initial ceiling — autoFitY takes over
+            max: 300,
             suggestedMax: 300,
           },
         },
@@ -259,6 +268,12 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     }
 
     chart = new Chart(canvasRef.value, config)
+
+    const zoomPluginRegistered = !!Chart.registry.plugins.get('zoom')
+    const zoomOptsOnChart       = !!chart.options?.plugins?.zoom
+    console.debug('[useKilnChart] chart built — zoom plugin registered?', zoomPluginRegistered,
+                  '| zoom opts present on chart?', zoomOptsOnChart,
+                  '| enableZoom flag?', enableZoom)
   }
 
   function setSchedule(points, offset = 0) {
@@ -350,9 +365,6 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     chart.update('none')
   }
 
-  // Force a re-measure of the canvas against its container. Call after the
-  // canvas remounts into a freshly laid-out container (state switch) so
-  // Chart.js doesn't keep a stale (squished) size.
   function resize() {
     if (!ensureAlive()) return
     try { chart.resize() } catch {}

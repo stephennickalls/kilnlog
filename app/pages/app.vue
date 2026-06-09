@@ -86,9 +86,11 @@
             />
           </div>
 
-          <!-- Chart (shared, responsive) -->
+          <!-- Chart (shared, responsive) — faint celadon chart-ground behind the
+               transparent canvas ties it into the palette without fighting the
+               orange Actual line. -->
           <div class="flex-1 relative min-h-0 p-3 pt-2 sm:p-5 sm:pt-4 flex flex-col">
-            <div class="flex-1 min-h-0 bg-white rounded-xl border border-parchment-3 relative" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
+            <div class="flex-1 min-h-0 rounded-xl border border-parchment-3 relative" style="box-shadow:0 2px 12px rgba(58,30,8,0.06); background: linear-gradient(to right, rgba(95,138,120,0.07) 1px, transparent 1px) 0 0 / 12.5% 100%, linear-gradient(to bottom, rgba(95,138,120,0.07) 1px, transparent 1px) 0 0 / 100% 25%, #fcfdfc;">
               <canvas ref="chartCanvas" class="absolute inset-0 w-full h-full"/>
               <button class="absolute bottom-2 right-2 sm:bottom-4 sm:right-4 px-2.5 py-1.5 text-xs font-medium border border-parchment-3 rounded-lg bg-white text-ink-muted hover:bg-parchment transition-colors" @click="resetZoom">Reset zoom</button>
               <div v-if="isLive && !selectedFiring?.readings?.length" class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-ink-muted pointer-events-none px-6 text-center">
@@ -215,7 +217,7 @@
         <div
           v-if="toast.visible.value"
           class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-semibold font-serif max-w-sm w-[calc(100%-2rem)]"
-          :class="toast.type.value === 'error' ? 'bg-red-600 text-white' : 'bg-green-600 text-white'"
+          :class="toast.type.value === 'error' ? 'bg-red-600 text-white' : 'bg-celadon-dark text-white'"
         >
           <span class="flex-1">{{ toast.message.value }}</span>
           <button class="shrink-0 opacity-75 hover:opacity-100" @click="toast.hide()">
@@ -262,8 +264,6 @@ const nowUnix              = ref(Math.floor(Date.now() / 1000))
 
 let elapsedTickInterval = null
 
-// Single responsive chart — the old separate mobile canvas is gone; FiringConsole
-// is responsive so one chart serves all breakpoints.
 const { init, setSchedule, setReadings, resetZoom, resize, destroy } = useKilnChart(chartCanvas, {
   enableZoom: true,
   showLabels: true,
@@ -280,7 +280,6 @@ const pastFirings  = computed(() => allFirings.value.filter(f => f.ended_at).sor
 const { duration, readingCount, elapsed, rateOfChange, targetRate, targetTemp }
   = useFiringStats(selectedFiring, nowUnix)
 
-// Peak temp of the selected firing's actual readings (for the review summary).
 const peakTemp = computed(() => {
   const rs = selectedFiring.value?.readings
   if (!rs?.length) return null
@@ -300,8 +299,6 @@ onMounted(async () => {
   if (activeFiring.value) await selectFiring(activeFiring.value)
   document.addEventListener('visibilitychange', onVisibilityChange)
   window.addEventListener('resize', onWindowResize)
-  // Belt-and-suspenders: after first paint settles, force a re-measure in case
-  // the canvas container hadn't resolved its height when the chart first built.
   requestAnimationFrame(() => requestAnimationFrame(() => resize()))
 })
 
@@ -312,7 +309,6 @@ onUnmounted(() => {
   window.removeEventListener('resize', onWindowResize)
 })
 
-// Debounced chart re-measure on viewport changes (rotation, window resize).
 let resizeRaf = null
 function onWindowResize() {
   if (resizeRaf) cancelAnimationFrame(resizeRaf)
@@ -352,9 +348,6 @@ async function refreshFirings() {
   allFirings.value = await $fetch('/api/firings')
 }
 
-// selectFiring accepts an optional `preloaded` firing. When the caller already
-// has a full firing object (with schedule + readings), we use it directly and
-// skip the GET — removes a round-trip AND the stale-read race on restart.
 async function selectFiring(f, preloaded = null) {
   stopAllIntervals()
   isLive.value = false
@@ -368,12 +361,9 @@ async function selectFiring(f, preloaded = null) {
   }
 
   selectedFiring.value = data
-  await nextTick()                                   // ensure canvas is mounted for this state
+  await nextTick()
   setSchedule(data.schedule ?? [], data.schedule_offset ?? 0)
   setReadings(data.readings ?? [], data.started_at)
-  // The canvas may have just remounted into a container whose height wasn't
-  // settled when Chart.js first measured it (state switch). Re-measure on the
-  // next frame so it fills the area instead of staying squished.
   requestAnimationFrame(() => resize())
 
   if (data.readings?.length) {
@@ -398,8 +388,8 @@ async function createFiring(payload) {
   const firing = await $fetch('/api/firings', { method: 'POST', body: payload })
   await $fetch(`/api/firings/${firing.id}`, { method: 'PUT', body: { startedAt: Math.floor(Date.now() / 1000) } })
   showStartModal.value = false
-  refreshFirings()                          // background — don't block the UI
-  await selectFiring({ id: firing.id })     // fresh firing: fetch full record
+  refreshFirings()
+  await selectFiring({ id: firing.id })
 }
 
 async function confirmEndFiring() {
@@ -435,8 +425,6 @@ async function restartFiring(f) {
 }
 
 // ── Repeatability actions (FiringReview) ──────────────────────────────────────
-// Stubs wired to upcoming features. "Fire again" reuses this firing's schedule;
-// "Save as schedule" routes to the generate flow.
 function fireAgain(f) {
   openStartModal({ fromFiringId: f.id, name: f.name })
 }
@@ -508,7 +496,6 @@ async function deleteFiring(f) {
 
 async function openStartModal(opts) {
   if (!library.value.length) library.value = await $fetch('/api/library')
-  // opts may carry { fromFiringId, name } when invoked from "Fire this again".
   showStartModal.value = true
 }
 

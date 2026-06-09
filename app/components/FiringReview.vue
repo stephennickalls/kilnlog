@@ -4,6 +4,10 @@
   plus the repeatability actions. "Fire again" and "Save as schedule" are
   the headline features; Restart picks the exact firing back up.
   `canRestart` is false when another firing is already active.
+
+  "Save as schedule" is celadon — it's the act that turns a good firing into a
+  repeatable plan (the product's heart), so it visually echoes the schedules
+  world it creates. "Fire this again" stays flame (immediate); Restart stays quiet.
 -->
 <template>
   <div class="bg-white border border-parchment-3 rounded-2xl px-4 py-3 sm:px-6 sm:py-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-5" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
@@ -23,7 +27,7 @@
       <button class="col-span-2 sm:col-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-flame hover:bg-flame-dark text-parchment text-sm font-bold rounded-xl transition-colors" @click="$emit('fire-again', firing)">
         🔥 Fire this again
       </button>
-      <button class="flex items-center justify-center gap-2 px-4 py-2.5 border border-parchment-3 text-ink-muted hover:bg-parchment-2 text-sm font-semibold rounded-xl transition-colors" @click="$emit('save-as-schedule', firing)">
+      <button class="flex items-center justify-center gap-2 px-4 py-2.5 border border-celadon/30 bg-celadon-bg text-celadon-dark hover:bg-celadon hover:text-parchment text-sm font-bold rounded-xl transition-colors" @click="$emit('save-as-schedule', firing)">
         ✨ Save as schedule
       </button>
       <button

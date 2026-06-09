@@ -1,26 +1,18 @@
 <!-- app/components/FiringConsole.vue -->
 <!--
-  Live firing console, built around the current-vs-target comparison (the
-  thing potters read most). Current and target are paired as equals with the
-  delta as a prominent pill; delta colour encodes state (blue=behind,
-  amber=ahead, green=on track) so the colour alone tells the story.
-
-  Desktop/tablet (sm+): one compact row — [current → target  Δ] | rate/readings | Log | ⋯
-  Mobile: a single tight strip — pairing + tiny metric rail + Log bar + ⋯.
-
-  No-target fallback (no schedule / not started): Current shown alone, no
-  arrow/delta, so the layout never looks broken.
+  Live firing console, built around the current-vs-target comparison. Delta colour
+  encodes state (blue=behind, amber=ahead, CELADON=on track). On-track uses celadon
+  (the pottery "good result" accent) rather than generic green — same green-family
+  meaning, warmer and on-brand. Desktop (lg+): compact row. Below lg: tight strip.
 -->
 <template>
   <div class="flex flex-col gap-2">
 
-    <!-- ─────────────── Desktop / tablet ─────────────── -->
-    <div class="hidden sm:flex gap-2 items-stretch">
+    <!-- ─────────────── Desktop (lg+) ─────────────── -->
+    <div class="hidden lg:flex gap-2 items-stretch">
 
-      <!-- Hero: current → target + delta, single row -->
       <div class="bg-white border border-parchment-3 rounded-xl flex items-center gap-5 px-5 py-2" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
         <button class="flex items-end gap-5 text-left" @click="$emit('open-temp')">
-          <!-- Current -->
           <div>
             <div class="text-[10px] font-semibold uppercase tracking-widest text-ink-faint">Current</div>
             <div class="flex items-baseline gap-1">
@@ -28,7 +20,6 @@
               <span class="text-sm font-medium" :class="currentTemp !== null ? currentColorClass : 'text-parchment-4'">°C</span>
             </div>
           </div>
-          <!-- Arrow + Target (only when a target exists) -->
           <template v-if="targetTemp !== null">
             <svg class="w-4 h-4 mb-1.5 shrink-0" :class="delta ? delta.textClass : 'text-ink-faint'" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
             <div>
@@ -41,13 +32,11 @@
           </template>
         </button>
 
-        <!-- Delta pill -->
         <div v-if="delta" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-sm font-bold shrink-0" :class="delta.class">
           <span>{{ delta.icon }}</span> {{ delta.label }}
         </div>
       </div>
 
-      <!-- Rate + Readings, one card -->
       <div class="bg-white border border-parchment-3 rounded-xl px-3 py-2 flex flex-col justify-center w-36 shrink-0" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
         <div class="flex items-center justify-between">
           <span class="text-[10px] font-semibold uppercase tracking-wide text-ink-faint">Rate act</span>
@@ -63,16 +52,13 @@
         </div>
       </div>
 
-      <!-- Log -->
       <button v-if="isLive" class="w-28 shrink-0 bg-flame hover:bg-flame-dark active:bg-flame-dark text-parchment rounded-xl flex flex-col items-center justify-center gap-1 transition-colors" @click="$emit('log-reading')">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
         <span class="text-xs font-bold uppercase tracking-wide">Log reading</span>
       </button>
 
-      <!-- Spacer pushes ⋯ to the far edge -->
       <div class="flex-1"/>
 
-      <!-- ⋯ -->
       <div class="relative shrink-0 flex">
         <button class="bg-white border border-parchment-3 rounded-xl flex items-center justify-center w-11 text-ink-muted hover:text-ink hover:border-flame/40 transition-colors" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)" @click="menuOpen = !menuOpen">
           <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
@@ -91,10 +77,9 @@
       </div>
     </div>
 
-    <!-- ─────────────── Mobile ─────────────── -->
-    <div class="sm:hidden bg-white border border-parchment-3 rounded-2xl flex items-stretch overflow-hidden" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
+    <!-- ─────────────── Compact (below lg) ─────────────── -->
+    <div class="lg:hidden bg-white border border-parchment-3 rounded-2xl flex items-stretch overflow-hidden" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
       <button class="flex-1 min-w-0 px-3 py-2.5 text-left" @click="$emit('open-temp')">
-        <!-- pairing -->
         <div class="flex items-end gap-2.5">
           <div class="flex items-baseline gap-0.5">
             <span class="text-4xl font-bold tabular-nums leading-none transition-colors" :class="currentColorClass">{{ currentTemp !== null ? Math.round(currentTemp) : '—' }}</span>
@@ -109,7 +94,6 @@
             <span v-if="delta" class="mb-1 inline-flex items-center gap-0.5 text-[11px] font-bold" :class="delta.textClass">{{ delta.icon }}{{ delta.short }}</span>
           </template>
         </div>
-        <!-- metric rail -->
         <div class="flex gap-3.5 mt-1.5">
           <span class="text-[11px] text-ink-muted">Rate <b class="font-bold" :class="rateColorClass">{{ rateShort }}</b><span class="text-ink-faint">/{{ targetRate }}</span></span>
           <span class="text-[11px] text-ink-muted">Readings <b class="font-bold text-ink">{{ readingCount }}</b></span>
@@ -171,34 +155,31 @@ function parseRate(str) {
   return isFinite(n) ? n : null
 }
 
+// On-track rate reads celadon (the pottery "good" accent); behind=blue, ahead=amber.
 const rateColorClass = computed(() => {
   const actual = parseRate(props.rateOfChange)
   const target = parseRate(props.targetRate)
   if (actual === null) return 'text-ink-faint'
-  if (target === null) return 'text-green-600'
+  if (target === null) return 'text-celadon'
   const diff = actual - target
   if (diff > 1.5)  return 'text-amber-600'
   if (diff < -1.5) return 'text-blue-600'
-  return 'text-green-600'
+  return 'text-celadon'
 })
 
 const rateShort = computed(() => (props.rateOfChange ?? '—').replace('°/m', ''))
 
-// Current temp colour tracks the delta state — flame when no target yet, then
-// blue (behind) / amber (ahead) / green (on track). The number itself signals
-// state at a glance, matching the delta pill and rate colours.
 const currentColorClass = computed(() => {
   if (props.currentTemp === null) return 'text-parchment-4'
   if (!delta.value) return 'text-flame'
   return delta.value.textClass
 })
 
-// Delta between current and target temperature — the headline comparison.
 const delta = computed(() => {
   if (props.currentTemp === null || props.targetTemp === null) return null
   const d = Math.round(props.currentTemp - props.targetTemp)
   const abs = Math.abs(d)
-  if (abs <= 15) return { icon: '✓', label: 'On track', short: 'on track', class: 'bg-green-50 text-green-700', textClass: 'text-green-600' }
+  if (abs <= 15) return { icon: '✓', label: 'On track', short: 'on track', class: 'bg-celadon-bg text-celadon-dark', textClass: 'text-celadon' }
   if (d > 15)    return { icon: '↑', label: `${abs}° ahead`, short: `${abs}°`, class: 'bg-amber-50 text-amber-700', textClass: 'text-amber-600' }
   return { icon: '↓', label: `${abs}° behind`, short: `${abs}°`, class: 'bg-blue-50 text-blue-700', textClass: 'text-blue-600' }
 })

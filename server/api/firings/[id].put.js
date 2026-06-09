@@ -23,9 +23,12 @@ export default defineEventHandler(async (event) => {
   if (body.scheduleOffset !== undefined) updates.schedule_offset = body.scheduleOffset ?? 0
   if ('pausedAt' in body)                updates.paused_at       = body.pausedAt ?? null
 
-  // Clearing ended_at (a restart) also clears the auto-ended flag.
+  // Clearing ended_at (a restart) also clears the auto-ended flag and stamps
+  // restarted_at, so the list route's auto-ender exempts this firing until the
+  // user logs a fresh reading (its existing readings are all stale by now).
   if ('endedAt' in body && body.endedAt === null) {
-    updates.auto_ended = false
+    updates.auto_ended   = false
+    updates.restarted_at = Math.floor(Date.now() / 1000)
   }
 
   const { data, error } = await db

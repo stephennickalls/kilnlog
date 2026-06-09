@@ -350,10 +350,19 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     chart.update('none')
   }
 
+  // Force a re-measure of the canvas against its container. Call after the
+  // canvas remounts into a freshly laid-out container (state switch) so
+  // Chart.js doesn't keep a stale (squished) size.
+  function resize() {
+    if (!ensureAlive()) return
+    try { chart.resize() } catch {}
+    chart.update('none')
+  }
+
   function destroy() {
     try { chart?.destroy() } catch {}
     chart = null
   }
 
-  return { init, setSchedule, setReadings, setManualMode, setSignalLost, clearSignalLost, resetZoom, destroy }
+  return { init, setSchedule, setReadings, setManualMode, setSignalLost, clearSignalLost, resetZoom, resize, destroy }
 }

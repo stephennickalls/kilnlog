@@ -3,8 +3,11 @@
 // On each call, checks for stale active firings and auto-ends them:
 //   No readings for 2 hours, OR
 //   Started but never had a reading, and started > 1 hour ago.
-// Paused firings (paused_at set) are EXEMPT — the user deliberately suspended
-// them, so the reading gap is intentional.
+// EXEMPT from auto-end:
+//   - Paused firings (paused_at set) — the user deliberately suspended them.
+//   - Just-restarted firings whose only readings predate the restart — they
+//     pick up where they left off; normal staleness resumes once a fresh
+//     reading is logged after restarted_at.
 
 const TWO_HOURS = 2 * 60 * 60
 const ONE_HOUR  = 1 * 60 * 60
@@ -15,7 +18,7 @@ export default defineEventHandler(async (event) => {
   const { data: activeFirings, error: activeError } = await db
     .from('firings')
     .select(`
-      id, started_at, paused_at,
+      id, started_at, paused_at, restarted_at,
       readings:readings(timestamp)
     `)
     .eq('user_id', user.id)
@@ -34,6 +37,11 @@ export default defineEventHandler(async (event) => {
     const lastTs = readings.length
       ? readings.reduce((max, r) => r.timestamp > max ? r.timestamp : max, readings[0].timestamp)
       : null
+
+    // A just-restarted firing has only stale readings (all older than the
+    // restart). Exempt it until the user logs a fresh reading — then the
+    // normal staleness rules resume from that reading onward.
+    if (firing.restarted_at && (lastTs === null || lastTs < firing.restarted_at)) continue
 
     if (lastTs === null) {
       if (now - firing.started_at > ONE_HOUR) toAutoEnd.push(firing.id)

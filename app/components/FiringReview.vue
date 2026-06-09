@@ -1,0 +1,61 @@
+<!-- app/components/FiringReview.vue -->
+<!--
+  Shown when an ENDED firing is selected. Read-only review: a summary line
+  plus the repeatability actions. "Fire again" and "Save as schedule" are
+  the headline features; Restart picks the exact firing back up.
+  `canRestart` is false when another firing is already active.
+-->
+<template>
+  <div class="bg-white border border-parchment-3 rounded-2xl px-4 py-3 sm:px-6 sm:py-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-5" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
+
+    <!-- Summary -->
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-2">
+        <span class="text-[10px] sm:text-xs font-semibold uppercase tracking-widest text-ink-faint">Finished firing</span>
+        <span v-if="firing.auto_ended" class="text-[10px] px-1.5 py-0.5 rounded bg-parchment-2 text-ink-faint border border-parchment-3">auto-ended</span>
+      </div>
+      <p class="text-base sm:text-xl font-bold text-ink truncate mt-0.5">{{ firing.name }}</p>
+      <p class="text-xs sm:text-sm text-ink-muted mt-0.5">{{ summary }}</p>
+    </div>
+
+    <!-- Actions -->
+    <div class="grid grid-cols-2 sm:flex gap-2 shrink-0">
+      <button class="col-span-2 sm:col-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-flame hover:bg-flame-dark text-parchment text-sm font-bold rounded-xl transition-colors" @click="$emit('fire-again', firing)">
+        🔥 Fire this again
+      </button>
+      <button class="flex items-center justify-center gap-2 px-4 py-2.5 border border-parchment-3 text-ink-muted hover:bg-parchment-2 text-sm font-semibold rounded-xl transition-colors" @click="$emit('save-as-schedule', firing)">
+        ✨ Save as schedule
+      </button>
+      <button
+        class="flex items-center justify-center gap-2 px-4 py-2.5 border border-parchment-3 text-ink-muted hover:bg-parchment-2 text-sm font-semibold rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        :disabled="!canRestart"
+        :title="canRestart ? '' : 'End the active firing first'"
+        @click="$emit('restart', firing)"
+      >
+        ↺ Restart
+      </button>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { computed } from 'vue'
+
+const props = defineProps({
+  firing:     { type: Object, required: true },
+  canRestart: { type: Boolean, default: true },
+  peakTemp:   { type: Number, default: null },
+  duration:   { type: String, default: null },
+})
+
+const summary = computed(() => {
+  const parts = []
+  if (props.peakTemp !== null) parts.push(`Peak ${Math.round(props.peakTemp)}°`)
+  if (props.duration)          parts.push(props.duration)
+  const n = props.firing.readings?.length
+  if (n) parts.push(`${n} reading${n === 1 ? '' : 's'}`)
+  return parts.join(' · ') || 'No readings logged'
+})
+
+defineEmits(['fire-again', 'save-as-schedule', 'restart'])
+</script>

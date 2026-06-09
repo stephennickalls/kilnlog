@@ -12,29 +12,11 @@
       </div>
       <div class="flex items-center gap-2 min-w-0">
         <template v-if="selectedFiring">
-          <span class="text-xs sm:text-sm font-semibold text-ink truncate max-w-[90px] sm:max-w-none">{{ selectedFiring.name }}</span>
-          <span v-if="isLive" class="px-2 py-0.5 text-xs font-bold rounded-full bg-blue-100 text-blue-700 border border-blue-200 shrink-0">● ACTIVE</span>
+          <span class="text-xs sm:text-sm font-semibold text-ink truncate max-w-[120px] sm:max-w-none">{{ selectedFiring.name }}</span>
+          <span v-if="isLive && !isPaused" class="px-2 py-0.5 text-xs font-bold rounded-full bg-blue-100 text-blue-700 border border-blue-200 shrink-0">● ACTIVE</span>
+          <span v-else-if="isPaused" class="px-2 py-0.5 text-xs font-bold rounded-full bg-amber-100 text-amber-700 border border-amber-200 shrink-0">⏸ PAUSED</span>
           <span v-else-if="!selectedFiring.ended_at" class="px-2 py-0.5 text-xs font-bold rounded-full bg-amber-100 text-amber-700 border border-amber-200 shrink-0">⏳</span>
           <span v-else class="px-2 py-0.5 text-xs font-bold rounded-full bg-parchment-2 text-ink-faint border border-parchment-3 shrink-0">DONE</span>
-          <template v-if="activeFiring && selectedFiring.id === activeFiring.id">
-            <button v-if="isLive && !isPaused" class="hidden sm:flex shrink-0 items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-lg border border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 transition-colors" @click="pauseFiring">⏸ Pause</button>
-            <button v-if="isPaused" class="hidden sm:block shrink-0 px-3 py-1.5 text-xs font-bold rounded-lg bg-flame hover:bg-flame-dark text-parchment transition-colors" @click="resumeFiring">▶ Resume</button>
-            <div v-if="isLive && !isPaused" class="relative shrink-0 hidden sm:block">
-              <button class="flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-lg border border-flame/40 text-flame bg-flame-bg hover:bg-flame/10 transition-colors" @click="showRecalibrateInfo = !showRecalibrateInfo">
-                ↻ Recalibrate
-                <svg class="w-3 h-3 opacity-60" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-              </button>
-              <div v-if="showRecalibrateInfo" class="absolute right-0 top-full mt-2 w-72 z-50 bg-white border border-parchment-3 rounded-xl p-3 text-left" style="box-shadow:0 4px 20px rgba(58,30,8,0.12)">
-                <p class="text-xs font-bold text-ink mb-1">When to recalibrate</p>
-                <p class="text-xs text-ink-muted leading-relaxed">Use this when your kiln has fallen behind the planned curve — a weak burner, a stall, or after a gas-out. It slides the rest of your schedule to start from your <strong>current temperature</strong>, keeping every ramp rate intact. Your firing just finishes later.</p>
-                <div class="flex gap-2 mt-3">
-                  <button class="flex-1 py-1.5 bg-flame hover:bg-flame-dark text-parchment text-xs font-bold rounded-lg transition-colors" @click="recalibrate">Recalibrate now</button>
-                  <button class="px-3 py-1.5 border border-parchment-3 text-ink-muted text-xs font-semibold rounded-lg hover:bg-parchment-2 transition-colors" @click="showRecalibrateInfo = false">Cancel</button>
-                </div>
-              </div>
-            </div>
-            <button class="btn-danger !px-3 !py-1.5 !text-xs shrink-0 hidden sm:block" @click="endFiring">End</button>
-          </template>
         </template>
         <UserMenu />
       </div>
@@ -61,148 +43,96 @@
       <!-- Main content -->
       <main class="flex-1 flex flex-col min-w-0 overflow-hidden">
 
-        <!-- Desktop stats bar -->
-        <div class="hidden sm:block p-5 pb-0">
-          <FiringStatsBar
-            v-if="selectedFiring && !selectedFiring.ended_at"
-            :target-temp="targetTemp"
-            :target-rate="targetRate"
-            :duration="duration"
-            :rate-of-change="rateOfChange"
-            :elapsed="elapsed"
-            :reading-count="readingCount"
-            :is-live="isLive"
-            :current-temp="currentTemp"
-            @open-temp="showTempModal = true"
-            @log-reading="openLogReading"
-          />
-          <div v-else-if="selectedFiring?.ended_at && !activeFiring" class="flex items-center gap-3 px-1 py-1">
-            <span class="text-sm text-ink-muted">This firing has ended.</span>
-            <button class="flex items-center gap-2 px-4 py-1.5 bg-flame hover:bg-flame-dark text-parchment text-sm font-bold rounded-lg transition-colors" @click="restartFiring(selectedFiring)">↺ Restart firing</button>
-          </div>
-        </div>
+        <!-- ── Empty state — nothing selected ── -->
+        <FiringEmptyState
+          v-if="!selectedFiring"
+          :recent-firing="pastFirings[0] ?? null"
+          @start="openStartModal"
+          @browse-schedules="goToSchedules"
+          @select-recent="selectFiring"
+        />
 
-        <!-- Desktop chart -->
-        <div class="hidden sm:flex flex-1 bg-white rounded-xl border border-parchment-3 relative items-center justify-center min-h-0 sm:m-5 sm:mt-4" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
-          <canvas ref="chartCanvas" class="w-full h-full"/>
-          <button v-if="selectedFiring" class="absolute bottom-4 right-4 px-3 py-1.5 text-xs font-medium border border-parchment-3 rounded-lg bg-white text-ink-muted hover:bg-parchment transition-colors" @click="resetZoom">Reset zoom</button>
-          <div v-if="isLive && !selectedFiring?.readings?.length" class="absolute flex flex-col items-center gap-2 text-ink-muted pointer-events-none">
-            <p class="text-sm">Use <strong>Log Reading</strong> to record your first temperature</p>
-          </div>
-          <div v-else-if="!selectedFiring" class="absolute flex flex-col items-center gap-3 text-ink-muted">
-            <p class="text-sm">Select a firing from the sidebar or start a new one</p>
-          </div>
-          <div v-if="isPaused" class="absolute top-4 left-1/2 -translate-x-1/2 flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold">
-            ⏸ Paused — resume when your kiln is firing again
-          </div>
-        </div>
+        <!-- ── A firing is selected ── -->
+        <template v-else>
 
-        <!-- Mobile view -->
-        <div class="flex flex-col flex-1 sm:hidden overflow-hidden">
-
-          <!-- No firing -->
-          <div v-if="!selectedFiring" class="flex-1 flex flex-col items-center justify-center gap-4 px-8 text-center">
-            <p class="text-ink-muted text-sm">No firing selected</p>
-            <button class="btn-primary px-6 py-3" @click="openStartModal">+ Start firing</button>
-            <button class="text-sm text-flame" @click="showFiringSheet = true">View past firings</button>
+          <!-- Console (live) or Review (ended) -->
+          <div class="shrink-0 p-3 sm:p-5 sm:pb-0">
+            <FiringConsole
+              v-if="!selectedFiring.ended_at"
+              ref="consoleRef"
+              :current-temp="currentTemp"
+              :target-temp="targetTemp"
+              :rate-of-change="rateOfChange"
+              :target-rate="targetRate"
+              :reading-count="readingCount"
+              :is-live="isLive"
+              :is-paused="isPaused"
+              @open-temp="showTempModal = true"
+              @log-reading="openLogReading"
+              @pause="pauseFiring"
+              @resume="resumeFiring"
+              @recalibrate="openRecalibrate"
+              @end="showEndConfirm = true"
+            />
+            <FiringReview
+              v-else
+              :firing="selectedFiring"
+              :can-restart="!activeFiring"
+              :peak-temp="peakTemp"
+              :duration="duration"
+              @fire-again="fireAgain"
+              @save-as-schedule="saveAsSchedule"
+              @restart="restartFiring"
+            />
           </div>
 
-          <!-- Firing selected -->
-          <template v-else>
-
-            <!-- ── Mobile stats row ── -->
-            <div class="shrink-0 px-2 pt-2 flex gap-1.5">
-              <!-- Current -->
-              <button class="flex-1 bg-white border border-parchment-3 rounded-lg py-2 px-2 flex flex-col items-center active:bg-flame-bg" @click="showTempModal = true">
-                <span class="text-[10px] text-ink-faint uppercase tracking-wide leading-none mb-0.5">Now</span>
-                <span class="text-2xl font-bold tabular-nums leading-none" :class="currentTemp !== null ? 'text-flame' : 'text-parchment-4'">
-                  {{ currentTemp !== null ? Math.round(currentTemp) : '—' }}
-                </span>
-                <span class="text-[10px] text-flame-light">°C</span>
-              </button>
-
-              <!-- Target temp -->
-              <div v-if="targetTemp !== null" class="flex-1 bg-white border border-parchment-3 rounded-lg py-2 px-2 flex flex-col items-center">
-                <span class="text-[10px] text-ink-faint uppercase tracking-wide leading-none mb-0.5">Target</span>
-                <span class="text-2xl font-bold tabular-nums leading-none text-ink-muted">{{ targetTemp }}</span>
-                <span class="text-[10px] text-ink-faint">°C</span>
-              </div>
-
-              <!-- Rate: act + tgt stacked -->
-              <div class="flex-1 bg-white border border-parchment-3 rounded-lg py-2 px-2 flex flex-col items-center justify-center">
-                <span class="text-[10px] text-ink-faint uppercase tracking-wide leading-none mb-1">Rate</span>
-                <div class="flex items-baseline gap-1">
-                  <span class="text-[9px] font-bold text-ink-faint uppercase">act</span>
-                  <span class="text-sm font-bold tabular-nums" :class="mobileRateColorClass">{{ rateOfChange }}</span>
-                </div>
-                <div class="flex items-baseline gap-1">
-                  <span class="text-[9px] font-bold text-ink-faint uppercase">tgt</span>
-                  <span class="text-sm font-bold tabular-nums text-ink-muted">{{ targetRate }}</span>
-                </div>
-              </div>
-
-              <!-- Actions column: Log + ⋯ -->
-              <div class="flex flex-col gap-1">
-                <button
-                  v-if="isLive"
-                  class="flex-1 bg-flame text-parchment rounded-lg px-3 flex flex-col items-center justify-center active:bg-flame-dark transition-colors"
-                  @click="openLogReading"
-                >
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-                  <span class="text-[9px] font-bold uppercase mt-0.5">Log</span>
-                </button>
-                <button
-                  class="flex-1 bg-white border border-parchment-3 rounded-lg px-3 flex flex-col items-center justify-center text-ink-muted active:bg-parchment-2"
-                  @click="showMobileMenu = !showMobileMenu"
-                >
-                  <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
-                </button>
+          <!-- Chart (shared, responsive) -->
+          <div class="flex-1 relative min-h-0 p-3 pt-2 sm:p-5 sm:pt-4 flex flex-col">
+            <div class="flex-1 min-h-0 bg-white rounded-xl border border-parchment-3 relative" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
+              <canvas ref="chartCanvas" class="absolute inset-0 w-full h-full"/>
+              <button class="absolute bottom-2 right-2 sm:bottom-4 sm:right-4 px-2.5 py-1.5 text-xs font-medium border border-parchment-3 rounded-lg bg-white text-ink-muted hover:bg-parchment transition-colors" @click="resetZoom">Reset zoom</button>
+              <div v-if="isLive && !selectedFiring?.readings?.length" class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-ink-muted pointer-events-none px-6 text-center">
+                <p class="text-sm">Use <strong>Log Reading</strong> to record your first temperature</p>
               </div>
             </div>
+          </div>
 
-            <!-- ── Mobile chart ── -->
-            <div class="flex-1 relative min-h-0 px-2 py-2 flex items-stretch">
-              <div class="flex-1 bg-white rounded-xl border border-parchment-3 relative" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
-                <canvas ref="chartCanvasMobile" class="w-full h-full"/>
-                <button class="absolute bottom-2 right-2 p-1.5 rounded-lg bg-white border border-parchment-3 text-ink-muted" @click="resetZoomMobile">
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7"/></svg>
-                </button>
-              </div>
-            </div>
-
-            <!-- ── Mobile overflow menu sheet ── -->
-            <Teleport to="body">
-              <div v-if="showMobileMenu" class="fixed inset-0 z-[60] flex items-end sm:hidden" style="background:rgba(26,18,8,0.5)" @click.self="showMobileMenu = false">
-                <div class="bg-parchment rounded-t-2xl w-full p-4 flex flex-col gap-2">
-                  <div class="w-10 h-1 bg-parchment-3 rounded-full mx-auto mb-2"/>
-
-                  <button v-if="isPaused" class="w-full py-3 bg-flame text-parchment text-sm font-bold rounded-xl active:bg-flame-dark" @click="resumeFiring(); showMobileMenu = false">▶ Resume firing</button>
-                  <button v-else-if="isLive" class="w-full py-3 border border-amber-300 bg-amber-50 text-amber-700 text-sm font-bold rounded-xl" @click="pauseFiring(); showMobileMenu = false">⏸ Pause</button>
-                  <button v-if="isLive && !isPaused" class="w-full py-3 border border-flame/40 bg-flame-bg text-flame text-sm font-bold rounded-xl" @click="showMobileMenu = false; showRecalibrateInfo = true">↻ Recalibrate</button>
-                  <button v-if="activeFiring && selectedFiring.id === activeFiring.id" class="w-full py-3 border border-red-300 text-red-500 text-sm font-bold rounded-xl" @click="endFiring(); showMobileMenu = false">End firing</button>
-                  <button v-if="!isLive && !activeFiring && selectedFiring?.ended_at" class="w-full py-3 bg-amber-500 text-white text-sm font-bold rounded-xl" @click="restartFiring(selectedFiring); showMobileMenu = false">↺ Restart firing</button>
-                  <button class="w-full py-2.5 border border-parchment-3 text-ink-muted text-sm font-semibold rounded-xl mt-1" @click="showMobileMenu = false">Cancel</button>
-                </div>
-              </div>
-            </Teleport>
-
-            <!-- Mobile recalibrate sheet -->
-            <Teleport to="body">
-              <div v-if="showRecalibrateInfo" class="fixed inset-0 z-[60] flex items-end sm:hidden" style="background:rgba(26,18,8,0.6)" @click.self="showRecalibrateInfo = false">
-                <div class="bg-parchment rounded-t-2xl w-full p-5 flex flex-col gap-3">
-                  <p class="text-sm font-bold text-ink">When to recalibrate</p>
-                  <p class="text-sm text-ink-muted leading-relaxed">Use this when your kiln has fallen behind the planned curve — a weak burner, a stall, or after a gas-out. It slides the rest of your schedule to start from your <strong>current temperature</strong>, keeping every ramp rate intact. Your firing just finishes later.</p>
-                  <button class="w-full py-3 bg-flame text-parchment text-sm font-bold rounded-lg active:bg-flame-dark transition-colors" @click="recalibrate">Recalibrate now</button>
-                  <button class="w-full py-2.5 border border-parchment-3 text-ink-muted text-sm font-semibold rounded-lg" @click="showRecalibrateInfo = false">Cancel</button>
-                </div>
-              </div>
-            </Teleport>
-
-          </template>
-        </div>
+        </template>
 
       </main>
     </div>
+
+    <!-- ── Recalibrate modal ─────────────────────────────────────────────────── -->
+    <Teleport to="body">
+      <div v-if="showRecalibrateInfo" class="fixed inset-0 z-[70] flex items-end sm:items-center justify-center" style="background:rgba(26,18,8,0.55)" @click.self="showRecalibrateInfo = false">
+        <div class="bg-parchment sm:bg-white w-full sm:w-80 sm:rounded-2xl rounded-t-2xl p-5 sm:border sm:border-parchment-3" style="box-shadow:0 -8px 40px rgba(26,18,8,0.15)">
+          <p class="text-sm font-bold text-ink mb-1.5">When to recalibrate</p>
+          <p class="text-sm text-ink-muted leading-relaxed">Use this when your kiln has fallen behind the planned curve — a weak burner, a stall, or after a gas-out. It slides the rest of your schedule to start from your <strong>current temperature</strong>, keeping every ramp rate intact. Your firing just finishes later.</p>
+          <div class="flex gap-2 mt-4">
+            <button class="flex-1 py-2.5 bg-flame hover:bg-flame-dark text-parchment text-sm font-bold rounded-lg transition-colors" @click="recalibrate">Recalibrate now</button>
+            <button class="px-4 py-2.5 border border-parchment-3 text-ink-muted text-sm font-semibold rounded-lg hover:bg-parchment-2 transition-colors" @click="showRecalibrateInfo = false">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- ── End firing confirm modal ──────────────────────────────────────────── -->
+    <Teleport to="body">
+      <div v-if="showEndConfirm" class="fixed inset-0 z-[70] flex items-end sm:items-center justify-center" style="background:rgba(26,18,8,0.6)" @click.self="showEndConfirm = false">
+        <div class="bg-parchment w-full sm:w-[400px] sm:rounded-2xl rounded-t-2xl p-6 flex flex-col gap-4 border border-parchment-3" style="box-shadow:0 -8px 40px rgba(26,18,8,0.15)">
+          <div class="flex flex-col gap-1.5">
+            <h2 class="text-base font-bold text-ink">End this firing?</h2>
+            <p class="text-sm text-ink-muted leading-relaxed">
+              This marks <strong>{{ selectedFiring?.name }}</strong> as finished and stops logging. You can restart it later if you need to keep going.
+            </p>
+          </div>
+          <div class="flex justify-end gap-2">
+            <button class="px-4 py-2 border border-parchment-3 text-ink-muted hover:bg-parchment-2 text-sm font-semibold rounded-lg transition-colors" @click="showEndConfirm = false">Cancel</button>
+            <button class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-bold rounded-lg transition-colors" @click="confirmEndFiring">End firing</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
 
     <!-- ── Mobile firing sheet ───────────────────────────────────────────────── -->
     <Teleport to="body">
@@ -304,17 +234,18 @@ import { useKilnChart } from '~/composables/useKilnChart'
 
 definePageMeta({ middleware: ['auth'] })
 
-const toast = useToast()
+const toast  = useToast()
+const router = useRouter()
 
 const chartCanvas          = ref(null)
-const chartCanvasMobile    = ref(null)
+const consoleRef           = ref(null)
 const editingReading       = ref(null)
 const showReadingModal     = ref(false)
 const showFiringSheet      = ref(false)
 const sheetConfirmDeleteId = ref(null)
 const showStartModal       = ref(false)
 const showTempModal        = ref(false)
-const showMobileMenu       = ref(false)
+const showEndConfirm       = ref(false)
 const allFirings           = ref([])
 const selectedFiring       = ref(null)
 const currentTemp          = ref(null)
@@ -331,7 +262,9 @@ const nowUnix              = ref(Math.floor(Date.now() / 1000))
 
 let elapsedTickInterval = null
 
-const { init, setSchedule, setReadings, resetZoom, destroy } = useKilnChart(chartCanvas, {
+// Single responsive chart — the old separate mobile canvas is gone; FiringConsole
+// is responsive so one chart serves all breakpoints.
+const { init, setSchedule, setReadings, resetZoom, resize, destroy } = useKilnChart(chartCanvas, {
   enableZoom: true,
   showLabels: true,
   onPointClick: (point) => {
@@ -341,52 +274,50 @@ const { init, setSchedule, setReadings, resetZoom, destroy } = useKilnChart(char
   },
 })
 
-const { init: initMobile, setSchedule: setScheduleMobile, setReadings: setReadingsMobile, resetZoom: resetZoomMobile, destroy: destroyMobile } = useKilnChart(chartCanvasMobile, { enableZoom: true, showLabels: true })
-
 const activeFiring = computed(() => allFirings.value.find(f => f.started_at && !f.ended_at) ?? null)
 const pastFirings  = computed(() => allFirings.value.filter(f => f.ended_at).sort((a, b) => b.created_at - a.created_at))
 
 const { duration, readingCount, elapsed, rateOfChange, targetRate, targetTemp }
   = useFiringStats(selectedFiring, nowUnix)
 
+// Peak temp of the selected firing's actual readings (for the review summary).
+const peakTemp = computed(() => {
+  const rs = selectedFiring.value?.readings
+  if (!rs?.length) return null
+  return rs.reduce((max, r) => r.temperature > max ? r.temperature : max, rs[0].temperature)
+})
+
 const scheduleOffset = computed(() => selectedFiring.value?.schedule_offset ?? 0)
 
 function applySchedule(scheduleRows) {
   const rows = scheduleRows ?? selectedFiring.value?.schedule ?? []
   setSchedule(rows, scheduleOffset.value)
-  setScheduleMobile(rows, scheduleOffset.value)
 }
-
-// Mobile rate colour
-function parseMobileRate(str) {
-  if (!str || str === '—') return null
-  const n = parseFloat(str.replace('°/m', ''))
-  return isFinite(n) ? n : null
-}
-const mobileRateColorClass = computed(() => {
-  const actual = parseMobileRate(rateOfChange.value)
-  const target = parseMobileRate(targetRate.value)
-  if (actual === null) return 'text-ink-faint'
-  if (target === null) return 'text-green-600'
-  const diff = actual - target
-  if (diff > 1.5)  return 'text-amber-600'
-  if (diff < -1.5) return 'text-blue-600'
-  return 'text-green-600'
-})
 
 onMounted(async () => {
   await init()
   await refreshFirings()
   if (activeFiring.value) await selectFiring(activeFiring.value)
   document.addEventListener('visibilitychange', onVisibilityChange)
+  window.addEventListener('resize', onWindowResize)
+  // Belt-and-suspenders: after first paint settles, force a re-measure in case
+  // the canvas container hadn't resolved its height when the chart first built.
+  requestAnimationFrame(() => requestAnimationFrame(() => resize()))
 })
 
 onUnmounted(() => {
   stopAllIntervals()
   destroy()
-  destroyMobile()
   document.removeEventListener('visibilitychange', onVisibilityChange)
+  window.removeEventListener('resize', onWindowResize)
 })
+
+// Debounced chart re-measure on viewport changes (rotation, window resize).
+let resizeRaf = null
+function onWindowResize() {
+  if (resizeRaf) cancelAnimationFrame(resizeRaf)
+  resizeRaf = requestAnimationFrame(() => resize())
+}
 
 function formatDate(unix) {
   if (!unix) return ''
@@ -396,6 +327,8 @@ function formatDate(unix) {
 function stopAllIntervals() {
   if (elapsedTickInterval) { clearInterval(elapsedTickInterval); elapsedTickInterval = null }
 }
+
+function goToSchedules() { router.push('/schedules') }
 
 function startDrag(e) {
   isDragging.value = true
@@ -409,9 +342,6 @@ function startDrag(e) {
 async function onVisibilityChange() {
   if (document.hidden) return
   if (!selectedFiring.value) return
-  // Returning to a foregrounded PWA: the canvas may have been resized or
-  // detached while hidden. Reloading readings runs setReadings, which
-  // self-heals the chart (rebuilding if the canvas was recreated).
   await reloadReadings()
   if (isLive.value && !elapsedTickInterval) {
     elapsedTickInterval = setInterval(() => { nowUnix.value = Math.floor(Date.now() / 1000) }, 1000)
@@ -424,13 +354,13 @@ async function refreshFirings() {
 
 // selectFiring accepts an optional `preloaded` firing. When the caller already
 // has a full firing object (with schedule + readings), we use it directly and
-// skip the GET — this removes a network round-trip AND removes the stale-read
-// race where a just-restarted firing could be re-selected as still-ended.
+// skip the GET — removes a round-trip AND the stale-read race on restart.
 async function selectFiring(f, preloaded = null) {
   stopAllIntervals()
   isLive.value = false
   isPaused.value = false
   currentTemp.value = null
+  consoleRef.value?.closeMenu?.()
 
   let data = preloaded
   if (!data || data.schedule === undefined || data.readings === undefined) {
@@ -438,11 +368,13 @@ async function selectFiring(f, preloaded = null) {
   }
 
   selectedFiring.value = data
+  await nextTick()                                   // ensure canvas is mounted for this state
   setSchedule(data.schedule ?? [], data.schedule_offset ?? 0)
   setReadings(data.readings ?? [], data.started_at)
-  await nextTick(); await initMobile()
-  setScheduleMobile(data.schedule ?? [], data.schedule_offset ?? 0)
-  setReadingsMobile(data.readings ?? [], data.started_at)
+  // The canvas may have just remounted into a container whose height wasn't
+  // settled when Chart.js first measured it (state switch). Re-measure on the
+  // next frame so it fills the area instead of staying squished.
+  requestAnimationFrame(() => resize())
 
   if (data.readings?.length) {
     currentTemp.value = data.readings.at(-1).temperature
@@ -470,7 +402,8 @@ async function createFiring(payload) {
   await selectFiring({ id: firing.id })     // fresh firing: fetch full record
 }
 
-async function endFiring() {
+async function confirmEndFiring() {
+  showEndConfirm.value = false
   if (!activeFiring.value) return
   const id = activeFiring.value.id
   const updated = await $fetch(`/api/firings/${id}`, {
@@ -480,16 +413,10 @@ async function endFiring() {
   stopAllIntervals()
   isLive.value = isPaused.value = false
   currentTemp.value = null
-
-  // Update the selected firing in place from the PUT response — instant, no race.
   if (selectedFiring.value?.id === id) {
-    selectedFiring.value = {
-      ...selectedFiring.value,
-      ended_at:   updated.ended_at,
-      auto_ended: updated.auto_ended,
-    }
+    selectedFiring.value = { ...selectedFiring.value, ended_at: updated.ended_at, auto_ended: updated.auto_ended }
   }
-  refreshFirings()                          // background — refresh sidebar
+  refreshFirings()
 }
 
 async function restartFiring(f) {
@@ -497,14 +424,24 @@ async function restartFiring(f) {
   if (activeFiring.value) { toast.show(`End "${activeFiring.value.name}" first — only one firing can be active at a time.`); return }
   try {
     const updated = await $fetch(`/api/firings/${f.id}`, { method: 'PUT', body: { endedAt: null } })
-    // Trust the PUT's returned row (ended_at is null) — never re-read and risk a
-    // stale GET. Merge onto the firing we already have so its children are kept.
-    const restored = { ...f, ended_at: updated.ended_at, auto_ended: updated.auto_ended }
-    refreshFirings()                        // background — refresh sidebar
+    const restored = { ...f, ended_at: null, auto_ended: false, restarted_at: updated.restarted_at }
+    const i = allFirings.value.findIndex(x => x.id === f.id)
+    if (i !== -1) allFirings.value[i] = { ...allFirings.value[i], ended_at: null, auto_ended: false, restarted_at: updated.restarted_at }
     await selectFiring(restored, restored)
+    refreshFirings()
   } catch (err) {
     toast.show(`Couldn\u2019t restart: ${err?.data?.message ?? err.message ?? 'Unknown error'}`)
   }
+}
+
+// ── Repeatability actions (FiringReview) ──────────────────────────────────────
+// Stubs wired to upcoming features. "Fire again" reuses this firing's schedule;
+// "Save as schedule" routes to the generate flow.
+function fireAgain(f) {
+  openStartModal({ fromFiringId: f.id, name: f.name })
+}
+function saveAsSchedule(f) {
+  router.push(`/schedules/new?fromFiring=${f.id}`)
 }
 
 async function pauseFiring() {
@@ -530,6 +467,8 @@ async function resumeFiring() {
   elapsedTickInterval = setInterval(() => { nowUnix.value = Math.floor(Date.now() / 1000) }, 1000)
   toast.show(`Resumed — schedule shifted ${gapMins} min to match.`, 'success')
 }
+
+function openRecalibrate() { showRecalibrateInfo.value = true }
 
 async function recalibrate() {
   const f = selectedFiring.value
@@ -567,8 +506,9 @@ async function deleteFiring(f) {
   await refreshFirings()
 }
 
-async function openStartModal() {
+async function openStartModal(opts) {
   if (!library.value.length) library.value = await $fetch('/api/library')
+  // opts may carry { fromFiringId, name } when invoked from "Fire this again".
   showStartModal.value = true
 }
 
@@ -617,7 +557,6 @@ async function reloadReadings() {
     selectedFiring.value.readings = data.readings
     selectedFiring.value.schedule = data.schedule
     setReadings(data.readings, selectedFiring.value.started_at)
-    setReadingsMobile(data.readings, selectedFiring.value.started_at)
     if (!isSaving.value && data.readings?.length) {
       currentTemp.value = data.readings.at(-1).temperature
     }

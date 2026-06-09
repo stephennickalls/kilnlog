@@ -86,9 +86,7 @@
             />
           </div>
 
-          <!-- Chart (shared, responsive) — faint celadon chart-ground behind the
-               transparent canvas ties it into the palette without fighting the
-               orange Actual line. -->
+          <!-- Chart -->
           <div class="flex-1 relative min-h-0 p-3 pt-2 sm:p-5 sm:pt-4 flex flex-col">
             <div class="flex-1 min-h-0 rounded-xl border border-parchment-3 relative" style="box-shadow:0 2px 12px rgba(58,30,8,0.06); background: linear-gradient(to right, rgba(95,138,120,0.07) 1px, transparent 1px) 0 0 / 12.5% 100%, linear-gradient(to bottom, rgba(95,138,120,0.07) 1px, transparent 1px) 0 0 / 100% 25%, #fcfdfc;">
               <canvas ref="chartCanvas" class="absolute inset-0 w-full h-full"/>
@@ -176,7 +174,8 @@
             </li>
           </ul>
           <div class="p-3 border-t border-parchment-3 shrink-0">
-            <button class="btn-primary w-full py-3" @click="openStartModal(); showFiringSheet = false">+ Start firing</button>
+            <!-- TEST: celadon button to verify custom palette is working -->
+            <button class="w-full py-3 bg-celadon hover:bg-celadon-dark text-white text-sm font-bold rounded-lg transition-colors" @click="openStartModal(); showFiringSheet = false">+ Start firing</button>
           </div>
         </div>
       </div>
@@ -424,7 +423,6 @@ async function restartFiring(f) {
   }
 }
 
-// ── Repeatability actions (FiringReview) ──────────────────────────────────────
 function fireAgain(f) {
   openStartModal({ fromFiringId: f.id, name: f.name })
 }

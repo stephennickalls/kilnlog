@@ -1,6 +1,7 @@
 {
   "name": "kiln-monitor",
   "version": "1.0.0",
+   "type": "module", 
   "description": "Kiln temperature monitoring — real-time chart of planned vs actual firing",
   "private": true,
   "license": "UNLICENSED",

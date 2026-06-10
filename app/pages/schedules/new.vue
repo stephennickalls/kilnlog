@@ -34,47 +34,19 @@
           <span>Generated from <strong>{{ firingData?.name }}</strong></span>
         </div>
 
-        <!-- Dual-layer preview SVG -->
-        <div class="flex flex-col gap-2">
-          <div class="flex items-center justify-between">
-            <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Preview</label>
-            <div class="flex items-center gap-3 text-[10px] text-ink-faint">
-              <span class="flex items-center gap-1.5">
-                <span class="inline-block w-5 border-t border-parchment-4"/>actual readings
-              </span>
-              <span class="flex items-center gap-1.5 text-celadon-dark font-semibold">
-                <span class="inline-block w-5 border-t-2 border-celadon"/>schedule
-              </span>
-            </div>
-          </div>
-          <div class="bg-white border border-parchment-3 rounded-xl overflow-hidden" style="box-shadow: inset 0 1px 3px rgba(58,30,8,0.04)">
-            <svg :viewBox="`0 0 ${SVG_W} ${SVG_H}`" class="w-full block" preserveAspectRatio="xMidYMid meet">
-              <!-- Grid -->
-              <line v-for="t in prevTempLines" :key="'pgt'+t" :x1="PAD_L" :y1="pTempToY(t)" :x2="SVG_W - PAD_R" :y2="pTempToY(t)" stroke="#f5f5f4" stroke-width="1"/>
-              <line v-for="m in prevTimeLines" :key="'pgm'+m" :x1="pMinsToX(m)" :y1="PAD_T" :x2="pMinsToX(m)" :y2="SVG_H - PAD_B" stroke="#f5f5f4" stroke-width="1"/>
-              <!-- Axis labels -->
-              <text v-for="t in prevTempLines" :key="'ptl'+t" :x="PAD_L - 6" :y="pTempToY(t) + 4" text-anchor="end" font-size="9" font-family="Georgia, serif" fill="#a8a29e">{{ t }}°</text>
-              <text v-for="m in prevTimeLines" :key="'pml'+m" :x="pMinsToX(m)" :y="SVG_H - PAD_B + 14" text-anchor="middle" font-size="9" font-family="Georgia, serif" fill="#a8a29e">{{ minsLabel(m) }}</text>
-              <!-- Raw readings — faint -->
-              <path v-if="rawSvgPath" :d="rawSvgPath" fill="none" stroke="#d6d3d1" stroke-width="1" stroke-linejoin="round"/>
-              <!-- Simplified fill + line — celadon -->
-              <path v-if="simplifiedFillPath" :d="simplifiedFillPath" fill="rgba(95,138,120,0.08)"/>
-              <path v-if="simplifiedSvgPath" :d="simplifiedSvgPath" fill="none" stroke="#5f8a78" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-              <!-- Simplified waypoint dots -->
-              <circle
-                v-for="pt in simplified" :key="`dot-${pt.offsetMinutes}-${pt.targetTemp}`"
-                :cx="pMinsToX(pt.offsetMinutes)" :cy="pTempToY(pt.targetTemp)"
-                r="4" fill="white" stroke="#5f8a78" stroke-width="2"
-              />
-            </svg>
-          </div>
-        </div>
-
-        <!-- Detail slider -->
+        <!-- Slider + segment count + reset -->
         <div class="flex flex-col gap-2">
           <div class="flex items-center justify-between">
             <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Detail level</label>
-            <span class="text-[11px] tabular-nums text-celadon-dark font-semibold">{{ simplified.length }} segment{{ simplified.length === 1 ? '' : 's' }}</span>
+            <div class="flex items-center gap-3">
+              <span class="text-[11px] tabular-nums text-celadon-dark font-semibold">
+                {{ slider >= 1 ? `All ${rawPoints.length} readings` : `${simplified.length} segment${simplified.length === 1 ? '' : 's'}` }}
+              </span>
+              <button
+                class="text-[11px] text-ink-faint hover:text-flame transition-colors font-semibold"
+                @click="resetToInitial"
+              >↺ Reset</button>
+            </div>
           </div>
           <div class="flex items-center gap-3">
             <span class="text-[10px] text-ink-faint w-10 shrink-0">Simple</span>
@@ -95,11 +67,12 @@
           </p>
         </div>
 
-        <!-- Fine-tune editor -->
-        <div class="flex flex-col gap-2">
-          <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Fine-tune</label>
-          <ScheduleCurveEditor :model-value="editPoints" @update:model-value="onEditorChange" />
-        </div>
+        <!-- Unified editor — raw readings shown faint underneath via backgroundPoints -->
+        <ScheduleCurveEditor
+          :model-value="editPoints"
+          :background-points="rawPoints"
+          @update:model-value="onEditorChange"
+        />
 
       </template>
 
@@ -110,17 +83,6 @@
           <ScheduleCurveEditor v-model="editPoints" />
         </div>
       </template>
-
-      <!-- ── SHARED: soft warnings ────────────────────────────────────── -->
-      <div
-        v-for="(w, i) in warnings" :key="i"
-        class="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800"
-      >
-        <svg class="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-        </svg>
-        {{ w }}
-      </div>
 
       <!-- ── SHARED: name, type, cone ─────────────────────────────────── -->
       <div class="flex flex-col gap-1.5">
@@ -134,26 +96,8 @@
       </div>
 
       <div class="grid grid-cols-2 gap-3">
-        <div class="flex flex-col gap-1.5">
-          <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Type</label>
-          <select
-            v-model="form.type"
-            class="w-full border border-parchment-3 rounded-xl px-4 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame font-serif appearance-none"
-          >
-            <option v-for="t in FIRING_TYPES" :key="t" :value="t">{{ t.charAt(0).toUpperCase() + t.slice(1) }}</option>
-          </select>
-        </div>
-        <div class="flex flex-col gap-1.5">
-          <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">
-            Cone <span class="text-parchment-4 font-normal normal-case tracking-normal">(optional)</span>
-          </label>
-          <input
-            v-model="form.cone"
-            type="text"
-            placeholder="6, 10, 06…"
-            class="w-full border border-parchment-3 rounded-xl px-4 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif"
-          />
-        </div>
+        <FiringTypeSelect v-model="form.type" />
+        <ConeSelect v-model="form.cone" />
       </div>
 
       <!-- ── SHARED: save ──────────────────────────────────────────────── -->
@@ -185,8 +129,6 @@ import { simplify, SUGGESTED_EPSILON, detailToEpsilon, epsilonToDetail } from '~
 
 definePageMeta({ middleware: ['auth'], path: '/schedules/new' })
 
-const FIRING_TYPES = ['bisque', 'glaze', 'raku', 'other']
-
 const BISQUE_DEFAULT = [
   { offsetMinutes: 0,   targetTemp: 20   },
   { offsetMinutes: 60,  targetTemp: 120  },
@@ -209,82 +151,23 @@ const saving        = ref(false)
 const status        = ref('')
 
 // From-firing specific
-const firingData     = ref(null)
-const rawPoints      = ref([])
-const slider         = ref(epsilonToDetail(SUGGESTED_EPSILON))
-const simplified     = ref([])
-const hasManualEdits = ref(false)
-const regenerating   = ref(false)
+const firingData        = ref(null)
+const rawPoints         = ref([])
+const slider            = ref(epsilonToDetail(SUGGESTED_EPSILON))
+const simplified        = ref([])
+const initialSimplified = ref([])  // stored on load, used by reset
+const hasManualEdits    = ref(false)
+const regenerating      = ref(false)
 
 // Shared
 const form       = reactive({ name: '', type: 'glaze', cone: '' })
 const editPoints = ref(BISQUE_DEFAULT.map(p => ({ ...p })))
 
-// ── SVG preview constants (mirror ScheduleCurveEditor) ────────────────────────
-const SVG_W = 520, SVG_H = 220
-const PAD_L = 38, PAD_R = 12, PAD_T = 16, PAD_B = 24
-
-const previewMaxMins = computed(() => {
-  if (!rawPoints.value.length) return 360
-  return Math.max(Math.max(...rawPoints.value.map(p => p.offsetMinutes)) + 60, 360)
-})
-const previewMaxTemp = computed(() => {
-  if (!rawPoints.value.length) return 1200
-  return Math.ceil((Math.max(...rawPoints.value.map(p => p.targetTemp)) + 50) / 100) * 100
-})
-
-function pMinsToX(m) { return PAD_L + (m / previewMaxMins.value) * (SVG_W - PAD_L - PAD_R) }
-function pTempToY(t) { return PAD_T + (1 - t / previewMaxTemp.value) * (SVG_H - PAD_T - PAD_B) }
-
-function buildSvgPath(pts) {
-  if (pts.length < 2) return ''
-  let d = `M ${pMinsToX(pts[0].offsetMinutes)} ${pTempToY(pts[0].targetTemp)}`
-  for (let i = 1; i < pts.length; i++) d += ` L ${pMinsToX(pts[i].offsetMinutes)} ${pTempToY(pts[i].targetTemp)}`
-  return d
-}
-
-const rawSvgPath        = computed(() => buildSvgPath(rawPoints.value))
-const simplifiedSvgPath = computed(() => buildSvgPath(simplified.value))
-const simplifiedFillPath = computed(() => {
-  if (simplified.value.length < 2) return ''
-  const pts = simplified.value
-  const bottom = SVG_H - PAD_B
-  return `${simplifiedSvgPath.value} L ${pMinsToX(pts[pts.length - 1].offsetMinutes)} ${bottom} L ${pMinsToX(pts[0].offsetMinutes)} ${bottom} Z`
-})
-
-const prevTempLines = computed(() => {
-  const lines = []
-  for (let t = 0; t <= previewMaxTemp.value; t += 200) lines.push(t)
-  return lines
-})
-const prevTimeLines = computed(() => {
-  const step = previewMaxMins.value <= 480 ? 120 : 240
-  const lines = []
-  for (let m = 0; m <= previewMaxMins.value; m += step) lines.push(m)
-  return lines
-})
-function minsLabel(m) {
-  const h = Math.floor(m / 60), min = m % 60
-  return h === 0 ? `${m}m` : min === 0 ? `${h}h` : `${h}h${min}m`
-}
-
-// ── Warnings (shared) ─────────────────────────────────────────────────────────
-const warnings = computed(() => {
-  const pts = [...editPoints.value].sort((a, b) => a.offsetMinutes - b.offsetMinutes)
-  return pts.slice(1).flatMap((curr, i) => {
-    const prev = pts[i]
-    const mins = curr.offsetMinutes - prev.offsetMinutes
-    if (mins <= 0) return []
-    const rate = (curr.targetTemp - prev.targetTemp) / mins * 60
-    return Math.abs(rate) > 200
-      ? [`Segment ${i + 1}→${i + 2}: ${rate > 0 ? 'ramp' : 'cooling'} rate ${Math.round(Math.abs(rate))}°C/hr — risk of thermal shock`]
-      : []
-  })
-})
-
-// ── Slider → re-simplify ─────────────────────────────────────────────────────
+// ── Slider → re-simplify (slider=1 = all raw readings, no simplification) ────
 watch(slider, (val) => {
-  const newPts = simplify(rawPoints.value, detailToEpsilon(val))
+  const newPts = val >= 1
+    ? rawPoints.value.map(p => ({ ...p }))
+    : simplify(rawPoints.value, detailToEpsilon(val))
   simplified.value = newPts
   regenerating.value = true
   editPoints.value   = newPts.map(p => ({ ...p }))
@@ -296,6 +179,14 @@ watch(slider, (val) => {
 function onEditorChange(pts) {
   editPoints.value = pts
   if (!regenerating.value) hasManualEdits.value = true
+}
+
+// ── Reset to initial simplification ──────────────────────────────────────────
+function resetToInitial() {
+  regenerating.value = true
+  editPoints.value = initialSimplified.value.map(p => ({ ...p }))
+  hasManualEdits.value = false
+  nextTick(() => { regenerating.value = false })
 }
 
 // ── Mount: load firing if from-firing mode ────────────────────────────────────
@@ -322,10 +213,11 @@ onMounted(async () => {
       return
     }
 
-    // Initial simplification at default slider value
+    // Initial simplification — also stored for reset
     const initPts = simplify(rawPoints.value, detailToEpsilon(slider.value))
-    simplified.value = initPts
-    editPoints.value = initPts.map(p => ({ ...p }))
+    simplified.value        = initPts
+    initialSimplified.value = initPts.map(p => ({ ...p }))
+    editPoints.value        = initPts.map(p => ({ ...p }))
 
     // Smart defaults
     form.name = `${data.name} (from ${formatFiringDate(data.started_at ?? data.created_at)})`

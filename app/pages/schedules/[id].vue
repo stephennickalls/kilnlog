@@ -33,26 +33,8 @@
 
       <!-- Type + Cone -->
       <div class="grid grid-cols-2 gap-3">
-        <div class="flex flex-col gap-1.5">
-          <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Type</label>
-          <select
-            v-model="form.type"
-            class="w-full border border-parchment-3 rounded-xl px-4 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame font-serif appearance-none"
-          >
-            <option v-for="t in FIRING_TYPES" :key="t" :value="t">{{ t.charAt(0).toUpperCase() + t.slice(1) }}</option>
-          </select>
-        </div>
-        <div class="flex flex-col gap-1.5">
-          <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">
-            Cone <span class="text-parchment-4 font-normal normal-case tracking-normal">(optional)</span>
-          </label>
-          <input
-            v-model="form.cone"
-            type="text"
-            placeholder="6, 10, 06…"
-            class="w-full border border-parchment-3 rounded-xl px-4 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif"
-          />
-        </div>
+        <FiringTypeSelect v-model="form.type" />
+        <ConeSelect v-model="form.cone" />
       </div>
 
       <!-- Curve editor — border tinted by type -->
@@ -111,8 +93,6 @@
 import { themeForType } from '~/composables/useScheduleTheme'
 
 definePageMeta({ middleware: ['auth'] })
-
-const FIRING_TYPES = ['bisque', 'glaze', 'raku', 'other']
 
 const route  = useRoute()
 const router = useRouter()

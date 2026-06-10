@@ -62,6 +62,9 @@
           >{{ minsToLabel(m) }}</text>
         </g>
 
+        <!-- Raw readings underlay (background-points prop, from-firing mode) -->
+        <path v-if="bgPath" :d="bgPath" fill="none" stroke="#d6d3d1" stroke-width="1" stroke-linejoin="round"/>
+
         <!-- Filled area under curve -->
         <path
           v-if="sortedPoints.length >= 2"
@@ -220,7 +223,8 @@
 
 <script setup>
 const props = defineProps({
-  modelValue: { type: Array, default: () => [] }, // [{ offsetMinutes, targetTemp }]
+  modelValue:       { type: Array, default: () => [] }, // [{ offsetMinutes, targetTemp }]
+  backgroundPoints: { type: Array, default: () => [] }, // raw readings shown as faint underlay
 })
 const emit = defineEmits(['update:modelValue'])
 
@@ -273,12 +277,14 @@ const totalHours = computed(() => {
 // ── Axis ranges ───────────────────────────────────────────────────────────────
 const maxMins = computed(() => {
   const pts = sortedPoints.value
-  const m = pts.length ? pts[pts.length - 1].offsetMinutes : 0
-  return Math.max(m + 60, 360)
+  const mPts = pts.length ? pts[pts.length - 1].offsetMinutes : 0
+  const mBg  = props.backgroundPoints.length ? Math.max(...props.backgroundPoints.map(p => p.offsetMinutes)) : 0
+  return Math.max(Math.max(mPts, mBg) + 60, 360)
 })
 const maxTemp = computed(() => {
-  const t = Math.max(...sortedPoints.value.map(p => p.targetTemp), 100)
-  return Math.ceil((t + 50) / 100) * 100
+  const t1 = Math.max(...sortedPoints.value.map(p => p.targetTemp), 100)
+  const t2 = props.backgroundPoints.length ? Math.max(...props.backgroundPoints.map(p => p.targetTemp)) : 0
+  return Math.ceil((Math.max(t1, t2) + 50) / 100) * 100
 })
 
 // ── Coordinate transforms ─────────────────────────────────────────────────────
@@ -324,6 +330,15 @@ const fillPath = computed(() => {
   const firstX = minsToX(pts[0].offsetMinutes)
   const lastX  = minsToX(pts[pts.length - 1].offsetMinutes)
   return `${curvePath.value} L ${lastX} ${bottom} L ${firstX} ${bottom} Z`
+})
+
+// Background path — raw readings passed in as underlay (from-firing mode)
+const bgPath = computed(() => {
+  const pts = [...props.backgroundPoints].sort((a, b) => a.offsetMinutes - b.offsetMinutes)
+  if (pts.length < 2) return ''
+  let d = `M ${minsToX(pts[0].offsetMinutes)} ${tempToY(pts[0].targetTemp)}`
+  for (let i = 1; i < pts.length; i++) d += ` L ${minsToX(pts[i].offsetMinutes)} ${tempToY(pts[i].targetTemp)}`
+  return d
 })
 
 // ── DEBUG ─────────────────────────────────────────────────────────────────────

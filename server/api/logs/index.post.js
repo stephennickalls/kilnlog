@@ -1,12 +1,16 @@
-// server/api/logs/index.post.js
-// POST /api/logs — client error ingest (Option B).
-// This is a browser-writable path, so it is deliberately constrained:
-//   - requires a valid user session (not open to the world)
-//   - only accepts level 'warn' | 'error' (no info spam)
+// File: server/api/logs/index.post.js
+// POST /api/logs — client error ingest.
+// Browser-writable path, deliberately constrained:
+//   - requires a valid user session
+//   - only accepts level 'warn' | 'error'
 //   - caps message and context size
-//   - per-user rate limit: rejects if this user has written > RATE_MAX rows
-//     in the last RATE_WINDOW seconds (best-effort, DB-backed)
-// Writes are attributed to the authenticated user and tagged source:'client'.
+//   - per-user rate limit (best-effort, DB-backed)
+//
+// PACKAGE 1 CHANGE: useServerUser's `db` is now user-scoped and the logs
+// table has no RLS policies, so both the rate-limit count and the insert go
+// through serviceClient(). Justified bypass: logs is policy-less by design;
+// the row is still attributed to the *authenticated* user — never trust a
+// user_id from the body.
 
 const RATE_MAX    = 30      // max client logs per user per window
 const RATE_WINDOW = 60      // seconds
@@ -16,7 +20,8 @@ const MAX_CONTEXT = 8000    // chars of serialized JSON
 export default defineEventHandler(async (event) => {
   // Must be a logged-in user; no subscription requirement (errors can happen
   // on the subscribe page itself).
-  const { db, user } = await useServerUser(event, { requireSubscription: false })
+  const { user } = await useServerUser(event, { requireSubscription: false })
+  const db = serviceClient()  // RLS bypass justified: logs is policy-less by design
 
   const body = await readBody(event)
   let { level, event: evt, message, context } = body ?? {}
@@ -53,7 +58,6 @@ export default defineEventHandler(async (event) => {
     .gte('created_at', windowStart)
 
   if ((count ?? 0) >= RATE_MAX) {
-    // Drop silently with a 429 — don't error the client's actual flow over a log.
     throw createError({ statusCode: 429, statusMessage: 'Log rate limit exceeded' })
   }
 

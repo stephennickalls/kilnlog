@@ -1,0 +1,128 @@
+[
+  {
+    "schemaname": "public",
+    "tablename": "cones",
+    "policyname": "cones_select",
+    "cmd": "SELECT",
+    "roles": "{authenticated}",
+    "using_expression": "true",
+    "check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "firing_types",
+    "policyname": "firing_types_select",
+    "cmd": "SELECT",
+    "roles": "{authenticated}",
+    "using_expression": "((user_id IS NULL) OR (user_id = auth.uid()))",
+    "check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "firings",
+    "policyname": "firings_owner",
+    "cmd": "ALL",
+    "roles": "{public}",
+    "using_expression": "(( SELECT auth.uid() AS uid) = user_id)",
+    "check_expression": "(( SELECT auth.uid() AS uid) = user_id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "profiles",
+    "policyname": "Users can update own profile",
+    "cmd": "UPDATE",
+    "roles": "{public}",
+    "using_expression": "(( SELECT auth.uid() AS uid) = id)",
+    "check_expression": "(( SELECT auth.uid() AS uid) = id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "profiles",
+    "policyname": "Users can view own profile",
+    "cmd": "SELECT",
+    "roles": "{public}",
+    "using_expression": "(auth.uid() = id)",
+    "check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "profiles",
+    "policyname": "profiles_owner",
+    "cmd": "ALL",
+    "roles": "{public}",
+    "using_expression": "(( SELECT auth.uid() AS uid) = id)",
+    "check_expression": "(( SELECT auth.uid() AS uid) = id)"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "readings",
+    "policyname": "readings_owner",
+    "cmd": "ALL",
+    "roles": "{public}",
+    "using_expression": "(EXISTS ( SELECT 1\n   FROM firings\n  WHERE ((firings.id = readings.firing_id) AND (firings.user_id = ( SELECT auth.uid() AS uid)))))",
+    "check_expression": "(EXISTS ( SELECT 1\n   FROM firings\n  WHERE ((firings.id = readings.firing_id) AND (firings.user_id = ( SELECT auth.uid() AS uid)))))"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "schedule",
+    "policyname": "schedule_owner",
+    "cmd": "ALL",
+    "roles": "{public}",
+    "using_expression": "(EXISTS ( SELECT 1\n   FROM firings\n  WHERE ((firings.id = schedule.firing_id) AND (firings.user_id = ( SELECT auth.uid() AS uid)))))",
+    "check_expression": "(EXISTS ( SELECT 1\n   FROM firings\n  WHERE ((firings.id = schedule.firing_id) AND (firings.user_id = ( SELECT auth.uid() AS uid)))))"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "schedule_library",
+    "policyname": "schedule_library_delete",
+    "cmd": "DELETE",
+    "roles": "{public}",
+    "using_expression": "(user_id = auth.uid())",
+    "check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "schedule_library",
+    "policyname": "schedule_library_insert",
+    "cmd": "INSERT",
+    "roles": "{public}",
+    "using_expression": null,
+    "check_expression": "(user_id = auth.uid())"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "schedule_library",
+    "policyname": "schedule_library_select",
+    "cmd": "SELECT",
+    "roles": "{public}",
+    "using_expression": "((user_id IS NULL) OR (user_id = auth.uid()))",
+    "check_expression": null
+  },
+  {
+    "schemaname": "public",
+    "tablename": "schedule_library",
+    "policyname": "schedule_library_update",
+    "cmd": "UPDATE",
+    "roles": "{public}",
+    "using_expression": "(user_id = auth.uid())",
+    "check_expression": "(user_id = auth.uid())"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "schedule_library_points",
+    "policyname": "schedule_library_points_mutate",
+    "cmd": "ALL",
+    "roles": "{public}",
+    "using_expression": "(EXISTS ( SELECT 1\n   FROM schedule_library l\n  WHERE ((l.id = schedule_library_points.library_id) AND (l.user_id = auth.uid()))))",
+    "check_expression": "(EXISTS ( SELECT 1\n   FROM schedule_library l\n  WHERE ((l.id = schedule_library_points.library_id) AND (l.user_id = auth.uid()))))"
+  },
+  {
+    "schemaname": "public",
+    "tablename": "schedule_library_points",
+    "policyname": "schedule_library_points_select",
+    "cmd": "SELECT",
+    "roles": "{public}",
+    "using_expression": "(EXISTS ( SELECT 1\n   FROM schedule_library l\n  WHERE ((l.id = schedule_library_points.library_id) AND ((l.user_id IS NULL) OR (l.user_id = auth.uid())))))",
+    "check_expression": null
+  }
+]

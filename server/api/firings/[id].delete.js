@@ -1,4 +1,9 @@
-// server/api/firings/[id].delete.js
+// File: server/api/firings/[id].delete.js
+//
+// PACKAGE 1 CHANGE: manual child deletes removed — readings.firing_id and
+// schedule.firing_id are ON DELETE CASCADE (verified in DB, 13 Jun 2026).
+// The user-scoped client means RLS also enforces ownership; the explicit
+// user_id check stays for a clean 404 and defence-in-depth.
 export default defineEventHandler(async (event) => {
   const { db, user } = await useServerUser(event)
   const id = Number(getRouterParam(event, 'id'))
@@ -12,11 +17,6 @@ export default defineEventHandler(async (event) => {
     .single()
 
   if (!existing) throw createError({ statusCode: 404, statusMessage: 'Firing not found' })
-
-  await Promise.all([
-    db.from('readings').delete().eq('firing_id', id),
-    db.from('schedule').delete().eq('firing_id', id),
-  ])
 
   const { error } = await db.from('firings').delete().eq('id', id)
   if (error) throw await serverError('firings.delete.failed', error, { userId: user.id, firingId: id })

@@ -1,0 +1,30 @@
+[
+  {
+    "indexname": "readings_pkey",
+    "indexdef": "CREATE UNIQUE INDEX readings_pkey ON public.readings USING btree (id)"
+  },
+  {
+    "indexname": "readings_firing_id_idx",
+    "indexdef": "CREATE INDEX readings_firing_id_idx ON public.readings USING btree (firing_id)"
+  },
+  {
+    "indexname": "readings_timestamp_idx",
+    "indexdef": "CREATE INDEX readings_timestamp_idx ON public.readings USING btree (\"timestamp\")"
+  },
+  {
+    "indexname": "idx_readings_firing_id",
+    "indexdef": "CREATE INDEX idx_readings_firing_id ON public.readings USING btree (firing_id)"
+  },
+  {
+    "indexname": "idx_readings_firing_timestamp",
+    "indexdef": "CREATE INDEX idx_readings_firing_timestamp ON public.readings USING btree (firing_id, \"timestamp\")"
+  },
+  {
+    "indexname": "readings_firing_timestamp_unique",
+    "indexdef": "CREATE UNIQUE INDEX readings_firing_timestamp_unique ON public.readings USING btree (firing_id, \"timestamp\")"
+  },
+  {
+    "indexname": "readings_firing_timestamp_idx",
+    "indexdef": "CREATE INDEX readings_firing_timestamp_idx ON public.readings USING btree (firing_id, \"timestamp\")"
+  }
+]

@@ -1,6 +1,11 @@
-// server/api/stripe/checkout.post.js
+// File: server/api/stripe/checkout.post.js
 import Stripe from 'stripe'
 
+// PACKAGE 1 CHANGE: the stripe_customer_id write now goes through
+// serviceClient() — the user-scoped client is blocked by the column grants
+// (authenticated may UPDATE only full_name/avatar_url). Justified bypass:
+// privileged billing column, value comes from Stripe, not the user.
+// Profile *read* stays on the user-scoped client (covered by RLS select).
 export default defineEventHandler(async (event) => {
   const { db, user } = await useServerUser(event, { requireSubscription: false })
 
@@ -24,10 +29,14 @@ export default defineEventHandler(async (event) => {
     })
     customerId = customer.id
 
-    await db
+    const { error: writeErr } = await serviceClient()
       .from('profiles')
       .update({ stripe_customer_id: customerId })
       .eq('id', user.id)
+
+    if (writeErr) {
+      throw await serverError('stripe.checkout.customer_save_failed', writeErr, { userId: user.id })
+    }
   }
 
   const session = await stripe.checkout.sessions.create({

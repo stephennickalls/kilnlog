@@ -1,0 +1,44 @@
+[
+  {
+    "conname": "firing_types_user_id_fkey",
+    "on_table": "firing_types",
+    "references_table": "auth.users",
+    "confdeltype": "a"
+  },
+  {
+    "conname": "firings_user_id_fkey",
+    "on_table": "firings",
+    "references_table": "auth.users",
+    "confdeltype": "c"
+  },
+  {
+    "conname": "profiles_id_fkey",
+    "on_table": "profiles",
+    "references_table": "auth.users",
+    "confdeltype": "c"
+  },
+  {
+    "conname": "readings_firing_id_fkey",
+    "on_table": "readings",
+    "references_table": "firings",
+    "confdeltype": "c"
+  },
+  {
+    "conname": "schedule_firing_id_fkey",
+    "on_table": "schedule",
+    "references_table": "firings",
+    "confdeltype": "c"
+  },
+  {
+    "conname": "schedule_library_points_library_id_fkey",
+    "on_table": "schedule_library_points",
+    "references_table": "schedule_library",
+    "confdeltype": "c"
+  },
+  {
+    "conname": "schedule_library_user_id_fkey",
+    "on_table": "schedule_library",
+    "references_table": "auth.users",
+    "confdeltype": "a"
+  }
+]

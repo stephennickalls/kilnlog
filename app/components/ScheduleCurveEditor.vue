@@ -69,7 +69,7 @@
         <path
           v-if="sortedPoints.length >= 2"
           :d="fillPath"
-          fill="rgba(249,115,22,0.07)"
+          :fill="fill"
         />
 
         <!-- Curve line -->
@@ -77,7 +77,7 @@
           v-if="sortedPoints.length >= 2"
           :d="curvePath"
           fill="none"
-          stroke="#f97316"
+          :stroke="stroke"
           stroke-width="2.5"
           stroke-linecap="round"
           stroke-linejoin="round"
@@ -103,7 +103,7 @@
             :cx="minsToX(pt.offsetMinutes)"
             :cy="tempToY(pt.targetTemp)"
             r="14"
-            fill="rgba(249,115,22,0.12)"
+            :fill="`${stroke}1e`"
             :class="draggingId === pt._id ? 'opacity-100' : 'opacity-0 hover:opacity-100'"
             style="transition: opacity 0.1s; cursor: grab"
             @mousedown.stop="startDrag(i, $event)"
@@ -116,7 +116,7 @@
             :cy="tempToY(pt.targetTemp)"
             :r="draggingId === pt._id ? 7 : 5.5"
             fill="white"
-            stroke="#f97316"
+            :stroke="stroke"
             :stroke-width="draggingId === pt._id ? 2.5 : 2"
             style="cursor: grab; transition: r 0.1s"
             @mousedown.stop="startDrag(i, $event)"
@@ -130,7 +130,7 @@
             text-anchor="middle"
             font-size="8"
             font-family="Georgia, serif"
-            fill="#f97316"
+            :fill="stroke"
             font-weight="bold"
             style="pointer-events: none"
           >{{ i + 1 }}</text>
@@ -223,8 +223,10 @@
 
 <script setup>
 const props = defineProps({
-  modelValue:       { type: Array, default: () => [] }, // [{ offsetMinutes, targetTemp }]
-  backgroundPoints: { type: Array, default: () => [] }, // raw readings shown as faint underlay
+  modelValue:       { type: Array,  default: () => [] }, // [{ offsetMinutes, targetTemp }]
+  backgroundPoints: { type: Array,  default: () => [] }, // raw readings shown as faint underlay
+  stroke:           { type: String, default: '#f97316' }, // curve + handle color
+  fill:             { type: String, default: 'rgba(249,115,22,0.07)' }, // area fill
 })
 const emit = defineEmits(['update:modelValue'])
 

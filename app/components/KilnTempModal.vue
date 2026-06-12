@@ -1,33 +1,64 @@
-<!-- app/components/FiringTypeSelect.vue -->
+<!-- app/components/KilnTempModal.vue -->
 <template>
-  <div class="flex flex-col gap-1.5">
-    <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Type</label>
-    <div class="relative">
-      <select
-        :value="modelValue"
-        class="w-full border border-parchment-3 rounded-xl px-4 py-2.5 pr-9 text-sm text-ink bg-white focus:outline-none focus:border-flame font-serif appearance-none"
-        @change="$emit('update:modelValue', $event.target.value)"
+  <Teleport to="body">
+    <Transition name="toast">
+      <div
+        v-if="open"
+        class="fixed inset-0 z-[80] flex items-center justify-center cursor-pointer font-serif"
+        style="background: rgba(26,18,8,0.96)"
+        @click="$emit('close')"
       >
-        <option v-if="!types.length" value="">Loading…</option>
-        <option v-for="t in types" :key="t.id" :value="t.name">
-          {{ t.name.charAt(0).toUpperCase() + t.name.slice(1) }}
-        </option>
-      </select>
-      <svg class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-muted pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-        <path d="M6 9l6 6 6-6"/>
-      </svg>
-    </div>
-  </div>
+        <div class="flex flex-col items-center px-8">
+
+          <!-- Big temperature number -->
+          <div class="flex items-end leading-none">
+            <span
+              class="font-bold tabular-nums leading-none"
+              :class="temp !== null ? 'text-flame' : 'text-parchment-3'"
+              style="font-size: clamp(140px, 28vw, 380px)"
+            >{{ temp !== null ? Math.round(temp) : '—' }}</span>
+            <span
+              class="font-bold text-flame-light mb-3"
+              style="font-size: clamp(50px, 8vw, 110px)"
+            >°C</span>
+          </div>
+
+          <!-- Firing name -->
+          <p v-if="firingName" class="mt-4 text-parchment-3 font-medium text-center text-xl">
+            {{ firingName }}
+          </p>
+
+          <!-- Rate + elapsed -->
+          <div class="flex gap-8 mt-10 flex-wrap justify-center">
+            <div v-if="isLive && rateOfChange !== '—'" class="flex flex-col items-center gap-1">
+              <span class="text-[10px] font-bold uppercase tracking-[0.12em] text-parchment-4">Rate</span>
+              <span class="text-4xl font-bold text-parchment tabular-nums">{{ rateOfChange }}</span>
+            </div>
+            <div v-if="isLive && elapsed !== '—'" class="flex flex-col items-center gap-1">
+              <span class="text-[10px] font-bold uppercase tracking-[0.12em] text-parchment-4">Elapsed</span>
+              <span class="text-4xl font-bold text-parchment tabular-nums">{{ elapsed }}</span>
+            </div>
+          </div>
+
+          <!-- Tap to dismiss hint -->
+          <p class="mt-12 text-parchment-4 text-xs">Tap anywhere to close</p>
+
+        </div>
+      </div>
+    </Transition>
+  </Teleport>
 </template>
 
 <script setup>
-// app/components/FiringTypeSelect.vue
-defineProps({ modelValue: { type: String, default: '' } })
-defineEmits(['update:modelValue'])
-
-const types = ref([])
-
-onMounted(async () => {
-  try { types.value = await $fetch('/api/firing-types') } catch {}
+// app/components/KilnTempModal.vue
+defineProps({
+  open:         Boolean,
+  temp:         { type: Number, default: null },
+  rateOfChange: { type: String, default: '—' },
+  elapsed:      { type: String, default: '—' },
+  isLive:       Boolean,
+  firingName:   { type: String, default: null },
 })
+
+defineEmits(['close'])
 </script>

@@ -37,28 +37,13 @@
         <ConeSelect v-model="form.cone" />
       </div>
 
-      <!-- Curve editor — border tinted by type -->
+      <!-- Curve -->
       <div class="flex flex-col gap-2">
         <div class="flex items-center gap-2">
           <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Curve</label>
-          <span v-if="form.type" class="text-[10px] font-bold px-2 py-0.5 rounded-full" :class="theme.badgeText">
-            {{ form.type }}
-          </span>
+          <span v-if="form.type" class="text-[10px] font-bold px-2 py-0.5 rounded-full" :class="theme.badgeText">{{ form.type }}</span>
         </div>
-        <div class="rounded-xl border-2 p-1 transition-colors" :style="{ borderColor: theme.stroke + '50' }">
-          <ScheduleCurveEditor v-model="editPoints" />
-        </div>
-      </div>
-
-      <!-- Soft warnings -->
-      <div
-        v-for="(w, i) in warnings" :key="i"
-        class="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800"
-      >
-        <svg class="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-        </svg>
-        {{ w }}
+        <ScheduleCurveEditor v-model="editPoints" :stroke="theme.stroke" :fill="theme.fill" />
       </div>
 
       <!-- Actions -->
@@ -106,29 +91,14 @@ const editPoints = ref([])
 const id    = computed(() => Number(route.params.id))
 const theme = computed(() => themeForType(form.type))
 
-const warnings = computed(() => {
-  const pts = [...editPoints.value].sort((a, b) => a.offsetMinutes - b.offsetMinutes)
-  return pts.slice(1).flatMap((curr, i) => {
-    const prev = pts[i]
-    const mins = curr.offsetMinutes - prev.offsetMinutes
-    if (mins <= 0) return []
-    const rate = (curr.targetTemp - prev.targetTemp) / mins * 60
-    return Math.abs(rate) > 200
-      ? [`Segment ${i + 1}→${i + 2}: ${rate > 0 ? 'ramp' : 'cooling'} rate ${Math.round(Math.abs(rate))}°C/hr — risk of thermal shock`]
-      : []
-  })
-})
-
 function flash(msg) {
   status.value = msg
   setTimeout(() => { if (status.value === msg) status.value = '' }, 2800)
 }
 
-// Watch id so the preset-guard redirect (which changes id) re-runs load()
 watch(id, load, { immediate: true })
 
 async function load() {
-  // Guard: if Nuxt routes /schedules/new to this dynamic page, redirect correctly
   if (isNaN(id.value) || id.value <= 0) {
     router.replace('/schedules/new')
     return
@@ -136,7 +106,6 @@ async function load() {
 
   loading.value = true
 
-  // Toast from preset-guard redirect (?copyOf=Name in query)
   if (route.query.copyOf) {
     flash(`Editing your own copy of "${route.query.copyOf}"`)
     router.replace({ params: route.params, query: {} })
@@ -145,7 +114,6 @@ async function load() {
   try {
     const s = await $fetch(`/api/schedules/${id.value}`)
 
-    // Preset guard — silently duplicate, redirect to copy
     if (s.user_id === null) {
       const pts = (s.points ?? []).map(p => ({ offsetMinutes: p.offset_minutes, targetTemp: p.target_temp }))
       const copy = await $fetch('/api/schedules', {
@@ -153,7 +121,7 @@ async function load() {
         body: { name: `${s.name} (copy)`, type: s.type ?? 'bisque', cone: s.cone ?? null, source: 'preset_copy', points: pts },
       })
       router.replace(`/schedules/${copy.id}?copyOf=${encodeURIComponent(s.name)}`)
-      return // loading stays true; watch(id) re-runs load() when id changes
+      return
     }
 
     form.name = s.name

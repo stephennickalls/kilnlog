@@ -402,12 +402,20 @@ async function selectFiring(f, preloaded = null) {
 }
 
 async function createFiring(payload) {
-  const firing = await $fetch('/api/firings', { method: 'POST', body: payload })
-  await $fetch(`/api/firings/${firing.id}`, { method: 'PUT', body: { startedAt: Math.floor(Date.now() / 1000) } })
-  showStartModal.value = false
-  preselect.value = null
-  refreshFirings()
-  await selectFiring({ id: firing.id })
+  try {
+    const firing = await $fetch('/api/firings', {
+      method: 'POST',
+      body: { ...payload, startedAt: Math.floor(Date.now() / 1000) },
+    })
+    showStartModal.value = false
+    preselect.value = null
+    refreshFirings()
+    await selectFiring({ id: firing.id })
+  } catch (err) {
+    // 409 = another firing is active (or validation failed) — keep the modal
+    // open so the user doesn't lose what they typed.
+    toast.show(err?.data?.statusMessage ?? err?.data?.message ?? 'Could not start firing.')
+  }
 }
 
 async function confirmEndFiring() {

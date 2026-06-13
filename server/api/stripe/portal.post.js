@@ -1,14 +1,16 @@
-// server/api/stripe/portal.post.js
-import Stripe from 'stripe'
+// File: server/api/stripe/portal.post.js
+//
+// PACKAGE 5 — uses the shared pinned-version getStripe() factory.
+import { getStripe } from '~~/server/utils/stripe'
 
 export default defineEventHandler(async (event) => {
-  const { user, profile } = await useServerUser(event, { requireSubscription: false })
+  const { profile } = await useServerUser(event, { requireSubscription: false })
 
   if (!profile?.stripe_customer_id) {
     throw createError({ statusCode: 400, statusMessage: 'No billing account found' })
   }
 
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
+  const stripe = getStripe()
 
   const session = await stripe.billingPortal.sessions.create({
     customer:   profile.stripe_customer_id,

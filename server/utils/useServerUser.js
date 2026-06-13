@@ -18,8 +18,24 @@
 // checkout route's stripe_customer_id write.
 //
 // Return shape is unchanged: { db, user, profile }.
+//
+// PACKAGE 7 (G8) — past_due grace window.
+//   A card failure mid-firing used to lock the user out instantly (past_due
+//   was simply not in hasAccess). That punishes a paying customer at the worst
+//   possible moment. Now past_due keeps FULL access for PAST_DUE_GRACE_DAYS,
+//   anchored to last_stripe_event_at — which the webhook stamps on
+//   invoice.payment_failed, i.e. the moment the card actually failed.
+//   When the customer fixes their card, the invoice.paid webhook flips them
+//   back to active immediately; if they never do, access lapses after the
+//   window. If past_due somehow has no timestamp, we fail OPEN inside the
+//   window's intent (treat as just-failed) rather than locking a payer out on
+//   a data gap — Stripe will resolve the real status shortly.
 
 import { createClient } from '@supabase/supabase-js'
+
+// Grace window for a past_due (failed-payment) subscriber. Keep in sync with
+// the same constant in app/middleware/auth.js so UI and server agree.
+export const PAST_DUE_GRACE_DAYS = 7
 
 export async function useServerUser(event, { requireSubscription = true } = {}) {
   const config = useRuntimeConfig()
@@ -45,9 +61,10 @@ export async function useServerUser(event, { requireSubscription = true } = {}) 
   if (error || !user) throw createError({ statusCode: 401, statusMessage: 'Invalid session' })
 
   // Reads the caller's own row under profiles_select_own RLS.
+  // last_stripe_event_at added to the select for the past_due grace check.
   const { data: profile, error: profErr } = await db
     .from('profiles')
-    .select('subscription_status, trial_ends_at, subscription_ends_at, stripe_customer_id, role')
+    .select('subscription_status, trial_ends_at, subscription_ends_at, last_stripe_event_at, stripe_customer_id, role')
     .eq('id', user.id)
     .single()
 
@@ -75,5 +92,15 @@ export function hasAccess(profile) {
     profile.subscription_ends_at &&
     new Date(profile.subscription_ends_at) > now
   ) return true
+  // G8: failed payment keeps full access for the grace window. Anchor is the
+  // last Stripe event (the payment_failed that set past_due). No anchor →
+  // treat as in-window (Stripe will reconcile shortly; don't lock out a payer).
+  if (profile.subscription_status === 'past_due') {
+    if (!profile.last_stripe_event_at) return true
+    const graceEnds = new Date(
+      new Date(profile.last_stripe_event_at).getTime() + PAST_DUE_GRACE_DAYS * 86400000
+    )
+    return graceEnds > now
+  }
   return false
 }

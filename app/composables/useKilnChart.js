@@ -7,6 +7,21 @@
 //     the planned/actual lines. Does NOT touch autoFitY (annotation, not data).
 //   - new setReductions(periods) method + lastReductions cache (replayed on rebuild).
 //   - reductions are stored on a closure var the plugin reads at draw time.
+//
+// NOW-LINE CHANGE SUMMARY (search "NOW-LINE"):
+//   - new nowLinePlugin: a vertical "you are here" line at the current elapsed
+//     minute, drawn in afterDatasetsDraw so it sits ON TOP of the curves. It
+//     gives an at-a-glance read of where the firing is RIGHT NOW, independent
+//     of the last logged reading (which may be minutes stale). A small marker
+//     shows the PLANNED target temp at this moment ("target now: 920°").
+//   - new setNowLine(startedAt) + clearNowLine() methods. Caller ticks
+//     setNowLine on the existing 1s interval. Live firings only.
+//   - Pure annotation: never feeds autoFitY, never alters data. Mirrors the
+//     reduction-band pattern exactly (closure var read at draw time).
+//   - x-space note: readings map to chart-x as (ts - startedAt)/60 with NO
+//     offset; setSchedule bakes scheduleOffset into the planned x. So the
+//     now-line x is simply elapsed minutes, and the planned-target lookup uses
+//     that same x against the already-offset planned curve. No offset arg needed.
 
 import { nextTick } from 'vue'
 import { Chart, registerables } from 'chart.js'
@@ -85,6 +100,10 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
   //   { startX, endX } in minutes, already mapped from temperature.
   let reductionBands = []
 
+  // NOW-LINE: live reference the plugin reads at draw time.
+  //   null = not shown; otherwise { minutes, targetTemp }.
+  let nowLine = null
+
   // G11: map a temperature to the x(minute) where the ACTUAL curve first
   // reaches it (linear interpolation between bracketing readings). Returns null
   // if the curve never reaches that temp.
@@ -102,6 +121,26 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     // Temp beyond the curve's range: clamp to nearest end if close, else null.
     const first = actualPoints[0], last = actualPoints[actualPoints.length - 1]
     if (temp <= Math.min(first.y, last.y)) return first.x
+    return null
+  }
+
+  // NOW-LINE: map an x(minute) to the PLANNED curve's y(temp) — the inverse
+  // direction of minuteAtTemp. Linear interpolation between bracketing planned
+  // points; clamps to the first/last point outside the curve's time range.
+  // Returns null only if there's no planned curve.
+  function targetAtMinute(plannedPoints, minute) {
+    if (!plannedPoints.length) return null
+    if (minute <= plannedPoints[0].x) return plannedPoints[0].y
+    const last = plannedPoints[plannedPoints.length - 1]
+    if (minute >= last.x) return last.y
+    for (let i = 0; i < plannedPoints.length - 1; i++) {
+      const a = plannedPoints[i], b = plannedPoints[i + 1]
+      if (minute >= a.x && minute <= b.x) {
+        const span = b.x - a.x
+        const frac = span === 0 ? 0 : (minute - a.x) / span
+        return a.y + frac * (b.y - a.y)
+      }
+    }
     return null
   }
 
@@ -170,6 +209,69 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     },
   }
 
+  // NOW-LINE: draw the current-time line + target marker ON TOP of the curves.
+  const nowLinePlugin = {
+    id: 'nowLine',
+    afterDatasetsDraw(chart) {
+      if (!nowLine) return
+      const { ctx, chartArea, scales } = chart
+      if (!chartArea || !scales?.x || !scales?.y) return
+
+      const xPix = scales.x.getPixelForValue(nowLine.minutes)
+      // Don't draw if "now" is off the visible (possibly zoomed) area.
+      if (xPix < chartArea.left - 0.5 || xPix > chartArea.right + 0.5) return
+
+      ctx.save()
+
+      // The vertical line — celadon, solid, distinct from the dashed planned
+      // curve and the orange actual curve.
+      ctx.strokeStyle = 'rgba(95,138,120,0.9)'   // celadon
+      ctx.lineWidth = 1.5
+      ctx.beginPath()
+      ctx.moveTo(xPix, chartArea.top)
+      ctx.lineTo(xPix, chartArea.bottom)
+      ctx.stroke()
+
+      // "NOW" tag at the top of the line.
+      const tag = 'NOW'
+      ctx.font = 'bold 9px sans-serif'
+      const tagW = ctx.measureText(tag).width + 8
+      const tagX = Math.min(xPix, chartArea.right - tagW)
+      ctx.fillStyle = 'rgba(95,138,120,0.95)'
+      ctx.fillRect(tagX, chartArea.top, tagW, 14)
+      ctx.fillStyle = '#fff'
+      ctx.textAlign = 'left'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(tag, tagX + 4, chartArea.top + 7)
+
+      // Target-temp marker: a dot on the planned curve at "now" + a label.
+      if (nowLine.targetTemp !== null && nowLine.targetTemp !== undefined) {
+        const yPix = scales.y.getPixelForValue(nowLine.targetTemp)
+        if (yPix >= chartArea.top && yPix <= chartArea.bottom) {
+          ctx.beginPath()
+          ctx.arc(xPix, yPix, 3.5, 0, Math.PI * 2)
+          ctx.fillStyle = 'rgba(95,138,120,1)'
+          ctx.fill()
+          ctx.strokeStyle = '#fff'
+          ctx.lineWidth = 1.5
+          ctx.stroke()
+
+          // Label — flip side near the right edge so it stays on-canvas.
+          const label = `target ${Math.round(nowLine.targetTemp)}°`
+          ctx.font = 'bold 10px sans-serif'
+          const lblW = ctx.measureText(label).width
+          const nearRight = xPix + 8 + lblW > chartArea.right
+          ctx.textAlign = nearRight ? 'right' : 'left'
+          ctx.textBaseline = 'middle'
+          ctx.fillStyle = 'rgba(58,90,72,0.95)'   // celadon-dark
+          ctx.fillText(label, xPix + (nearRight ? -8 : 8), yPix)
+        }
+      }
+
+      ctx.restore()
+    },
+  }
+
   function isAlive() {
     if (!chart || !canvasRef.value) return false
     if (chart.canvas !== canvasRef.value) return false
@@ -192,6 +294,7 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     if (lastSchedule.points.length) setSchedule(lastSchedule.points, lastSchedule.offset)
     if (lastReadings.rows.length)   setReadings(lastReadings.rows, lastReadings.startedAt)
     if (lastReductions.length)      setReductions(lastReductions)   // G11
+    // NOW-LINE: nowLine closure var survives rebuild; next chart.update repaints it.
   }
 
   function autoFitY() {
@@ -231,7 +334,8 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     if (chart) { try { chart.destroy() } catch {} }
 
     // G11: reductionBandsPlugin always on (cheap no-op when no bands); labels optional.
-    const extraPlugins = [reductionBandsPlugin, ...(showLabels ? [curveLabelsPlugin] : [])]
+    // NOW-LINE: nowLinePlugin always on (cheap no-op when nowLine is null).
+    const extraPlugins = [reductionBandsPlugin, nowLinePlugin, ...(showLabels ? [curveLabelsPlugin] : [])]
 
     const config = {
       type: 'line',
@@ -398,6 +502,34 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     chart.update('none')
   }
 
+  // NOW-LINE: position the current-time line. Call on each live tick.
+  //   startedAt — firing.started_at (unix seconds).
+  // Computes elapsed minutes (chart-x) and the planned target temp at that x.
+  // Extends the x-axis max so the line stays visible as the firing outruns the
+  // planned curve. No-op-safe; cheap enough to call every second.
+  function setNowLine(startedAt) {
+    if (!ensureAlive()) return
+    if (!startedAt) { nowLine = null; chart.update('none'); return }
+
+    const minutes = (Date.now() / 1000 - startedAt) / 60
+    const planned = chart.data.datasets[0]?.data ?? []
+    const targetTemp = targetAtMinute(planned, minutes)
+    nowLine = { minutes, targetTemp }
+
+    // Keep "now" on-canvas once the firing runs past the planned end.
+    const currentMax = chart.options.scales.x.max ?? 0
+    if (minutes > currentMax) chart.options.scales.x.max = minutes + 5
+
+    chart.update('none')
+  }
+
+  // NOW-LINE: hide it (ended firings, or on deselect).
+  function clearNowLine() {
+    nowLine = null
+    if (!ensureAlive()) return
+    chart.update('none')
+  }
+
   function setManualMode(enabled) {
     if (!ensureAlive()) return
     chart.data.datasets[1].pointRadius      = showLabels ? 0 : (enabled ? 6 : 0)
@@ -467,6 +599,7 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
 
   return {
     init, setSchedule, setReadings, setReductions,   // G11: setReductions exported
+    setNowLine, clearNowLine,                         // NOW-LINE
     setManualMode, setSignalLost, clearSignalLost, resetZoom, resize, destroy,
   }
 }

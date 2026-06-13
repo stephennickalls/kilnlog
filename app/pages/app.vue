@@ -4,7 +4,10 @@
     Package 4 — delete confirm (ConfirmDialog), rename (RenameFiringModal),
                 auto-ended banner (AutoEndedBanner)
     Package 6 — CSV export (useFiringExport)
+    G8        — PastDueBanner (payment-failure warning)
     G11       — live reduction logging + chart bands (setReductions)
+    NOW-LINE  — current-time vertical line + planned-target marker
+                (setNowLine / clearNowLine, driven off the 1s tick)
   Components are Nuxt auto-imported from app/components; useFiringExport is
   auto-imported from app/composables.
 -->
@@ -59,6 +62,13 @@
 
       <!-- Main content -->
       <main class="flex-1 flex flex-col min-w-0 overflow-hidden">
+
+        <!-- G8: payment-failure warning. Self-contained — renders only when the
+             user is past_due and still inside the grace window. Sits above all
+             content so it's seen regardless of whether a firing is selected. -->
+        <div class="shrink-0 px-3 pt-3 sm:px-5 sm:pt-5">
+          <PastDueBanner />
+        </div>
 
         <!-- ── Empty state — nothing selected ── -->
         <FiringEmptyState
@@ -313,8 +323,8 @@ const nowUnix              = ref(Math.floor(Date.now() / 1000))
 
 let elapsedTickInterval = null
 
-// G11: setReductions pulled from the chart composable
-const { init, setSchedule, setReadings, setReductions, resetZoom, resize, destroy } = useKilnChart(chartCanvas, {
+// NOW-LINE: setNowLine / clearNowLine added to the destructure
+const { init, setSchedule, setReadings, setReductions, setNowLine, clearNowLine, resetZoom, resize, destroy } = useKilnChart(chartCanvas, {
   enableZoom: true,
   showLabels: true,
   onPointClick: (point) => {
@@ -346,6 +356,13 @@ const scheduleOffset = computed(() => selectedFiring.value?.schedule_offset ?? 0
 function applySchedule(scheduleRows) {
   const rows = scheduleRows ?? selectedFiring.value?.schedule ?? []
   setSchedule(rows, scheduleOffset.value)
+}
+
+// NOW-LINE: a single tick — advances the clock and repositions the line.
+// Called every second while a firing is live (and unpaused).
+function tickNow() {
+  nowUnix.value = Math.floor(Date.now() / 1000)
+  if (selectedFiring.value?.started_at) setNowLine(selectedFiring.value.started_at)
 }
 
 onMounted(async () => {
@@ -409,8 +426,9 @@ async function onVisibilityChange() {
   if (document.hidden) return
   if (!selectedFiring.value) return
   await reloadReadings()
-  if (isLive.value && !elapsedTickInterval) {
-    elapsedTickInterval = setInterval(() => { nowUnix.value = Math.floor(Date.now() / 1000) }, 1000)
+  if (isLive.value && !isPaused.value && !elapsedTickInterval) {
+    setNowLine(selectedFiring.value.started_at)        // NOW-LINE: catch up immediately
+    elapsedTickInterval = setInterval(tickNow, 1000)
   }
 }
 
@@ -424,6 +442,7 @@ async function selectFiring(f, preloaded = null) {
   isPaused.value = false
   currentTemp.value = null
   consoleRef.value?.closeMenu?.()
+  clearNowLine()                                        // NOW-LINE: reset before repaint
 
   let data = preloaded
   if (!data || data.schedule === undefined || data.readings === undefined) {
@@ -446,12 +465,14 @@ async function selectFiring(f, preloaded = null) {
   if (isActive && data.paused_at) {
     isPaused.value = true
     isLive.value = true
+    setNowLine(data.started_at)                         // NOW-LINE: static paint at pause point
     return
   }
 
   if (isActive) {
     isLive.value = true
-    elapsedTickInterval = setInterval(() => { nowUnix.value = Math.floor(Date.now() / 1000) }, 1000)
+    setNowLine(data.started_at)                         // NOW-LINE: initial paint
+    elapsedTickInterval = setInterval(tickNow, 1000)    // NOW-LINE: advance each second
   }
 }
 
@@ -481,6 +502,7 @@ async function confirmEndFiring() {
     body: { endedAt: Math.floor(Date.now() / 1000) },
   })
   stopAllIntervals()
+  clearNowLine()                                        // NOW-LINE: no "now" on an ended firing
   isLive.value = isPaused.value = false
   currentTemp.value = null
   if (selectedFiring.value?.id === id) {
@@ -570,6 +592,7 @@ async function pauseFiring() {
   stopAllIntervals()
   isPaused.value = true
   f.paused_at = pausedAt
+  setNowLine(f.started_at)                              // NOW-LINE: freeze at the pause moment
 }
 
 async function resumeFiring() {
@@ -582,7 +605,8 @@ async function resumeFiring() {
   f.paused_at = null
   isPaused.value = false
   applySchedule()
-  elapsedTickInterval = setInterval(() => { nowUnix.value = Math.floor(Date.now() / 1000) }, 1000)
+  setNowLine(f.started_at)                              // NOW-LINE: repaint against shifted curve
+  elapsedTickInterval = setInterval(tickNow, 1000)
   toast.show(`Resumed — schedule shifted ${gapMins} min to match.`, 'success')
 }
 
@@ -610,6 +634,7 @@ async function recalibrate() {
   await $fetch(`/api/firings/${f.id}`, { method: 'PUT', body: { scheduleOffset: newOffset } })
   f.schedule_offset = newOffset
   applySchedule()
+  setNowLine(f.started_at)                              // NOW-LINE: target dot follows the shifted curve
   showRecalibrateInfo.value = false
   toast.show('Schedule recalibrated to current temperature.', 'success')
 }
@@ -626,6 +651,7 @@ async function performDeleteFiring(f) {
     await $fetch(`/api/firings/${f.id}`, { method: 'DELETE' })
     if (selectedFiring.value?.id === f.id) {
       stopAllIntervals()
+      clearNowLine()                                    // NOW-LINE: clear on deselect
       selectedFiring.value = currentTemp.value = null
       isLive.value = isPaused.value = false
     }
@@ -697,6 +723,9 @@ async function reloadReadings() {
     selectedFiring.value.reductions = data.reductions ?? selectedFiring.value.reductions  // G11
     setReadings(data.readings, selectedFiring.value.started_at)
     setReductions(selectedFiring.value.reductions ?? [])                                  // G11
+    if (isLive.value && !isPaused.value && selectedFiring.value.started_at) {
+      setNowLine(selectedFiring.value.started_at)                                         // NOW-LINE: keep aligned after reload
+    }
     if (!isSaving.value && data.readings?.length) {
       currentTemp.value = data.readings.at(-1).temperature
     }

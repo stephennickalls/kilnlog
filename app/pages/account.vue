@@ -93,6 +93,32 @@
               </button>
             </template>
 
+            <!-- G8: failed payment, still inside the grace window. The user keeps
+                 full access; this nudges them to fix the card via the Stripe
+                 portal before access lapses. -->
+            <template v-else-if="profile?.subscription_status === 'past_due' && inGrace">
+              <div class="flex items-center justify-between">
+                <span class="text-sm text-ink-muted">Status</span>
+                <span class="px-2.5 py-1 text-xs font-bold rounded-full bg-amber-50 text-amber-700 border border-amber-200">Payment failed</span>
+              </div>
+              <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-relaxed">
+                We couldn't charge your card. Your access stays on until
+                <span class="font-semibold">{{ graceEndsLabel }}</span> — update your
+                payment method to keep it active.
+              </p>
+              <button
+                class="w-full py-2.5 bg-flame text-parchment text-sm font-bold rounded-xl hover:bg-flame-dark transition-colors disabled:opacity-50"
+                :disabled="billingLoading"
+                @click="portal"
+              >
+                <span v-if="billingLoading" class="flex items-center justify-center gap-2">
+                  <span class="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin"/>
+                  Redirecting…
+                </span>
+                <span v-else>Update payment method →</span>
+              </button>
+            </template>
+
             <template v-else>
               <div class="flex items-center justify-between">
                 <span class="text-sm text-ink-muted">Status</span>
@@ -138,6 +164,10 @@
 // app/pages/account.vue
 definePageMeta({ middleware: 'auth' })
 
+// G8 — keep in sync with PAST_DUE_GRACE_DAYS in server/utils/useServerUser.js
+// and app/middleware/auth.js.
+const PAST_DUE_GRACE_DAYS = 7
+
 const supabase     = useSupabaseClient()
 const loading      = ref(true)
 const loadError    = ref('')
@@ -171,6 +201,20 @@ const daysLeft = computed(() => {
   const diff = new Date(profile.value.trial_ends_at) - new Date()
   return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
 })
+
+// G8: when does the past_due grace window run out? Anchored to the failed-
+// payment event (last_stripe_event_at). No anchor → treat as just-failed.
+const graceEnds = computed(() => {
+  if (profile.value?.subscription_status !== 'past_due') return null
+  const anchor = profile.value.last_stripe_event_at
+    ? new Date(profile.value.last_stripe_event_at)
+    : new Date()
+  return new Date(anchor.getTime() + PAST_DUE_GRACE_DAYS * 86400000)
+})
+
+const inGrace = computed(() => !!graceEnds.value && graceEnds.value > new Date())
+
+const graceEndsLabel = computed(() => (graceEnds.value ? formatDate(graceEnds.value) : ''))
 
 function formatDate(ts) {
   if (!ts) return ''

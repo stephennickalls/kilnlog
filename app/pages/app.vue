@@ -1,4 +1,13 @@
 <!-- app/pages/app.vue -->
+<!--
+  Wired for:
+    Package 4 — delete confirm (ConfirmDialog), rename (RenameFiringModal),
+                auto-ended banner (AutoEndedBanner)
+    Package 6 — CSV export (useFiringExport)
+    G11       — live reduction logging + chart bands (setReductions)
+  Components are Nuxt auto-imported from app/components; useFiringExport is
+  auto-imported from app/composables.
+-->
 <template>
   <div class="flex flex-col h-screen overflow-hidden font-serif bg-parchment">
 
@@ -12,7 +21,15 @@
       </div>
       <div class="flex items-center gap-2 min-w-0">
         <template v-if="selectedFiring">
-          <span class="text-xs sm:text-sm font-semibold text-ink truncate max-w-[120px] sm:max-w-none">{{ selectedFiring.name }}</span>
+          <!-- G2: name is now a button that opens the rename modal -->
+          <button
+            class="group flex items-center gap-1 text-xs sm:text-sm font-semibold text-ink truncate max-w-[140px] sm:max-w-none hover:text-flame transition-colors"
+            title="Rename firing"
+            @click="showRenameModal = true"
+          >
+            <span class="truncate">{{ selectedFiring.name }}</span>
+            <svg class="w-3.5 h-3.5 shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
           <span v-if="isLive && !isPaused" class="px-2 py-0.5 text-xs font-bold rounded-full bg-blue-100 text-blue-700 border border-blue-200 shrink-0">● ACTIVE</span>
           <span v-else-if="isPaused" class="px-2 py-0.5 text-xs font-bold rounded-full bg-amber-100 text-amber-700 border border-amber-200 shrink-0">⏸ PAUSED</span>
           <span v-else-if="!selectedFiring.ended_at" class="px-2 py-0.5 text-xs font-bold rounded-full bg-amber-100 text-amber-700 border border-amber-200 shrink-0">⏳</span>
@@ -67,12 +84,14 @@
               :reading-count="readingCount"
               :is-live="isLive"
               :is-paused="isPaused"
+              :reduction-open="!!openReduction"
               @open-temp="showTempModal = true"
               @log-reading="openLogReading"
               @pause="pauseFiring"
               @resume="resumeFiring"
               @recalibrate="openRecalibrate"
               @end="showEndConfirm = true"
+              @reduction="onToggleReduction"
             />
             <FiringReview
               v-else
@@ -83,7 +102,13 @@
               @fire-again="fireAgain"
               @save-as-schedule="saveAsSchedule"
               @restart="restartFiring"
+              @export="onExportFiring"
             />
+          </div>
+
+          <!-- G6: auto-ended banner -->
+          <div v-if="selectedFiring.auto_ended && selectedFiring.ended_at" class="px-3 sm:px-5 pt-2">
+            <AutoEndedBanner :firing="selectedFiring" @restart="restartFiring(selectedFiring)" />
           </div>
 
           <!-- Chart -->
@@ -211,6 +236,24 @@
       @delete="deleteReading"
     />
 
+    <!-- G4: delete-firing confirm (desktop path) -->
+    <ConfirmDialog
+      :open="!!pendingDeleteFiring"
+      :title="`Delete ${pendingDeleteFiring?.name ?? 'firing'}?`"
+      message="This permanently removes the firing, its schedule, and every logged reading. This cannot be undone."
+      confirm-label="Delete firing"
+      @confirm="performDeleteFiring(pendingDeleteFiring)"
+      @cancel="pendingDeleteFiring = null"
+    />
+
+    <!-- G2: rename firing -->
+    <RenameFiringModal
+      :open="showRenameModal"
+      :firing="selectedFiring"
+      @close="showRenameModal = false"
+      @renamed="onFiringRenamed"
+    />
+
     <!-- ── Toast ─────────────────────────────────────────────────────────────── -->
     <Teleport to="body">
       <Transition name="toast">
@@ -240,6 +283,8 @@ const toast  = useToast()
 const router = useRouter()
 const route  = useRoute()          // D2: needed for ?startSchedule param
 
+const { exportFiring } = useFiringExport()   // Package 6
+
 const chartCanvas          = ref(null)
 const consoleRef           = ref(null)
 const editingReading       = ref(null)
@@ -250,6 +295,8 @@ const showStartModal       = ref(false)
 const preselect            = ref(null) // D1/D2: points + name to pre-load into modal
 const showTempModal        = ref(false)
 const showEndConfirm       = ref(false)
+const pendingDeleteFiring  = ref(null) // G4: firing awaiting delete confirmation
+const showRenameModal      = ref(false) // G2: rename dialog visibility
 const allFirings           = ref([])
 const selectedFiring       = ref(null)
 const currentTemp          = ref(null)
@@ -266,7 +313,8 @@ const nowUnix              = ref(Math.floor(Date.now() / 1000))
 
 let elapsedTickInterval = null
 
-const { init, setSchedule, setReadings, resetZoom, resize, destroy } = useKilnChart(chartCanvas, {
+// G11: setReductions pulled from the chart composable
+const { init, setSchedule, setReadings, setReductions, resetZoom, resize, destroy } = useKilnChart(chartCanvas, {
   enableZoom: true,
   showLabels: true,
   onPointClick: (point) => {
@@ -287,6 +335,11 @@ const peakTemp = computed(() => {
   if (!rs?.length) return null
   return rs.reduce((max, r) => r.temperature > max ? r.temperature : max, rs[0].temperature)
 })
+
+// G11: the open (in-progress) reduction period, if any
+const openReduction = computed(() =>
+  (selectedFiring.value?.reductions ?? []).find(r => r.end_temp === null || r.end_temp === undefined) ?? null
+)
 
 const scheduleOffset = computed(() => selectedFiring.value?.schedule_offset ?? 0)
 
@@ -381,6 +434,7 @@ async function selectFiring(f, preloaded = null) {
   await nextTick()
   setSchedule(data.schedule ?? [], data.schedule_offset ?? 0)
   setReadings(data.readings ?? [], data.started_at)
+  setReductions(data.reductions ?? [])          // G11
   requestAnimationFrame(() => resize())
 
   if (data.readings?.length) {
@@ -462,6 +516,52 @@ function fireAgain(f) {
 
 function saveAsSchedule(f) { router.push(`/schedules/new?fromFiring=${f.id}`) }
 
+// Package 6: CSV export. selectedFiring already holds schedule + readings +
+// reductions, so no fetch needed.
+function onExportFiring(f) {
+  const firing = f ?? selectedFiring.value
+  if (!firing) return
+  const full = (firing.readings !== undefined || firing.schedule !== undefined)
+    ? firing
+    : selectedFiring.value
+  exportFiring(full)
+  toast.show('Firing exported.', 'success')
+}
+
+// G11: start/end a reduction period at the current temperature
+async function onToggleReduction() {
+  const f = selectedFiring.value
+  if (!f || !isLive.value) return
+
+  const temp = currentTemp.value
+  if (temp === null || temp === undefined) {
+    toast.show('Log a temperature reading first, then mark reduction.')
+    return
+  }
+
+  try {
+    if (openReduction.value) {
+      const updated = await $fetch(`/api/reductions/${openReduction.value.id}`, {
+        method: 'PUT',
+        body: { endTemp: temp },
+      })
+      const list = (f.reductions ?? []).map(r => r.id === updated.id ? updated : r)
+      selectedFiring.value = { ...f, reductions: list }
+      toast.show(`Reduction ended at ${Math.round(temp)}°C.`, 'success')
+    } else {
+      const created = await $fetch(`/api/firings/${f.id}/reductions`, {
+        method: 'POST',
+        body: { startTemp: temp },
+      })
+      selectedFiring.value = { ...f, reductions: [...(f.reductions ?? []), created] }
+      toast.show(`Reduction started at ${Math.round(temp)}°C.`, 'success')
+    }
+    setReductions(selectedFiring.value.reductions)
+  } catch (err) {
+    toast.show(err?.data?.statusMessage ?? err?.data?.message ?? 'Could not update reduction.')
+  }
+}
+
 async function pauseFiring() {
   const f = selectedFiring.value
   if (!f || !isLive.value || isPaused.value) return
@@ -514,14 +614,35 @@ async function recalibrate() {
   toast.show('Schedule recalibrated to current temperature.', 'success')
 }
 
-async function deleteFiring(f) {
-  await $fetch(`/api/firings/${f.id}`, { method: 'DELETE' })
-  if (selectedFiring.value?.id === f.id) {
-    stopAllIntervals()
-    selectedFiring.value = currentTemp.value = null
-    isLive.value = isPaused.value = false
+// G4: desktop delete now confirms first (mobile sheet keeps its own two-tap)
+function deleteFiring(f) {
+  pendingDeleteFiring.value = f
+}
+
+async function performDeleteFiring(f) {
+  pendingDeleteFiring.value = null
+  if (!f?.id) return
+  try {
+    await $fetch(`/api/firings/${f.id}`, { method: 'DELETE' })
+    if (selectedFiring.value?.id === f.id) {
+      stopAllIntervals()
+      selectedFiring.value = currentTemp.value = null
+      isLive.value = isPaused.value = false
+    }
+    await refreshFirings()
+  } catch (err) {
+    toast.show(`Couldn\u2019t delete: ${err?.data?.statusMessage ?? err?.data?.message ?? 'Unknown error'}`)
   }
-  await refreshFirings()
+}
+
+// G2: apply a rename returned by RenameFiringModal
+function onFiringRenamed(updated) {
+  showRenameModal.value = false
+  if (selectedFiring.value?.id === updated.id) {
+    selectedFiring.value = { ...selectedFiring.value, name: updated.name }
+  }
+  const i = allFirings.value.findIndex(f => f.id === updated.id)
+  if (i !== -1) allFirings.value[i] = { ...allFirings.value[i], name: updated.name }
 }
 
 async function openStartModal() {
@@ -573,7 +694,9 @@ async function reloadReadings() {
     const data = await $fetch(`/api/firings/${selectedFiring.value.id}`)
     selectedFiring.value.readings = data.readings
     selectedFiring.value.schedule = data.schedule
+    selectedFiring.value.reductions = data.reductions ?? selectedFiring.value.reductions  // G11
     setReadings(data.readings, selectedFiring.value.started_at)
+    setReductions(selectedFiring.value.reductions ?? [])                                  // G11
     if (!isSaving.value && data.readings?.length) {
       currentTemp.value = data.readings.at(-1).temperature
     }
@@ -585,7 +708,7 @@ async function reloadReadings() {
 async function sheetDeleteFiring(f) {
   sheetConfirmDeleteId.value = null
   showFiringSheet.value = false
-  await deleteFiring(f)
+  await performDeleteFiring(f)   // G4: mobile two-tap deletes directly
 }
 </script>
 

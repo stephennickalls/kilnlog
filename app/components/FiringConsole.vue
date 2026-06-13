@@ -1,9 +1,12 @@
 <!-- app/components/FiringConsole.vue -->
 <!--
   Live firing console, built around the current-vs-target comparison. Delta colour
-  encodes state (blue=behind, amber=ahead, CELADON=on track). On-track uses celadon
-  (the pottery "good result" accent) rather than generic green — same green-family
-  meaning, warmer and on-brand. Desktop (lg+): compact row. Below lg: tight strip.
+  encodes state (blue=behind, amber=ahead, CELADON=on track). Desktop (lg+): compact
+  row. Below lg: tight strip.
+
+  G11: the overflow menu gains a reduction toggle — "Start reduction" when none is
+  open, "End reduction" when one is in progress. Emits a single 'reduction' action;
+  the parent captures the current temperature and calls the API.
 -->
 <template>
   <div class="flex flex-col gap-2">
@@ -59,6 +62,11 @@
 
       <div class="flex-1"/>
 
+      <!-- Reduction in-progress chip (desktop) -->
+      <div v-if="reductionOpen" class="self-center inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 shrink-0">
+        <span class="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"/> Reduction
+      </div>
+
       <div class="relative shrink-0 flex">
         <button class="bg-white border border-parchment-3 rounded-xl flex items-center justify-center w-11 text-ink-muted hover:text-ink hover:border-flame/40 transition-colors" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)" @click="menuOpen = !menuOpen">
           <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
@@ -68,6 +76,10 @@
           <button v-if="isLive && !isPaused" class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-amber-700 hover:bg-amber-50 transition-colors text-left" @click="emitAction('pause')"><span class="text-base">⏸</span> Pause firing</button>
           <button v-if="isPaused" class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-flame hover:bg-flame-bg transition-colors text-left" @click="emitAction('resume')"><span class="text-base">▶</span> Resume firing</button>
           <button v-if="isLive && !isPaused" class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-ink hover:bg-flame-bg transition-colors text-left" @click="emitAction('recalibrate')"><span class="text-base">↻</span> Recalibrate</button>
+          <!-- G11: reduction toggle -->
+          <button v-if="isLive" class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-indigo-700 hover:bg-indigo-50 transition-colors text-left" @click="emitAction('reduction')">
+            <span class="text-base">{{ reductionOpen ? '⊟' : '⊞' }}</span> {{ reductionOpen ? 'End reduction' : 'Start reduction' }}
+          </button>
           <div class="h-px bg-parchment-3 my-0.5 mx-2"/>
           <button class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-red-500 hover:bg-red-50 transition-colors text-left" @click="emitAction('end')">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5.64 5.64a9 9 0 1012.72 0M12 3v9"/></svg>
@@ -94,9 +106,10 @@
             <span v-if="delta" class="mb-1 inline-flex items-center gap-0.5 text-[11px] font-bold" :class="delta.textClass">{{ delta.icon }}{{ delta.short }}</span>
           </template>
         </div>
-        <div class="flex gap-3.5 mt-1.5">
+        <div class="flex gap-3.5 mt-1.5 items-center">
           <span class="text-[11px] text-ink-muted">Rate <b class="font-bold" :class="rateColorClass">{{ rateShort }}</b><span class="text-ink-faint">/{{ targetRate }}</span></span>
           <span class="text-[11px] text-ink-muted">Readings <b class="font-bold text-ink">{{ readingCount }}</b></span>
+          <span v-if="reductionOpen" class="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600"><span class="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"/>Reduction</span>
         </div>
       </button>
 
@@ -114,6 +127,10 @@
           <button v-if="isLive && !isPaused" class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-amber-700 hover:bg-amber-50 transition-colors text-left" @click="emitAction('pause')"><span class="text-base">⏸</span> Pause firing</button>
           <button v-if="isPaused" class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-flame hover:bg-flame-bg transition-colors text-left" @click="emitAction('resume')"><span class="text-base">▶</span> Resume firing</button>
           <button v-if="isLive && !isPaused" class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-ink hover:bg-flame-bg transition-colors text-left" @click="emitAction('recalibrate')"><span class="text-base">↻</span> Recalibrate</button>
+          <!-- G11: reduction toggle -->
+          <button v-if="isLive" class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-indigo-700 hover:bg-indigo-50 transition-colors text-left" @click="emitAction('reduction')">
+            <span class="text-base">{{ reductionOpen ? '⊟' : '⊞' }}</span> {{ reductionOpen ? 'End reduction' : 'Start reduction' }}
+          </button>
           <div class="h-px bg-parchment-3 my-0.5 mx-2"/>
           <button class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-red-500 hover:bg-red-50 transition-colors text-left" @click="emitAction('end')">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5.64 5.64a9 9 0 1012.72 0M12 3v9"/></svg>
@@ -134,16 +151,17 @@
 import { computed, ref, watch } from 'vue'
 
 const props = defineProps({
-  currentTemp:  { type: Number, default: null },
-  targetTemp:   { type: Number, default: null },
-  rateOfChange: { type: String, default: '—' },
-  targetRate:   { type: String, default: '—' },
-  readingCount: { type: Number, default: 0 },
-  isLive:       Boolean,
-  isPaused:     Boolean,
+  currentTemp:   { type: Number, default: null },
+  targetTemp:    { type: Number, default: null },
+  rateOfChange:  { type: String, default: '—' },
+  targetRate:    { type: String, default: '—' },
+  readingCount:  { type: Number, default: 0 },
+  isLive:        Boolean,
+  isPaused:      Boolean,
+  reductionOpen: { type: Boolean, default: false },   // G11
 })
 
-const emit = defineEmits(['open-temp', 'log-reading', 'pause', 'resume', 'recalibrate', 'end'])
+const emit = defineEmits(['open-temp', 'log-reading', 'pause', 'resume', 'recalibrate', 'end', 'reduction'])
 
 const menuOpen = ref(false)
 function emitAction(name) { menuOpen.value = false; emit(name) }
@@ -155,7 +173,6 @@ function parseRate(str) {
   return isFinite(n) ? n : null
 }
 
-// On-track rate reads celadon (the pottery "good" accent); behind=blue, ahead=amber.
 const rateColorClass = computed(() => {
   const actual = parseRate(props.rateOfChange)
   const target = parseRate(props.targetRate)

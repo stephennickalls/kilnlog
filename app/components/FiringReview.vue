@@ -2,12 +2,14 @@
 <!--
   Shown when an ENDED firing is selected. Read-only review: a summary line
   plus the repeatability actions. "Fire again" and "Save as schedule" are
-  the headline features; Restart picks the exact firing back up.
+  the headline features; Restart picks the exact firing back up; Export (G3)
+  downloads the full record as CSV.
   `canRestart` is false when another firing is already active.
 
   "Save as schedule" is celadon — it's the act that turns a good firing into a
   repeatable plan (the product's heart), so it visually echoes the schedules
-  world it creates. "Fire this again" stays flame (immediate); Restart stays quiet.
+  world it creates. "Fire this again" stays flame (immediate); Restart and
+  Export stay quiet.
 -->
 <template>
   <div class="bg-white border border-parchment-3 rounded-2xl px-4 py-3 sm:px-6 sm:py-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-5" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
@@ -38,6 +40,14 @@
       >
         ↺ Restart
       </button>
+      <button
+        class="flex items-center justify-center gap-2 px-4 py-2.5 border border-parchment-3 text-ink-muted hover:bg-parchment-2 text-sm font-semibold rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        :disabled="!hasData"
+        :title="hasData ? 'Download this firing as CSV' : 'Nothing to export yet'"
+        @click="$emit('export', firing)"
+      >
+        ↓ Export
+      </button>
     </div>
   </div>
 </template>
@@ -52,6 +62,10 @@ const props = defineProps({
   duration:   { type: String, default: null },
 })
 
+const hasData = computed(() =>
+  !!(props.firing.readings?.length || props.firing.schedule?.length)
+)
+
 const summary = computed(() => {
   const parts = []
   if (props.peakTemp !== null) parts.push(`Peak ${Math.round(props.peakTemp)}°`)
@@ -61,5 +75,5 @@ const summary = computed(() => {
   return parts.join(' · ') || 'No readings logged'
 })
 
-defineEmits(['fire-again', 'save-as-schedule', 'restart'])
+defineEmits(['fire-again', 'save-as-schedule', 'restart', 'export'])
 </script>

@@ -1,4 +1,12 @@
-// app/composables/useKilnChart.js
+// File: app/composables/useKilnChart.js
+//
+// G11 CHANGE SUMMARY (search "G11" for the spots):
+//   - new reductionBandsPlugin: shaded vertical bands behind the curves,
+//     one per reduction period, mapped from temperature → x(minutes) using
+//     the ACTUAL readings curve. Drawn in beforeDatasetsDraw so it sits under
+//     the planned/actual lines. Does NOT touch autoFitY (annotation, not data).
+//   - new setReductions(periods) method + lastReductions cache (replayed on rebuild).
+//   - reductions are stored on a closure var the plugin reads at draw time.
 
 import { nextTick } from 'vue'
 import { Chart, registerables } from 'chart.js'
@@ -6,19 +14,12 @@ import { Chart, registerables } from 'chart.js'
 Chart.register(...registerables)
 
 // ── Zoom plugin: browser-only, lazy registration ──────────────────────────────
-// chartjs-plugin-zoom depends on hammerjs, which references `window` at module
-// load — so a static top-level import crashes SSR. We register it lazily on the
-// first init(), guarded by import.meta.client. Crucially this keeps the module
-// SYNCHRONOUS (no top-level await): a top-level await turns the composable into
-// an async module, which shifts Nuxt's <Suspense> mount timing so onMounted can
-// fire before the canvas ref resolves ("init() called with no canvas ref").
-// Registering inside the awaited init() avoids that entirely.
 let zoomReady = false
 let zoomRegisterPromise = null
 
 function ensureZoomPlugin() {
   if (zoomReady) return Promise.resolve()
-  if (!import.meta.client) return Promise.resolve()        // never on server
+  if (!import.meta.client) return Promise.resolve()
   if (zoomRegisterPromise) return zoomRegisterPromise
   zoomRegisterPromise = import('chartjs-plugin-zoom')
     .then(({ default: zoomPlugin }) => {
@@ -76,8 +77,98 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
   let chart = null
   let xMax  = 120
 
-  let lastSchedule = { points: [], offset: 0 }
-  let lastReadings = { rows: [], startedAt: 0 }
+  let lastSchedule   = { points: [], offset: 0 }
+  let lastReadings   = { rows: [], startedAt: 0 }
+  let lastReductions = []                                  // G11: cache for rebuild
+
+  // G11: live reference the plugin reads at draw time. Each entry:
+  //   { startX, endX } in minutes, already mapped from temperature.
+  let reductionBands = []
+
+  // G11: map a temperature to the x(minute) where the ACTUAL curve first
+  // reaches it (linear interpolation between bracketing readings). Returns null
+  // if the curve never reaches that temp.
+  function minuteAtTemp(actualPoints, temp) {
+    if (!actualPoints.length) return null
+    for (let i = 0; i < actualPoints.length - 1; i++) {
+      const a = actualPoints[i], b = actualPoints[i + 1]
+      const lo = Math.min(a.y, b.y), hi = Math.max(a.y, b.y)
+      if (temp >= lo && temp <= hi) {
+        const span = b.y - a.y
+        const frac = span === 0 ? 0 : (temp - a.y) / span
+        return a.x + frac * (b.x - a.x)
+      }
+    }
+    // Temp beyond the curve's range: clamp to nearest end if close, else null.
+    const first = actualPoints[0], last = actualPoints[actualPoints.length - 1]
+    if (temp <= Math.min(first.y, last.y)) return first.x
+    return null
+  }
+
+  // G11: recompute pixel-independent band x-ranges from periods + current actual
+  // data. Called by setReductions and whenever readings change.
+  function computeReductionBands() {
+    const actual = chart?.data?.datasets?.[1]?.data ?? []
+    const bands = []
+    for (const p of lastReductions) {
+      const startX = minuteAtTemp(actual, p.start_temp)
+      if (startX === null) continue
+      let endX
+      if (p.end_temp === null || p.end_temp === undefined) {
+        // Open/in-progress: run to the latest reading (the live edge).
+        endX = actual.length ? actual[actual.length - 1].x : startX
+      } else {
+        const e = minuteAtTemp(actual, p.end_temp)
+        endX = e === null
+          ? (actual.length ? actual[actual.length - 1].x : startX)
+          : e
+      }
+      if (endX < startX) [endX] = [startX]                 // guard
+      bands.push({ startX, endX, open: p.end_temp == null })
+    }
+    reductionBands = bands
+  }
+
+  // G11: draw bands behind the curves.
+  const reductionBandsPlugin = {
+    id: 'reductionBands',
+    beforeDatasetsDraw(chart) {
+      if (!reductionBands.length) return
+      const { ctx, chartArea, scales } = chart
+      if (!chartArea || !scales?.x) return
+      ctx.save()
+      for (const band of reductionBands) {
+        const xPix1 = scales.x.getPixelForValue(band.startX)
+        const xPix2 = scales.x.getPixelForValue(band.endX)
+        const left  = Math.max(Math.min(xPix1, xPix2), chartArea.left)
+        const right = Math.min(Math.max(xPix1, xPix2), chartArea.right)
+        const width = Math.max(right - left, 1.5)          // hairline if zero-width
+
+        // Reduction = cooler-flame smoky tone; semi-transparent slate/blue.
+        ctx.fillStyle = band.open ? 'rgba(99,102,241,0.10)' : 'rgba(71,85,105,0.12)'
+        ctx.fillRect(left, chartArea.top, width, chartArea.bottom - chartArea.top)
+
+        // Left edge marker.
+        ctx.strokeStyle = band.open ? 'rgba(99,102,241,0.55)' : 'rgba(71,85,105,0.5)'
+        ctx.lineWidth = 1
+        ctx.setLineDash([3, 3])
+        ctx.beginPath()
+        ctx.moveTo(left, chartArea.top)
+        ctx.lineTo(left, chartArea.bottom)
+        ctx.stroke()
+        ctx.setLineDash([])
+
+        // Label near the top of the band.
+        if (width > 30) {
+          ctx.font = 'bold 9px sans-serif'
+          ctx.fillStyle = band.open ? 'rgba(79,70,229,0.9)' : 'rgba(51,65,85,0.8)'
+          ctx.textAlign = 'left'
+          ctx.fillText(band.open ? 'Reduction…' : 'Reduction', left + 4, chartArea.top + 12)
+        }
+      }
+      ctx.restore()
+    },
+  }
 
   function isAlive() {
     if (!chart || !canvasRef.value) return false
@@ -100,6 +191,7 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     buildChart()
     if (lastSchedule.points.length) setSchedule(lastSchedule.points, lastSchedule.offset)
     if (lastReadings.rows.length)   setReadings(lastReadings.rows, lastReadings.startedAt)
+    if (lastReductions.length)      setReductions(lastReductions)   // G11
   }
 
   function autoFitY() {
@@ -124,21 +216,13 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     chart.options.scales.y.max          = yMax
   }
 
-  // Async: awaits zoom plugin registration before the first build. The caller
-  // already does `await init()`, so this slots in cleanly.
   async function init() {
     await ensureZoomPlugin()
-    // The canvas ref may not be populated on the exact tick onMounted runs
-    // (Suspense / async-component timing). Wait one tick and re-check rather
-    // than bailing — buildChart still guards on canvasRef.value internally.
-    if (!canvasRef.value) {
-      await nextTick()
-    }
+    if (!canvasRef.value) await nextTick()
     if (!canvasRef.value) {
       console.warn('[useKilnChart] init() — canvas ref still null after nextTick; skipping build')
       return
     }
-    console.debug('[useKilnChart] init() — zoomReady?', zoomReady, '| canvas present')
     buildChart()
   }
 
@@ -146,7 +230,8 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     if (!canvasRef.value) return
     if (chart) { try { chart.destroy() } catch {} }
 
-    const extraPlugins = showLabels ? [curveLabelsPlugin] : []
+    // G11: reductionBandsPlugin always on (cheap no-op when no bands); labels optional.
+    const extraPlugins = [reductionBandsPlugin, ...(showLabels ? [curveLabelsPlugin] : [])]
 
     const config = {
       type: 'line',
@@ -268,12 +353,6 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     }
 
     chart = new Chart(canvasRef.value, config)
-
-    const zoomPluginRegistered = !!Chart.registry.plugins.get('zoom')
-    const zoomOptsOnChart       = !!chart.options?.plugins?.zoom
-    console.debug('[useKilnChart] chart built — zoom plugin registered?', zoomPluginRegistered,
-                  '| zoom opts present on chart?', zoomOptsOnChart,
-                  '| enableZoom flag?', enableZoom)
   }
 
   function setSchedule(points, offset = 0) {
@@ -306,6 +385,16 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
       ts: r.timestamp,
     }))
     autoFitY()
+    computeReductionBands()        // G11: bands depend on the actual curve
+    chart.update('none')
+  }
+
+  // G11: set/replace the reduction periods. Accepts the raw rows
+  // ({ start_temp, end_temp, ... }) from the firing payload.
+  function setReductions(periods) {
+    lastReductions = periods ?? []
+    if (!ensureAlive()) return
+    computeReductionBands()
     chart.update('none')
   }
 
@@ -376,5 +465,8 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     chart = null
   }
 
-  return { init, setSchedule, setReadings, setManualMode, setSignalLost, clearSignalLost, resetZoom, resize, destroy }
+  return {
+    init, setSchedule, setReadings, setReductions,   // G11: setReductions exported
+    setManualMode, setSignalLost, clearSignalLost, resetZoom, resize, destroy,
+  }
 }

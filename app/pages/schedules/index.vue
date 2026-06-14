@@ -22,6 +22,16 @@
 
     <main class="max-w-6xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-10">
 
+      <!-- G5: one firing at a time — note when starting is blocked -->
+      <NuxtLink
+        v-if="activeFiring"
+        to="/app"
+        class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm hover:bg-amber-100 transition-colors"
+      >
+        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+        <span><strong>{{ activeFiring.name }}</strong> is still firing — only one firing at a time. End it before starting another.</span>
+      </NuxtLink>
+
       <div v-if="loading" class="flex flex-col items-center justify-center py-20 text-ink-muted gap-2">
         <svg class="w-6 h-6 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"/></svg>
         <span class="text-sm">Loading schedules…</span>
@@ -40,6 +50,7 @@
             <ScheduleCard
               v-for="s in mySchedules" :key="s.id"
               :schedule="s"
+              :start-disabled="!!activeFiring"
               @edit="goEdit(s)"
               @start="startFromSchedule(s)"
               @duplicate="duplicate(s)"
@@ -79,6 +90,7 @@
               v-for="s in filteredPresets" :key="s.id"
               :schedule="s"
               :is-preset="true"
+              :start-disabled="!!activeFiring"
               @edit="goEdit(s)"
               @start="startFromSchedule(s)"
               @duplicate="duplicate(s)"
@@ -107,6 +119,9 @@ definePageMeta({ middleware: ['auth'] })
 
 const router = useRouter()
 
+// G5: know whether a firing is active so we can disable Start affordances.
+const { activeFiring, loadActiveFiring } = useActiveFiring()
+
 const schedules   = ref([])
 const loading     = ref(true)
 const status      = ref('')
@@ -126,7 +141,7 @@ const filteredPresets = computed(() =>
   activeFilter.value === 'all' ? presets.value : presets.value.filter(s => s.type === activeFilter.value)
 )
 
-onMounted(load)
+onMounted(() => { load(); loadActiveFiring() })
 
 async function load() {
   loading.value = true
@@ -145,7 +160,14 @@ function flash(msg) {
 }
 
 function goEdit(s) { router.push(`/schedules/${s.id}`) }
-function startFromSchedule(s) { router.push(`/app?startSchedule=${s.id}`) }
+function startFromSchedule(s) {
+  // G5 fallback — the card disables this when active, but guard anyway.
+  if (activeFiring.value) {
+    flash(`"${activeFiring.value.name}" is still firing — end it first.`)
+    return
+  }
+  router.push(`/app?startSchedule=${s.id}`)
+}
 
 async function duplicate(s) {
   try {

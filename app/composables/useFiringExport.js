@@ -10,8 +10,11 @@
 //   2. READINGS   — timestamp (ISO + unix), minutes from start, temperature
 //   3. SCHEDULE   — planned waypoints (offset minutes, target temp), offset-adjusted
 //
-// Temperatures are °C (matching the app). If/when a °F preference lands (G1),
-// pass a converter in and label the column accordingly.
+// G1 (°F): storage is always °C. buildFiringCsv takes an OPTIONS object with a
+// converter + unit so the exported temperatures and column headers match the
+// user's preference. Defaults to °C (identity) so the function stays pure and
+// callable without the composable (e.g. tests). useFiringExport() injects the
+// live useTempUnit helpers.
 
 function csvEscape(value) {
   if (value === null || value === undefined) return ''
@@ -52,13 +55,23 @@ function buildFilename(firing) {
   return `kilnmonitor_${base}_${stamp}.csv`
 }
 
-export function buildFiringCsv(firing) {
+// opts: { convert?: (c:number)=>number, unit?: 'C'|'F' }
+// convert defaults to identity (°C). Temperatures are rounded for the file.
+export function buildFiringCsv(firing, opts = {}) {
+  const convert = typeof opts.convert === 'function' ? opts.convert : (c => c)
+  const unit = opts.unit === 'F' ? 'F' : 'C'
+  const tcol = `(${unit})`
+  const conv = (c) => (c === null || c === undefined || !Number.isFinite(Number(c)))
+    ? ''
+    : Math.round(convert(Number(c)))
+
   const readings = [...(firing.readings ?? [])].sort((a, b) => a.timestamp - b.timestamp)
   const schedule = [...(firing.schedule ?? [])].sort((a, b) => a.offset_minutes - b.offset_minutes)
   const offset   = firing.schedule_offset ?? 0
   const startedAt = firing.started_at ?? null
 
-  const peak = readings.length
+  // Peak in °C, converted for display.
+  const peakC = readings.length
     ? Math.round(readings.reduce((mx, r) => r.temperature > mx ? r.temperature : mx, readings[0].temperature))
     : null
 
@@ -74,7 +87,7 @@ export function buildFiringCsv(firing) {
   lines.push(row(['Ended (ISO)', fmtUnixIso(firing.ended_at)]))
   lines.push(row(['Duration', fmtDuration(durationSecs)]))
   lines.push(row(['Auto-ended', firing.auto_ended ? 'yes' : 'no']))
-  lines.push(row(['Peak temperature (C)', peak ?? '']))
+  lines.push(row([`Peak temperature ${tcol}`, peakC === null ? '' : conv(peakC)]))
   lines.push(row(['Readings logged', readings.length]))
   lines.push(row(['Schedule offset (min)', offset]))
   lines.push(row(['Exported (ISO)', new Date().toISOString()]))
@@ -82,27 +95,31 @@ export function buildFiringCsv(firing) {
 
   // ── Section 2: readings ─────────────────────────────────────────────────────
   lines.push(row(['READINGS']))
-  lines.push(row(['Timestamp (ISO)', 'Unix', 'Minutes from start', 'Temperature (C)']))
+  lines.push(row(['Timestamp (ISO)', 'Unix', 'Minutes from start', `Temperature ${tcol}`]))
   for (const r of readings) {
     const minsFromStart = startedAt ? Math.round((r.timestamp - startedAt) / 60) : ''
-    lines.push(row([fmtUnixIso(r.timestamp), r.timestamp, minsFromStart, r.temperature]))
+    lines.push(row([fmtUnixIso(r.timestamp), r.timestamp, minsFromStart, conv(r.temperature)]))
   }
   lines.push('')
 
   // ── Section 3: planned schedule ─────────────────────────────────────────────
   lines.push(row(['PLANNED SCHEDULE']))
-  lines.push(row(['Offset minutes', 'Offset minutes (adjusted)', 'Target temp (C)']))
+  lines.push(row(['Offset minutes', 'Offset minutes (adjusted)', `Target temp ${tcol}`]))
   for (const p of schedule) {
-    lines.push(row([p.offset_minutes, p.offset_minutes + offset, p.target_temp]))
+    lines.push(row([p.offset_minutes, p.offset_minutes + offset, conv(p.target_temp)]))
   }
 
   return lines.join('\r\n')
 }
 
 export function useFiringExport() {
+  // Live unit + converter; read at export time.
+  const { unit, isF } = useTempUnit()
+  const convert = (c) => (isF.value ? c * 9 / 5 + 32 : c)
+
   function exportFiring(firing) {
     if (!firing) return
-    const csv = buildFiringCsv(firing)
+    const csv = buildFiringCsv(firing, { convert, unit: unit.value })
     // Prepend BOM so Excel reads UTF-8 correctly (names/notes with accents).
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
     const url  = URL.createObjectURL(blob)
@@ -112,7 +129,6 @@ export function useFiringExport() {
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
-    // Revoke on next tick so the download has grabbed the blob.
     setTimeout(() => URL.revokeObjectURL(url), 0)
   }
 

@@ -1,4 +1,12 @@
 <!-- app/components/ManualReadingModal.vue -->
+<!--
+  G1 (°F): the ONE temperature INPUT boundary. The field accepts a value in the
+  user's unit; on submit it converts to °C before emitting, so everything
+  downstream (parent state, API, storage) stays °C. When editing, the incoming
+  °C value is converted to the display unit to pre-fill the field. The max cap
+  is shown in the active unit (1400°C === 2552°F) but the server still validates
+  in °C.
+-->
 <template>
   <Teleport to="body">
     <div
@@ -41,12 +49,12 @@ class="bg-parchment w-full sm:w-[360px] sm:rounded-2xl rounded-t-2xl p-6 flex fl
               v-model.number="tempValue"
               type="number"
               min="0"
-              max="1400"
+              :max="maxInputTemp"
               placeholder="0"
               class="flex-1 border border-parchment-3 rounded-xl px-4 py-3 text-3xl font-bold tabular-nums text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif"
               @keydown.enter="submit"
             >
-            <span class="text-xl font-bold text-ink-faint shrink-0">°C</span>
+            <span class="text-xl font-bold text-ink-faint shrink-0">{{ unitLabel }}</span>
           </div>
         </div>
 
@@ -77,14 +85,16 @@ const props = defineProps({
   open:      Boolean,
   startedAt: { type: Number, default: 0 },
   isEdit:    Boolean,
-  editTemp:  { type: Number, default: null },
+  editTemp:  { type: Number, default: null },   // raw °C
   editTs:    { type: Number, default: null },
 })
 
 const emit = defineEmits(['close', 'save', 'delete'])
 
+const { displayTemp, toCelsius, unitLabel, maxInputTemp } = useTempUnit()
+
 const tempInput = ref(null)
-const tempValue = ref(null)
+const tempValue = ref(null)   // in the user's unit while the field is open
 
 // Ticks every second while modal is open so display stays current
 const nowUnix = ref(Math.floor(Date.now() / 1000))
@@ -92,8 +102,8 @@ let ticker = null
 
 watch(() => props.open, (val) => {
   if (val) {
-    tempValue.value = props.isEdit && props.editTemp ? props.editTemp : null
-    // Reset clock to now when modal opens
+    // Pre-fill: incoming editTemp is °C → show in the user's unit.
+    tempValue.value = props.isEdit && props.editTemp != null ? displayTemp(props.editTemp) : null
     nowUnix.value = Math.floor(Date.now() / 1000)
     ticker = setInterval(() => { nowUnix.value = Math.floor(Date.now() / 1000) }, 1000)
     nextTick(() => tempInput.value?.focus())
@@ -121,10 +131,11 @@ const clockTime = computed(() =>
 
 function submit() {
   if (!tempValue.value || tempValue.value <= 0) return
-  // Capture timestamp at the moment of submit — always current
+  // Convert the typed value (user's unit) back to °C for storage.
+  const temperatureC = toCelsius(tempValue.value)
   const timestamp = props.isEdit && props.editTs
     ? props.editTs
     : Math.floor(Date.now() / 1000)
-  emit('save', { temperature: tempValue.value, timestamp })
+  emit('save', { temperature: temperatureC, timestamp })
 }
 </script>

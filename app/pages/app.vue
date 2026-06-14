@@ -7,9 +7,10 @@
     G8        — PastDueBanner (payment-failure warning)
     G11       — live reduction logging + chart bands (setReductions)
     NOW-LINE  — current-time vertical line + planned-target marker
-                (setNowLine / clearNowLine, driven off the 1s tick)
-  Components are Nuxt auto-imported from app/components; useFiringExport is
-  auto-imported from app/composables.
+    G1 (°F)   — useTempUnit init from server + header toggle (optimistic + persist);
+                chart repaints on toggle via setUnit(); FiringConsole gets raw °C
+                values (rateC/targetRateC/targetTempC) alongside display strings.
+  Components are Nuxt auto-imported from app/components; composables from app/composables.
 -->
 <template>
   <div class="flex flex-col h-screen overflow-hidden font-serif bg-parchment">
@@ -26,7 +27,7 @@
         <template v-if="selectedFiring">
           <!-- G2: name is now a button that opens the rename modal -->
           <button
-            class="group flex items-center gap-1 text-xs sm:text-sm font-semibold text-ink truncate max-w-[140px] sm:max-w-none hover:text-flame transition-colors"
+            class="group flex items-center gap-1 text-xs sm:text-sm font-semibold text-ink truncate max-w-[120px] sm:max-w-none hover:text-flame transition-colors"
             title="Rename firing"
             @click="showRenameModal = true"
           >
@@ -38,6 +39,12 @@
           <span v-else-if="!selectedFiring.ended_at" class="px-2 py-0.5 text-xs font-bold rounded-full bg-amber-100 text-amber-700 border border-amber-200 shrink-0">⏳</span>
           <span v-else class="px-2 py-0.5 text-xs font-bold rounded-full bg-parchment-2 text-ink-faint border border-parchment-3 shrink-0">DONE</span>
         </template>
+
+        <!-- G1: °C/°F toggle (shared component). Repaints the kiln chart on
+             change via setChartUnit; the flip + persist + revert live inside
+             the component. -->
+        <TempUnitToggle size="md" @change="setChartUnit" />
+
         <UserMenu />
       </div>
     </header>
@@ -63,9 +70,7 @@
       <!-- Main content -->
       <main class="flex-1 flex flex-col min-w-0 overflow-hidden">
 
-        <!-- G8: payment-failure warning. Self-contained — renders only when the
-             user is past_due and still inside the grace window. Sits above all
-             content so it's seen regardless of whether a firing is selected. -->
+        <!-- G8: payment-failure warning (renders only when past_due in grace). -->
         <div class="shrink-0 px-3 pt-3 sm:px-5 sm:pt-5">
           <PastDueBanner />
         </div>
@@ -74,6 +79,7 @@
         <FiringEmptyState
           v-if="!selectedFiring"
           :recent-firing="pastFirings[0] ?? null"
+          :active-firing="activeFiring"
           @start="openStartModal"
           @browse-schedules="goToSchedules"
           @select-recent="selectFiring"
@@ -91,6 +97,9 @@
               :target-temp="targetTemp"
               :rate-of-change="rateOfChange"
               :target-rate="targetRate"
+              :rate-c="rateC"
+              :target-rate-c="targetRateC"
+              :target-temp-c="targetTempC"
               :reading-count="readingCount"
               :is-live="isLive"
               :is-paused="isPaused"
@@ -209,7 +218,15 @@
             </li>
           </ul>
           <div class="p-3 border-t border-parchment-3 shrink-0">
-            <button class="w-full py-3 bg-celadon hover:bg-celadon-dark text-white text-sm font-bold rounded-lg transition-colors" @click="openStartModal(); showFiringSheet = false">+ Start firing</button>
+            <!-- G5: one firing at a time. The active firing is listed above to tap into. -->
+            <button
+              class="w-full py-3 bg-celadon hover:bg-celadon-dark text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              :disabled="!!activeFiring"
+              @click="openStartModal(); showFiringSheet = false"
+            >+ Start firing</button>
+            <p v-if="activeFiring" class="text-[11px] text-ink-faint text-center mt-1.5 leading-snug">
+              End <strong class="font-semibold">{{ activeFiring.name }}</strong> first — only one firing at a time.
+            </p>
           </div>
         </div>
       </div>
@@ -239,7 +256,7 @@
       :open="showReadingModal"
       :started-at="selectedFiring?.started_at ?? 0"
       :is-edit="!!editingReading"
-      :edit-temp="editingReading?.y ?? null"
+      :edit-temp="editingReading?.tempC ?? null"
       :edit-ts="editingReading?.ts ?? null"
       @close="closeReadingModal"
       @save="saveReading"
@@ -295,6 +312,11 @@ const route  = useRoute()          // D2: needed for ?startSchedule param
 
 const { exportFiring } = useFiringExport()   // Package 6
 
+// G1: hydrate the shared unit from the server on load (loadUnit). The toggle
+// UI lives in TempUnitToggle; app.vue only seeds the initial value and repaints
+// the chart when the toggle emits `change`.
+const { setUnit: setUnitState } = useTempUnit()
+
 const chartCanvas          = ref(null)
 const consoleRef           = ref(null)
 const editingReading       = ref(null)
@@ -309,7 +331,7 @@ const pendingDeleteFiring  = ref(null) // G4: firing awaiting delete confirmatio
 const showRenameModal      = ref(false) // G2: rename dialog visibility
 const allFirings           = ref([])
 const selectedFiring       = ref(null)
-const currentTemp          = ref(null)
+const currentTemp          = ref(null)  // raw °C
 const isSaving             = ref(false)
 const isLive               = ref(false)
 const isPaused             = ref(false)
@@ -323,13 +345,14 @@ const nowUnix              = ref(Math.floor(Date.now() / 1000))
 
 let elapsedTickInterval = null
 
-// NOW-LINE: setNowLine / clearNowLine added to the destructure
-const { init, setSchedule, setReadings, setReductions, setNowLine, clearNowLine, resetZoom, resize, destroy } = useKilnChart(chartCanvas, {
+// NOW-LINE + G1: setUnit pulled from the chart composable to repaint on toggle.
+const { init, setSchedule, setReadings, setReductions, setNowLine, clearNowLine, setUnit: setChartUnit, resetZoom, resize, destroy } = useKilnChart(chartCanvas, {
   enableZoom: true,
   showLabels: true,
   onPointClick: (point) => {
     if (!isLive.value) return
-    editingReading.value = { id: point.raw?.id ?? point.id, ts: point.raw?.ts ?? point.ts, y: point.y, x: point.x }
+    // point.y is the °C data value; keep it as tempC for the modal to convert.
+    editingReading.value = { id: point.raw?.id ?? point.id, ts: point.raw?.ts ?? point.ts, tempC: point.y, x: point.x }
     showReadingModal.value = true
   },
 })
@@ -337,7 +360,9 @@ const { init, setSchedule, setReadings, setReductions, setNowLine, clearNowLine,
 const activeFiring = computed(() => allFirings.value.find(f => f.started_at && !f.ended_at) ?? null)
 const pastFirings  = computed(() => allFirings.value.filter(f => f.ended_at).sort((a, b) => b.created_at - a.created_at))
 
-const { duration, readingCount, elapsed, rateOfChange, targetRate, targetTemp }
+// G1: stats now also return raw °C values (rateC/targetRateC/targetTempC) for
+// FiringConsole's colour + delta logic, plus display strings/numbers.
+const { duration, readingCount, elapsed, rateOfChange, targetRate, targetTemp, rateC, targetRateC, targetTempC }
   = useFiringStats(selectedFiring, nowUnix)
 
 const peakTemp = computed(() => {
@@ -358,15 +383,26 @@ function applySchedule(scheduleRows) {
   setSchedule(rows, scheduleOffset.value)
 }
 
-// NOW-LINE: a single tick — advances the clock and repositions the line.
-// Called every second while a firing is live (and unpaused).
+// NOW-LINE: advance the clock and the line together each second.
 function tickNow() {
   nowUnix.value = Math.floor(Date.now() / 1000)
   if (selectedFiring.value?.started_at) setNowLine(selectedFiring.value.started_at)
 }
 
+// G1: hydrate the saved unit on load. The toggle itself lives in the shared
+// TempUnitToggle component (header); it flips + persists + reverts and emits
+// `change`, which we handle with setChartUnit to repaint the kiln canvas.
+async function loadUnit() {
+  try {
+    const { temp_unit } = await $fetch('/api/preferences')
+    setUnitState(temp_unit === 'F' ? 'F' : 'C')
+    setChartUnit()
+  } catch { /* default 'C' already set */ }
+}
+
 onMounted(async () => {
   await init()
+  await loadUnit()           // G1: hydrate unit before first paint of values
   await refreshFirings()
   if (activeFiring.value) await selectFiring(activeFiring.value)
 
@@ -427,7 +463,7 @@ async function onVisibilityChange() {
   if (!selectedFiring.value) return
   await reloadReadings()
   if (isLive.value && !isPaused.value && !elapsedTickInterval) {
-    setNowLine(selectedFiring.value.started_at)        // NOW-LINE: catch up immediately
+    setNowLine(selectedFiring.value.started_at)
     elapsedTickInterval = setInterval(tickNow, 1000)
   }
 }
@@ -442,7 +478,7 @@ async function selectFiring(f, preloaded = null) {
   isPaused.value = false
   currentTemp.value = null
   consoleRef.value?.closeMenu?.()
-  clearNowLine()                                        // NOW-LINE: reset before repaint
+  clearNowLine()
 
   let data = preloaded
   if (!data || data.schedule === undefined || data.readings === undefined) {
@@ -453,7 +489,7 @@ async function selectFiring(f, preloaded = null) {
   await nextTick()
   setSchedule(data.schedule ?? [], data.schedule_offset ?? 0)
   setReadings(data.readings ?? [], data.started_at)
-  setReductions(data.reductions ?? [])          // G11
+  setReductions(data.reductions ?? [])
   requestAnimationFrame(() => resize())
 
   if (data.readings?.length) {
@@ -465,14 +501,14 @@ async function selectFiring(f, preloaded = null) {
   if (isActive && data.paused_at) {
     isPaused.value = true
     isLive.value = true
-    setNowLine(data.started_at)                         // NOW-LINE: static paint at pause point
+    setNowLine(data.started_at)
     return
   }
 
   if (isActive) {
     isLive.value = true
-    setNowLine(data.started_at)                         // NOW-LINE: initial paint
-    elapsedTickInterval = setInterval(tickNow, 1000)    // NOW-LINE: advance each second
+    setNowLine(data.started_at)
+    elapsedTickInterval = setInterval(tickNow, 1000)
   }
 }
 
@@ -487,8 +523,6 @@ async function createFiring(payload) {
     refreshFirings()
     await selectFiring({ id: firing.id })
   } catch (err) {
-    // 409 = another firing is active (or validation failed) — keep the modal
-    // open so the user doesn't lose what they typed.
     toast.show(err?.data?.statusMessage ?? err?.data?.message ?? 'Could not start firing.')
   }
 }
@@ -502,7 +536,7 @@ async function confirmEndFiring() {
     body: { endedAt: Math.floor(Date.now() / 1000) },
   })
   stopAllIntervals()
-  clearNowLine()                                        // NOW-LINE: no "now" on an ended firing
+  clearNowLine()
   isLive.value = isPaused.value = false
   currentTemp.value = null
   if (selectedFiring.value?.id === id) {
@@ -538,8 +572,7 @@ function fireAgain(f) {
 
 function saveAsSchedule(f) { router.push(`/schedules/new?fromFiring=${f.id}`) }
 
-// Package 6: CSV export. selectedFiring already holds schedule + readings +
-// reductions, so no fetch needed.
+// Package 6: CSV export (unit handled inside useFiringExport).
 function onExportFiring(f) {
   const firing = f ?? selectedFiring.value
   if (!firing) return
@@ -550,7 +583,7 @@ function onExportFiring(f) {
   toast.show('Firing exported.', 'success')
 }
 
-// G11: start/end a reduction period at the current temperature
+// G11: start/end a reduction period at the current temperature (°C).
 async function onToggleReduction() {
   const f = selectedFiring.value
   if (!f || !isLive.value) return
@@ -569,14 +602,14 @@ async function onToggleReduction() {
       })
       const list = (f.reductions ?? []).map(r => r.id === updated.id ? updated : r)
       selectedFiring.value = { ...f, reductions: list }
-      toast.show(`Reduction ended at ${Math.round(temp)}°C.`, 'success')
+      toast.show('Reduction ended.', 'success')
     } else {
       const created = await $fetch(`/api/firings/${f.id}/reductions`, {
         method: 'POST',
         body: { startTemp: temp },
       })
       selectedFiring.value = { ...f, reductions: [...(f.reductions ?? []), created] }
-      toast.show(`Reduction started at ${Math.round(temp)}°C.`, 'success')
+      toast.show('Reduction started.', 'success')
     }
     setReductions(selectedFiring.value.reductions)
   } catch (err) {
@@ -592,7 +625,7 @@ async function pauseFiring() {
   stopAllIntervals()
   isPaused.value = true
   f.paused_at = pausedAt
-  setNowLine(f.started_at)                              // NOW-LINE: freeze at the pause moment
+  setNowLine(f.started_at)
 }
 
 async function resumeFiring() {
@@ -605,7 +638,7 @@ async function resumeFiring() {
   f.paused_at = null
   isPaused.value = false
   applySchedule()
-  setNowLine(f.started_at)                              // NOW-LINE: repaint against shifted curve
+  setNowLine(f.started_at)
   elapsedTickInterval = setInterval(tickNow, 1000)
   toast.show(`Resumed — schedule shifted ${gapMins} min to match.`, 'success')
 }
@@ -634,7 +667,7 @@ async function recalibrate() {
   await $fetch(`/api/firings/${f.id}`, { method: 'PUT', body: { scheduleOffset: newOffset } })
   f.schedule_offset = newOffset
   applySchedule()
-  setNowLine(f.started_at)                              // NOW-LINE: target dot follows the shifted curve
+  setNowLine(f.started_at)
   showRecalibrateInfo.value = false
   toast.show('Schedule recalibrated to current temperature.', 'success')
 }
@@ -651,7 +684,7 @@ async function performDeleteFiring(f) {
     await $fetch(`/api/firings/${f.id}`, { method: 'DELETE' })
     if (selectedFiring.value?.id === f.id) {
       stopAllIntervals()
-      clearNowLine()                                    // NOW-LINE: clear on deselect
+      clearNowLine()
       selectedFiring.value = currentTemp.value = null
       isLive.value = isPaused.value = false
     }
@@ -672,6 +705,14 @@ function onFiringRenamed(updated) {
 }
 
 async function openStartModal() {
+  // G5: one firing at a time. The server enforces this (partial unique index
+  // → 409), but guard the button so the user never fills out the modal only to
+  // be rejected. Surface the active firing instead of opening a doomed form.
+  if (activeFiring.value) {
+    toast.show(`"${activeFiring.value.name}" is still firing — only one firing at a time. End it first.`)
+    selectFiring(activeFiring.value)
+    return
+  }
   if (!library.value.length) library.value = await $fetch('/api/library')
   showStartModal.value = true
 }
@@ -679,6 +720,7 @@ async function openStartModal() {
 function openLogReading()    { editingReading.value = null; showReadingModal.value = true }
 function closeReadingModal() { showReadingModal.value = false; editingReading.value = null }
 
+// payload.temperature arrives as °C (the modal converts before emit).
 async function saveReading(payload) {
   if (!selectedFiring.value) return
   isSaving.value = true
@@ -720,11 +762,11 @@ async function reloadReadings() {
     const data = await $fetch(`/api/firings/${selectedFiring.value.id}`)
     selectedFiring.value.readings = data.readings
     selectedFiring.value.schedule = data.schedule
-    selectedFiring.value.reductions = data.reductions ?? selectedFiring.value.reductions  // G11
+    selectedFiring.value.reductions = data.reductions ?? selectedFiring.value.reductions
     setReadings(data.readings, selectedFiring.value.started_at)
-    setReductions(selectedFiring.value.reductions ?? [])                                  // G11
+    setReductions(selectedFiring.value.reductions ?? [])
     if (isLive.value && !isPaused.value && selectedFiring.value.started_at) {
-      setNowLine(selectedFiring.value.started_at)                                         // NOW-LINE: keep aligned after reload
+      setNowLine(selectedFiring.value.started_at)
     }
     if (!isSaving.value && data.readings?.length) {
       currentTemp.value = data.readings.at(-1).temperature

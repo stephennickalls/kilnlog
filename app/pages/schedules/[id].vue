@@ -42,6 +42,9 @@
         <div class="flex items-center gap-2">
           <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Curve</label>
           <span v-if="form.type" class="text-[10px] font-bold px-2 py-0.5 rounded-full" :class="theme.badgeText">{{ form.type }}</span>
+          <div class="flex-1" />
+          <!-- G1: unit toggle right where temps are entered -->
+          <TempUnitToggle />
         </div>
         <ScheduleCurveEditor v-model="editPoints" :stroke="theme.stroke" :fill="theme.fill" />
       </div>
@@ -54,11 +57,22 @@
           @click="save"
         >{{ saving ? 'Saving…' : 'Save schedule' }}</button>
         <button
-          class="flex-1 py-2.5 border border-celadon/40 bg-celadon-bg/60 text-celadon-dark hover:bg-celadon-bg text-sm font-semibold rounded-xl transition-colors disabled:opacity-40"
-          :disabled="saving || !form.name.trim()"
+          class="flex-1 py-2.5 border border-celadon/40 bg-celadon-bg/60 text-celadon-dark hover:bg-celadon-bg text-sm font-semibold rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          :disabled="saving || !form.name.trim() || !!activeFiring"
+          :title="activeFiring ? 'A firing is already active — only one at a time' : ''"
           @click="saveAndStart"
         >Save &amp; start firing →</button>
       </div>
+
+      <!-- G5: explain the disabled Save & start -->
+      <NuxtLink
+        v-if="activeFiring"
+        to="/app"
+        class="flex items-center gap-2 px-3 py-2 -mt-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs hover:bg-amber-100 transition-colors"
+      >
+        <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+        <span><strong>{{ activeFiring.name }}</strong> is still firing — end it before starting another. You can still save this schedule.</span>
+      </NuxtLink>
 
     </main>
 
@@ -81,6 +95,10 @@ definePageMeta({ middleware: ['auth'] })
 
 const route  = useRoute()
 const router = useRouter()
+
+// G5: know whether a firing is active so "Save & start" can be disabled.
+const { activeFiring, loadActiveFiring } = useActiveFiring()
+onMounted(loadActiveFiring)
 
 const loading    = ref(true)
 const saving     = ref(false)
@@ -152,6 +170,11 @@ async function save() {
 
 async function saveAndStart() {
   if (!form.name.trim() || saving.value) return
+  // G5 fallback — the button is disabled when active, but guard anyway.
+  if (activeFiring.value) {
+    flash(`"${activeFiring.value.name}" is still firing — end it before starting another.`)
+    return
+  }
   saving.value = true
   try {
     await $fetch(`/api/schedules/${id.value}`, {

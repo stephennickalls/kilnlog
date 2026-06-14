@@ -1,4 +1,9 @@
 <!-- app/components/KilnTempModal.vue -->
+<!--
+  G1 (°F): `temp` arrives as raw °C and is converted for the big display via
+  useTempUnit. rateOfChange/elapsed are already-formatted display strings from
+  useFiringStats (rate already in the active unit), so they render as-is.
+-->
 <template>
   <Teleport to="body">
     <Transition name="toast">
@@ -14,13 +19,13 @@
           <div class="flex items-end leading-none">
             <span
               class="font-bold tabular-nums leading-none"
-              :class="temp !== null ? 'text-flame' : 'text-parchment-3'"
+              :class="tempDisplay !== null ? 'text-flame' : 'text-parchment-3'"
               style="font-size: clamp(140px, 28vw, 380px)"
-            >{{ temp !== null ? Math.round(temp) : '—' }}</span>
+            >{{ tempDisplay !== null ? tempDisplay : '—' }}</span>
             <span
               class="font-bold text-flame-light mb-3"
               style="font-size: clamp(50px, 8vw, 110px)"
-            >°C</span>
+            >{{ unitLabel }}</span>
           </div>
 
           <!-- Firing name -->
@@ -51,9 +56,9 @@
 
 <script setup>
 // app/components/KilnTempModal.vue
-defineProps({
+const props = defineProps({
   open:         Boolean,
-  temp:         { type: Number, default: null },
+  temp:         { type: Number, default: null },   // raw °C
   rateOfChange: { type: String, default: '—' },
   elapsed:      { type: String, default: '—' },
   isLive:       Boolean,
@@ -61,4 +66,8 @@ defineProps({
 })
 
 defineEmits(['close'])
+
+const { displayTemp, unitLabel } = useTempUnit()
+
+const tempDisplay = computed(() => (props.temp === null ? null : displayTemp(props.temp)))
 </script>

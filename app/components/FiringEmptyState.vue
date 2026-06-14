@@ -7,6 +7,11 @@
   "Browse schedules" carries a celadon hint — it's the entry point to the
   schedules world (which is celadon-accented), so the colour telegraphs the
   destination before the user arrives.
+
+  G5: if a firing is active (rare here — the active firing is usually the
+  selected one — but possible, e.g. after deleting the selected past firing),
+  the "Start a firing" CTA is disabled with a note. "Browse schedules" stays
+  enabled; navigating away is always fine.
 -->
 <template>
   <div class="flex flex-col items-center justify-center text-center gap-5 px-6 py-10 sm:py-16 h-full">
@@ -27,7 +32,12 @@
     </div>
 
     <div class="flex flex-col sm:flex-row gap-2.5 w-full sm:w-auto max-w-xs sm:max-w-none">
-      <button class="flex items-center justify-center gap-2 px-6 py-3 bg-flame hover:bg-flame-dark text-parchment text-sm font-bold rounded-xl transition-colors" @click="$emit('start')">
+      <button
+        class="flex items-center justify-center gap-2 px-6 py-3 bg-flame hover:bg-flame-dark text-parchment text-sm font-bold rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        :disabled="!!activeFiring"
+        :title="activeFiring ? 'A firing is already active — only one at a time' : ''"
+        @click="$emit('start')"
+      >
         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
         Start a firing
       </button>
@@ -37,6 +47,11 @@
         Browse schedules
       </button>
     </div>
+
+    <!-- G5: explain the disabled Start CTA -->
+    <p v-if="activeFiring" class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 max-w-xs leading-relaxed">
+      <strong class="font-semibold">{{ activeFiring.name }}</strong> is still firing — only one firing at a time. End it from the sidebar first.
+    </p>
 
     <button
       v-if="recentFiring"
@@ -55,6 +70,7 @@
 <script setup>
 defineProps({
   recentFiring: { type: Object, default: null },
+  activeFiring: { type: Object, default: null },   // G5: disables the Start CTA
 })
 defineEmits(['start', 'browse-schedules', 'select-recent'])
 </script>

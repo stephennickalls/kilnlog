@@ -7,6 +7,12 @@
   G11: the overflow menu gains a reduction toggle — "Start reduction" when none is
   open, "End reduction" when one is in progress. Emits a single 'reduction' action;
   the parent captures the current temperature and calls the API.
+
+  G1 (°F): currentTemp / targetTemp arrive as raw °C numbers and are converted
+  for display via useTempUnit. The on-track / ahead / behind comparison stays in
+  °C (both operands °C), and the difference shown to the user is converted with
+  displayDelta (a delta has no +32 offset). Rate colour now reads the raw °C
+  rate props (rateC / targetRateC) instead of re-parsing formatted strings.
 -->
 <template>
   <div class="flex flex-col gap-2">
@@ -19,8 +25,8 @@
           <div>
             <div class="text-[10px] font-semibold uppercase tracking-widest text-ink-faint">Current</div>
             <div class="flex items-baseline gap-1">
-              <span class="text-4xl font-bold tabular-nums leading-none transition-colors" :class="currentColorClass">{{ currentTemp !== null ? Math.round(currentTemp) : '—' }}</span>
-              <span class="text-sm font-medium" :class="currentTemp !== null ? currentColorClass : 'text-parchment-4'">°C</span>
+              <span class="text-4xl font-bold tabular-nums leading-none transition-colors" :class="currentColorClass">{{ currentDisplay ?? '—' }}</span>
+              <span class="text-sm font-medium" :class="currentTemp !== null ? currentColorClass : 'text-parchment-4'">{{ unitLabel }}</span>
             </div>
           </div>
           <template v-if="targetTemp !== null">
@@ -29,7 +35,7 @@
               <div class="text-[10px] font-semibold uppercase tracking-widest text-ink-faint">Target</div>
               <div class="flex items-baseline gap-1">
                 <span class="text-4xl font-bold tabular-nums leading-none text-parchment-4">{{ targetTemp }}</span>
-                <span class="text-sm font-medium text-parchment-4">°C</span>
+                <span class="text-sm font-medium text-parchment-4">{{ unitLabel }}</span>
               </div>
             </div>
           </template>
@@ -94,7 +100,7 @@
       <button class="flex-1 min-w-0 px-3 py-2.5 text-left" @click="$emit('open-temp')">
         <div class="flex items-end gap-2.5">
           <div class="flex items-baseline gap-0.5">
-            <span class="text-4xl font-bold tabular-nums leading-none transition-colors" :class="currentColorClass">{{ currentTemp !== null ? Math.round(currentTemp) : '—' }}</span>
+            <span class="text-4xl font-bold tabular-nums leading-none transition-colors" :class="currentColorClass">{{ currentDisplay ?? '—' }}</span>
             <span class="text-xs text-ink-faint">°</span>
           </div>
           <template v-if="targetTemp !== null">
@@ -151,10 +157,13 @@
 import { computed, ref, watch } from 'vue'
 
 const props = defineProps({
-  currentTemp:   { type: Number, default: null },
-  targetTemp:    { type: Number, default: null },
-  rateOfChange:  { type: String, default: '—' },
-  targetRate:    { type: String, default: '—' },
+  currentTemp:   { type: Number, default: null },   // raw °C
+  targetTemp:    { type: Number, default: null },   // ALREADY in display unit (from useFiringStats)
+  rateOfChange:  { type: String, default: '—' },    // formatted display string
+  targetRate:    { type: String, default: '—' },    // formatted display string
+  rateC:         { type: Number, default: null },   // raw °C/min (colour logic)
+  targetRateC:   { type: Number, default: null },   // raw °C/min (colour logic)
+  targetTempC:   { type: Number, default: null },   // raw °C (delta logic)
   readingCount:  { type: Number, default: 0 },
   isLive:        Boolean,
   isPaused:      Boolean,
@@ -163,19 +172,22 @@ const props = defineProps({
 
 const emit = defineEmits(['open-temp', 'log-reading', 'pause', 'resume', 'recalibrate', 'end', 'reduction'])
 
+const { displayTemp, displayDelta, unitLabel } = useTempUnit()
+
 const menuOpen = ref(false)
 function emitAction(name) { menuOpen.value = false; emit(name) }
 watch(() => [props.isLive, props.isPaused], () => { menuOpen.value = false })
 
-function parseRate(str) {
-  if (!str || str === '—') return null
-  const n = parseFloat(str.replace('°/m', ''))
-  return isFinite(n) ? n : null
-}
+// Current temp converted for display (target arrives pre-converted from stats).
+const currentDisplay = computed(() =>
+  props.currentTemp === null ? null : displayTemp(props.currentTemp)
+)
 
+// Rate colour from raw °C rates — no string parsing. Thresholds are in °C/min;
+// comparing two °C rates is unit-agnostic, so no conversion needed here.
 const rateColorClass = computed(() => {
-  const actual = parseRate(props.rateOfChange)
-  const target = parseRate(props.targetRate)
+  const actual = props.rateC
+  const target = props.targetRateC
   if (actual === null) return 'text-ink-faint'
   if (target === null) return 'text-celadon'
   const diff = actual - target
@@ -184,7 +196,10 @@ const rateColorClass = computed(() => {
   return 'text-celadon'
 })
 
-const rateShort = computed(() => (props.rateOfChange ?? '—').replace('°/m', ''))
+// Mobile short rate: strip the unit suffix from the formatted string.
+const rateShort = computed(() =>
+  (props.rateOfChange ?? '—').replace('°/m', '').replace('°C/m', '').replace('°F/m', '')
+)
 
 const currentColorClass = computed(() => {
   if (props.currentTemp === null) return 'text-parchment-4'
@@ -192,13 +207,16 @@ const currentColorClass = computed(() => {
   return delta.value.textClass
 })
 
+// Delta computed in °C (both operands °C). The 15°C on-track window is a °C
+// threshold and stays °C. The NUMBER shown to the user converts via displayDelta.
 const delta = computed(() => {
-  if (props.currentTemp === null || props.targetTemp === null) return null
-  const d = Math.round(props.currentTemp - props.targetTemp)
-  const abs = Math.abs(d)
-  if (abs <= 15) return { icon: '✓', label: 'On track', short: 'on track', class: 'bg-celadon-bg text-celadon-dark', textClass: 'text-celadon' }
-  if (d > 15)    return { icon: '↑', label: `${abs}° ahead`, short: `${abs}°`, class: 'bg-amber-50 text-amber-700', textClass: 'text-amber-600' }
-  return { icon: '↓', label: `${abs}° behind`, short: `${abs}°`, class: 'bg-blue-50 text-blue-700', textClass: 'text-blue-600' }
+  if (props.currentTemp === null || props.targetTempC === null) return null
+  const dC = Math.round(props.currentTemp - props.targetTempC)
+  const absC = Math.abs(dC)
+  const absDisplay = Math.abs(displayDelta(dC))
+  if (absC <= 15) return { icon: '✓', label: 'On track', short: 'on track', class: 'bg-celadon-bg text-celadon-dark', textClass: 'text-celadon' }
+  if (dC > 15)    return { icon: '↑', label: `${absDisplay}° ahead`, short: `${absDisplay}°`, class: 'bg-amber-50 text-amber-700', textClass: 'text-amber-600' }
+  return { icon: '↓', label: `${absDisplay}° behind`, short: `${absDisplay}°`, class: 'bg-blue-50 text-blue-700', textClass: 'text-blue-600' }
 })
 
 defineExpose({ closeMenu: () => { menuOpen.value = false } })

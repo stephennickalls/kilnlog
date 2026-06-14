@@ -35,7 +35,12 @@
 
           <!-- Schedule section -->
           <div class="flex flex-col gap-3">
-            <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Schedule curve</label>
+            <div class="flex items-center gap-2">
+              <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Schedule curve</label>
+              <div class="flex-1" />
+              <!-- G1: unit toggle right where temps are entered -->
+              <TempUnitToggle />
+            </div>
 
             <!-- Controls row -->
             <div class="flex items-center gap-2 flex-wrap">

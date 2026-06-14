@@ -1,3 +1,15 @@
+<!-- app/components/ScheduleCurveEditor.vue -->
+<!--
+  G1 (°F): the curve MODEL stays in °C end-to-end — modelValue in/out, the SVG
+  coordinate transforms, maxTemp, grid spacing. Only what the USER READS or
+  TYPES converts via useTempUnit:
+    - y-axis grid labels (displayTemp)
+    - waypoint table "Target" column header (unitLabel)
+    - table target input value (displayTemp) and its @change (toCelsius before store)
+    - drag tooltip temperature (displayTemp)
+  The geometry never sees °F, so drag math, fill paths, and emitted points are
+  unchanged and storage stays °C.
+-->
 <template>
   <div class="flex flex-col gap-2">
     <div class="flex items-center justify-between">
@@ -38,7 +50,7 @@
           />
         </g>
 
-        <!-- Grid labels — temp -->
+        <!-- Grid labels — temp (converted for display) -->
         <g>
           <text
             v-for="t in tempGridLines" :key="'tl'+t"
@@ -47,7 +59,7 @@
             font-size="9"
             font-family="Georgia, serif"
             fill="#a8a29e"
-          >{{ t }}°</text>
+          >{{ displayTemp(t) }}°</text>
         </g>
 
         <!-- Grid labels — time -->
@@ -188,7 +200,7 @@
     <div class="flex flex-col gap-2 mt-1">
       <div class="flex items-center justify-between px-1">
         <div class="grid grid-cols-[1fr_1fr_28px] gap-2 text-[10px] font-bold uppercase tracking-[0.08em] text-ink-faint flex-1">
-          <span>Time (mins)</span><span>Target °C</span><span/>
+          <span>Time (mins)</span><span>Target {{ unitLabel }}</span><span/>
         </div>
         <button
           class="text-[10px] font-semibold text-ink-faint hover:text-flame transition-colors ml-4 shrink-0"
@@ -207,11 +219,12 @@
             class="w-full border border-parchment-3 rounded-lg px-3 py-1.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif"
             @change="updatePoint(i, 'offsetMinutes', Number($event.target.value))"
           >
+          <!-- Target value shown in the user's unit; typed value converted to °C before store -->
           <input
-            :value="pt.targetTemp"
-            type="number" min="0" max="1400" placeholder="100"
+            :value="displayTemp(pt.targetTemp)"
+            type="number" min="0" :max="maxInputTemp" placeholder="100"
             class="w-full border border-parchment-3 rounded-lg px-3 py-1.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif"
-            @change="updatePoint(i, 'targetTemp', Number($event.target.value))"
+            @change="updatePoint(i, 'targetTemp', toCelsius(Number($event.target.value)))"
           >
           <button class="text-parchment-4 hover:text-red-400 transition-colors text-sm" @click="removePoint(i)">✕</button>
         </div>
@@ -223,12 +236,15 @@
 
 <script setup>
 const props = defineProps({
-  modelValue:       { type: Array,  default: () => [] }, // [{ offsetMinutes, targetTemp }]
-  backgroundPoints: { type: Array,  default: () => [] }, // raw readings shown as faint underlay
+  modelValue:       { type: Array,  default: () => [] }, // [{ offsetMinutes, targetTemp }] — °C
+  backgroundPoints: { type: Array,  default: () => [] }, // raw readings shown as faint underlay — °C
   stroke:           { type: String, default: '#f97316' }, // curve + handle color
   fill:             { type: String, default: 'rgba(249,115,22,0.07)' }, // area fill
 })
 const emit = defineEmits(['update:modelValue'])
+
+// Display/input conversion (model stays °C).
+const { displayTemp, toCelsius, unitLabel, maxInputTemp } = useTempUnit()
 
 // ── Layout constants ──────────────────────────────────────────────────────────
 const svgWidth  = 520
@@ -245,17 +261,14 @@ let _inboundUpdate = false
 // Sync IN when parent changes (e.g. library preset or bisque/glaze button)
 // We patch in-place rather than replace the array so _ids survive during drag
 watch(() => props.modelValue, (val) => {
-  // Only sync if the change came from outside (different length or values)
-  // not from our own emit during drag
   if (draggingId.value !== null) return  // never interrupt an active drag
 
   _inboundUpdate = true
-  // Replace array wholesale (preset loaded etc) — assign new _ids
   points.value = val.map(p => ({ ...p, _id: _nextId++ }))
   nextTick(() => { _inboundUpdate = false })
 }, { deep: true })
 
-// Emit OUT when user edits the graph — but not during a drag (we emit on dragend instead)
+// Emit OUT when user edits the graph — but not during a drag (we emit on dragend)
 // and not when we just synced in from parent
 watch(points, (val) => {
   if (_inboundUpdate) return
@@ -276,7 +289,7 @@ const totalHours = computed(() => {
   return h > 0 ? `${h}h ${m > 0 ? m + 'm' : ''}` : `${m}m`
 })
 
-// ── Axis ranges ───────────────────────────────────────────────────────────────
+// ── Axis ranges (all °C) ──────────────────────────────────────────────────────
 const maxMins = computed(() => {
   const pts = sortedPoints.value
   const mPts = pts.length ? pts[pts.length - 1].offsetMinutes : 0
@@ -289,13 +302,13 @@ const maxTemp = computed(() => {
   return Math.ceil((Math.max(t1, t2) + 50) / 100) * 100
 })
 
-// ── Coordinate transforms ─────────────────────────────────────────────────────
+// ── Coordinate transforms (°C internally) ─────────────────────────────────────
 function minsToX(m)  { return PAD_L + (m / maxMins.value)  * (svgWidth  - PAD_L - PAD_R) }
 function xToMins(x)  { return Math.round(Math.max(0, (x - PAD_L) / (svgWidth - PAD_L - PAD_R) * maxMins.value)) }
 function tempToY(t)  { return PAD_T + (1 - t / maxTemp.value) * (svgHeight - PAD_T - PAD_B) }
 function yToTemp(y)  { return Math.round(Math.max(0, Math.min(maxTemp.value, (1 - (y - PAD_T) / (svgHeight - PAD_T - PAD_B)) * maxTemp.value))) }
 
-// ── Grid lines ────────────────────────────────────────────────────────────────
+// ── Grid lines (°C steps; labels convert at render) ───────────────────────────
 const tempGridLines = computed(() => {
   const step = maxTemp.value <= 400 ? 100 : maxTemp.value <= 800 ? 200 : 200
   const lines = []
@@ -392,11 +405,11 @@ function doDrag(clientX, clientY) {
     return
   }
   pt.offsetMinutes = xToMins(x)
-  pt.targetTemp    = yToTemp(y)
-  // Update display index for debug
+  pt.targetTemp    = yToTemp(y)   // °C
   draggingIdx.value = sortedPoints.value.findIndex(p => p._id === draggingId.value)
   debugLastMinsTemp.value = `${pt.offsetMinutes}m, ${pt.targetTemp}°C`
-  tooltip.value = { x, y, text: `${pt.offsetMinutes}m · ${pt.targetTemp}°C` }
+  // Tooltip shows the temp in the user's unit.
+  tooltip.value = { x, y, text: `${pt.offsetMinutes}m · ${displayTemp(pt.targetTemp)}${unitLabel.value}` }
 }
 
 function stopDrag() {
@@ -409,7 +422,7 @@ function stopDrag() {
   document.removeEventListener('touchmove', onDocTouchMove)
   document.removeEventListener('touchend',  onDocTouchEnd)
   debugDocListeners.value = 0
-  // Emit final positions now that drag is complete
+  // Emit final positions (°C) now that drag is complete
   emit('update:modelValue', points.value.map(({ offsetMinutes, targetTemp }) => ({ offsetMinutes, targetTemp })))
 }
 
@@ -468,14 +481,11 @@ const hoverAddPos = ref(null)
 function onSvgClick(e) {
   if (draggingIdx.value !== null) return
   const { x, y } = getSvgPos(e.clientX, e.clientY)
-  // Don't add if clicking in padding area
   if (x < PAD_L || x > svgWidth - PAD_R || y < PAD_T || y > svgHeight - PAD_B) return
   points.value.push({ offsetMinutes: xToMins(x), targetTemp: yToTemp(y), _id: _nextId++ })
 }
 
 function onCurveClick(e) {
-  // Let it bubble to onSvgClick — the wider transparent stroke catches it
-  // but we want to add ON the curve, so prevent the SVG click from double-firing
   e.stopPropagation()
   const { x, y } = getSvgPos(e.clientX, e.clientY)
   points.value.push({ offsetMinutes: xToMins(x), targetTemp: yToTemp(y), _id: _nextId++ })
@@ -491,6 +501,8 @@ function removePoint(sortedIdx) {
 // ── Table helpers ─────────────────────────────────────────────────────────────
 const showTable = ref(true)
 
+// val is already °C (offsetMinutes passes through; targetTemp is converted by
+// the @change handler via toCelsius before reaching here).
 function updatePoint(sortedIdx, field, val) {
   const pt = getPointById(sortedPoints.value[sortedIdx]._id)
   if (pt) pt[field] = val
@@ -501,7 +513,7 @@ function addPointAtEnd() {
   const last = pts.length ? pts[pts.length - 1] : null
   points.value.push({
     offsetMinutes: last ? last.offsetMinutes + 60 : 60,
-    targetTemp:    last ? last.targetTemp : 100,
+    targetTemp:    last ? last.targetTemp : 100,   // °C
     _id: _nextId++,
   })
 }

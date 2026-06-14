@@ -96,6 +96,9 @@
         <div class="flex items-center gap-2">
           <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Curve</label>
           <span v-if="form.type" class="text-[10px] font-bold px-2 py-0.5 rounded-full" :class="theme.badgeText">{{ form.type }}</span>
+          <div class="flex-1" />
+          <!-- G1: unit toggle right where temps are entered -->
+          <TempUnitToggle />
         </div>
         <!-- From-firing: raw readings faint underneath -->
         <ScheduleCurveEditor

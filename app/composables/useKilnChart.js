@@ -1,27 +1,23 @@
 // File: app/composables/useKilnChart.js
 //
 // G11 CHANGE SUMMARY (search "G11" for the spots):
-//   - new reductionBandsPlugin: shaded vertical bands behind the curves,
-//     one per reduction period, mapped from temperature → x(minutes) using
-//     the ACTUAL readings curve. Drawn in beforeDatasetsDraw so it sits under
-//     the planned/actual lines. Does NOT touch autoFitY (annotation, not data).
-//   - new setReductions(periods) method + lastReductions cache (replayed on rebuild).
-//   - reductions are stored on a closure var the plugin reads at draw time.
+//   - reductionBandsPlugin: shaded vertical bands behind the curves, mapped
+//     temperature → x(minutes) using the ACTUAL readings curve. beforeDatasetsDraw.
+//   - setReductions(periods) + lastReductions cache (replayed on rebuild).
 //
 // NOW-LINE CHANGE SUMMARY (search "NOW-LINE"):
-//   - new nowLinePlugin: a vertical "you are here" line at the current elapsed
-//     minute, drawn in afterDatasetsDraw so it sits ON TOP of the curves. It
-//     gives an at-a-glance read of where the firing is RIGHT NOW, independent
-//     of the last logged reading (which may be minutes stale). A small marker
-//     shows the PLANNED target temp at this moment ("target now: 920°").
-//   - new setNowLine(startedAt) + clearNowLine() methods. Caller ticks
-//     setNowLine on the existing 1s interval. Live firings only.
-//   - Pure annotation: never feeds autoFitY, never alters data. Mirrors the
-//     reduction-band pattern exactly (closure var read at draw time).
-//   - x-space note: readings map to chart-x as (ts - startedAt)/60 with NO
-//     offset; setSchedule bakes scheduleOffset into the planned x. So the
-//     now-line x is simply elapsed minutes, and the planned-target lookup uses
-//     that same x against the already-offset planned curve. No offset arg needed.
+//   - nowLinePlugin: vertical "you are here" line at the current elapsed minute,
+//     afterDatasetsDraw (on top). Shows the PLANNED target temp at this moment.
+//   - setNowLine(startedAt) + clearNowLine(). Live firings only.
+//
+// G1 °F CHANGE SUMMARY (search "G1"):
+//   - The chart's DATA stays in °C (all datasets, interpolation, autoFitY,
+//     reduction-band temp mapping, now-line target lookup). Only LABELS shown to
+//     the user convert: y-axis tick callback, tooltip, curve labels, and the
+//     now-line target label. Conversion uses useTempUnit.
+//   - setUnit() lets the parent force a re-render (axis ticks + labels) when the
+//     user flips the toggle. The unit ref is captured once; we read .value at
+//     draw/format time so it's always current, and setUnit() triggers a redraw.
 
 import { nextTick } from 'vue'
 import { Chart, registerables } from 'chart.js'
@@ -46,67 +42,65 @@ function ensureZoomPlugin() {
   return zoomRegisterPromise
 }
 
-// ── Inline label plugin ───────────────────────────────────────────────────────
-const curveLabelsPlugin = {
-  id: 'curveLabels',
-  afterDatasetsDraw(chart) {
-    const ctx = chart.ctx
-
-    const scheduleData = chart.data.datasets[0]?.data ?? []
-    if (scheduleData.length) {
-      ctx.save()
-      ctx.font = 'bold 10px sans-serif'
-      ctx.fillStyle = '#78716c'
-      ctx.textAlign = 'center'
-      scheduleData.forEach((pt, i) => {
-        const meta = chart.getDatasetMeta(0)
-        const el   = meta.data[i]
-        if (!el) return
-        const { x, y } = el.getProps(['x', 'y'], true)
-        const offset = i % 2 === 0 ? -14 : 14
-        ctx.fillText(`${Math.round(pt.y)}°`, x, y + offset)
-      })
-      ctx.restore()
-    }
-
-    const actualData = chart.data.datasets[1]?.data ?? []
-    if (actualData.length) {
-      const meta    = chart.getDatasetMeta(1)
-      const lastIdx = actualData.length - 1
-      const el      = meta.data[lastIdx]
-      if (el) {
-        const { x, y } = el.getProps(['x', 'y'], true)
-        const lastPt   = actualData[lastIdx]
-        ctx.save()
-        ctx.font      = 'bold 11px sans-serif'
-        ctx.fillStyle = '#f97316'
-        ctx.textAlign = 'left'
-        ctx.fillText(`${Math.round(lastPt.y)}°`, x + 5, y - 6)
-        ctx.restore()
-      }
-    }
-  },
-}
-
 export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showLabels = false } = {}) {
+  // G1: conversion helpers. Read .value at draw/format time → always current.
+  const { unitLabel, isF } = useTempUnit()
+  const cToDisplay = (c) => (isF.value ? c * 9 / 5 + 32 : c)
+
   let chart = null
   let xMax  = 120
 
   let lastSchedule   = { points: [], offset: 0 }
   let lastReadings   = { rows: [], startedAt: 0 }
-  let lastReductions = []                                  // G11: cache for rebuild
+  let lastReductions = []
 
-  // G11: live reference the plugin reads at draw time. Each entry:
-  //   { startX, endX } in minutes, already mapped from temperature.
-  let reductionBands = []
+  let reductionBands = []        // G11: { startX, endX, open } in minutes
+  let nowLine = null             // NOW-LINE: null | { minutes, targetTemp (°C) }
 
-  // NOW-LINE: live reference the plugin reads at draw time.
-  //   null = not shown; otherwise { minutes, targetTemp }.
-  let nowLine = null
+  // G1: curve label plugin — converts the °C data point to the display unit.
+  const curveLabelsPlugin = {
+    id: 'curveLabels',
+    afterDatasetsDraw(chart) {
+      const ctx = chart.ctx
 
-  // G11: map a temperature to the x(minute) where the ACTUAL curve first
-  // reaches it (linear interpolation between bracketing readings). Returns null
-  // if the curve never reaches that temp.
+      const scheduleData = chart.data.datasets[0]?.data ?? []
+      if (scheduleData.length) {
+        ctx.save()
+        ctx.font = 'bold 10px sans-serif'
+        ctx.fillStyle = '#78716c'
+        ctx.textAlign = 'center'
+        scheduleData.forEach((pt, i) => {
+          const meta = chart.getDatasetMeta(0)
+          const el   = meta.data[i]
+          if (!el) return
+          const { x, y } = el.getProps(['x', 'y'], true)
+          const offset = i % 2 === 0 ? -14 : 14
+          ctx.fillText(`${Math.round(cToDisplay(pt.y))}°`, x, y + offset)
+        })
+        ctx.restore()
+      }
+
+      const actualData = chart.data.datasets[1]?.data ?? []
+      if (actualData.length) {
+        const meta    = chart.getDatasetMeta(1)
+        const lastIdx = actualData.length - 1
+        const el      = meta.data[lastIdx]
+        if (el) {
+          const { x, y } = el.getProps(['x', 'y'], true)
+          const lastPt   = actualData[lastIdx]
+          ctx.save()
+          ctx.font      = 'bold 11px sans-serif'
+          ctx.fillStyle = '#f97316'
+          ctx.textAlign = 'left'
+          ctx.fillText(`${Math.round(cToDisplay(lastPt.y))}°`, x + 5, y - 6)
+          ctx.restore()
+        }
+      }
+    },
+  }
+
+  // G11: map a temperature (°C) to the x(minute) where the ACTUAL curve first
+  // reaches it. Data is °C, so this stays °C.
   function minuteAtTemp(actualPoints, temp) {
     if (!actualPoints.length) return null
     for (let i = 0; i < actualPoints.length - 1; i++) {
@@ -118,16 +112,12 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
         return a.x + frac * (b.x - a.x)
       }
     }
-    // Temp beyond the curve's range: clamp to nearest end if close, else null.
     const first = actualPoints[0], last = actualPoints[actualPoints.length - 1]
     if (temp <= Math.min(first.y, last.y)) return first.x
     return null
   }
 
-  // NOW-LINE: map an x(minute) to the PLANNED curve's y(temp) — the inverse
-  // direction of minuteAtTemp. Linear interpolation between bracketing planned
-  // points; clamps to the first/last point outside the curve's time range.
-  // Returns null only if there's no planned curve.
+  // NOW-LINE: map x(minute) → planned curve's y(temp, °C). Stays °C.
   function targetAtMinute(plannedPoints, minute) {
     if (!plannedPoints.length) return null
     if (minute <= plannedPoints[0].x) return plannedPoints[0].y
@@ -144,8 +134,6 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     return null
   }
 
-  // G11: recompute pixel-independent band x-ranges from periods + current actual
-  // data. Called by setReductions and whenever readings change.
   function computeReductionBands() {
     const actual = chart?.data?.datasets?.[1]?.data ?? []
     const bands = []
@@ -154,21 +142,17 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
       if (startX === null) continue
       let endX
       if (p.end_temp === null || p.end_temp === undefined) {
-        // Open/in-progress: run to the latest reading (the live edge).
         endX = actual.length ? actual[actual.length - 1].x : startX
       } else {
         const e = minuteAtTemp(actual, p.end_temp)
-        endX = e === null
-          ? (actual.length ? actual[actual.length - 1].x : startX)
-          : e
+        endX = e === null ? (actual.length ? actual[actual.length - 1].x : startX) : e
       }
-      if (endX < startX) [endX] = [startX]                 // guard
+      if (endX < startX) [endX] = [startX]
       bands.push({ startX, endX, open: p.end_temp == null })
     }
     reductionBands = bands
   }
 
-  // G11: draw bands behind the curves.
   const reductionBandsPlugin = {
     id: 'reductionBands',
     beforeDatasetsDraw(chart) {
@@ -181,13 +165,11 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
         const xPix2 = scales.x.getPixelForValue(band.endX)
         const left  = Math.max(Math.min(xPix1, xPix2), chartArea.left)
         const right = Math.min(Math.max(xPix1, xPix2), chartArea.right)
-        const width = Math.max(right - left, 1.5)          // hairline if zero-width
+        const width = Math.max(right - left, 1.5)
 
-        // Reduction = cooler-flame smoky tone; semi-transparent slate/blue.
         ctx.fillStyle = band.open ? 'rgba(99,102,241,0.10)' : 'rgba(71,85,105,0.12)'
         ctx.fillRect(left, chartArea.top, width, chartArea.bottom - chartArea.top)
 
-        // Left edge marker.
         ctx.strokeStyle = band.open ? 'rgba(99,102,241,0.55)' : 'rgba(71,85,105,0.5)'
         ctx.lineWidth = 1
         ctx.setLineDash([3, 3])
@@ -197,7 +179,6 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
         ctx.stroke()
         ctx.setLineDash([])
 
-        // Label near the top of the band.
         if (width > 30) {
           ctx.font = 'bold 9px sans-serif'
           ctx.fillStyle = band.open ? 'rgba(79,70,229,0.9)' : 'rgba(51,65,85,0.8)'
@@ -209,7 +190,6 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     },
   }
 
-  // NOW-LINE: draw the current-time line + target marker ON TOP of the curves.
   const nowLinePlugin = {
     id: 'nowLine',
     afterDatasetsDraw(chart) {
@@ -218,21 +198,16 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
       if (!chartArea || !scales?.x || !scales?.y) return
 
       const xPix = scales.x.getPixelForValue(nowLine.minutes)
-      // Don't draw if "now" is off the visible (possibly zoomed) area.
       if (xPix < chartArea.left - 0.5 || xPix > chartArea.right + 0.5) return
 
       ctx.save()
-
-      // The vertical line — celadon, solid, distinct from the dashed planned
-      // curve and the orange actual curve.
-      ctx.strokeStyle = 'rgba(95,138,120,0.9)'   // celadon
+      ctx.strokeStyle = 'rgba(95,138,120,0.9)'
       ctx.lineWidth = 1.5
       ctx.beginPath()
       ctx.moveTo(xPix, chartArea.top)
       ctx.lineTo(xPix, chartArea.bottom)
       ctx.stroke()
 
-      // "NOW" tag at the top of the line.
       const tag = 'NOW'
       ctx.font = 'bold 9px sans-serif'
       const tagW = ctx.measureText(tag).width + 8
@@ -244,7 +219,7 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
       ctx.textBaseline = 'middle'
       ctx.fillText(tag, tagX + 4, chartArea.top + 7)
 
-      // Target-temp marker: a dot on the planned curve at "now" + a label.
+      // Target marker — nowLine.targetTemp is °C; y-scale is °C; label converts.
       if (nowLine.targetTemp !== null && nowLine.targetTemp !== undefined) {
         const yPix = scales.y.getPixelForValue(nowLine.targetTemp)
         if (yPix >= chartArea.top && yPix <= chartArea.bottom) {
@@ -256,14 +231,13 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
           ctx.lineWidth = 1.5
           ctx.stroke()
 
-          // Label — flip side near the right edge so it stays on-canvas.
-          const label = `target ${Math.round(nowLine.targetTemp)}°`
+          const label = `target ${Math.round(cToDisplay(nowLine.targetTemp))}°`
           ctx.font = 'bold 10px sans-serif'
           const lblW = ctx.measureText(label).width
           const nearRight = xPix + 8 + lblW > chartArea.right
           ctx.textAlign = nearRight ? 'right' : 'left'
           ctx.textBaseline = 'middle'
-          ctx.fillStyle = 'rgba(58,90,72,0.95)'   // celadon-dark
+          ctx.fillStyle = 'rgba(58,90,72,0.95)'
           ctx.fillText(label, xPix + (nearRight ? -8 : 8), yPix)
         }
       }
@@ -293,10 +267,11 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     buildChart()
     if (lastSchedule.points.length) setSchedule(lastSchedule.points, lastSchedule.offset)
     if (lastReadings.rows.length)   setReadings(lastReadings.rows, lastReadings.startedAt)
-    if (lastReductions.length)      setReductions(lastReductions)   // G11
-    // NOW-LINE: nowLine closure var survives rebuild; next chart.update repaints it.
+    if (lastReductions.length)      setReductions(lastReductions)
   }
 
+  // autoFitY works in °C (the data space). The axis is °C; only tick LABELS
+  // convert. This keeps the fit identical regardless of unit.
   function autoFitY() {
     if (!chart) return
     const allPoints = [
@@ -333,8 +308,6 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     if (!canvasRef.value) return
     if (chart) { try { chart.destroy() } catch {} }
 
-    // G11: reductionBandsPlugin always on (cheap no-op when no bands); labels optional.
-    // NOW-LINE: nowLinePlugin always on (cheap no-op when nowLine is null).
     const extraPlugins = [reductionBandsPlugin, nowLinePlugin, ...(showLabels ? [curveLabelsPlugin] : [])]
 
     const config = {
@@ -411,9 +384,12 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
             titleColor: '#1c1917',
             bodyColor: '#78716c',
             callbacks: {
+              // G1: parsed.y is °C; convert for the label.
               label: ctx => {
                 if (ctx.dataset.label === 'Signal lost') return '⚠️ No signal'
-                return `${ctx.dataset.label}: ${ctx.parsed.y?.toFixed(1) ?? '—'}°C`
+                const c = ctx.parsed.y
+                const v = c == null ? null : cToDisplay(c)
+                return `${ctx.dataset.label}: ${v == null ? '—' : v.toFixed(1)}${unitLabel.value}`
               },
             },
           },
@@ -446,7 +422,12 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
           },
           y: {
             title: { display: false },
-            ticks: { color: '#a8a29e', maxTicksLimit: showLabels ? 4 : 6 },
+            ticks: {
+              color: '#a8a29e',
+              maxTicksLimit: showLabels ? 4 : 6,
+              // G1: tick values are °C; show them in the active unit.
+              callback: (value) => Math.round(cToDisplay(value)) + '°',
+            },
             grid:  { color: '#f5f5f4' },
             min: 0,
             max: 300,
@@ -464,7 +445,7 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     if (!ensureAlive()) return
     chart.data.datasets[0].data = points.map(p => ({
       x: p.offset_minutes + offset,
-      y: p.target_temp,
+      y: p.target_temp,                // °C
     }))
     if (points.length) {
       const maxX = Math.max(...points.map(p => p.offset_minutes + offset))
@@ -484,17 +465,15 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     if (!ensureAlive()) return
     chart.data.datasets[1].data = rows.map(r => ({
       x:  Math.round((r.timestamp - startedAt) / 60),
-      y:  r.temperature,
+      y:  r.temperature,               // °C
       id: r.id,
       ts: r.timestamp,
     }))
     autoFitY()
-    computeReductionBands()        // G11: bands depend on the actual curve
+    computeReductionBands()
     chart.update('none')
   }
 
-  // G11: set/replace the reduction periods. Accepts the raw rows
-  // ({ start_temp, end_temp, ... }) from the firing payload.
   function setReductions(periods) {
     lastReductions = periods ?? []
     if (!ensureAlive()) return
@@ -502,30 +481,28 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     chart.update('none')
   }
 
-  // NOW-LINE: position the current-time line. Call on each live tick.
-  //   startedAt — firing.started_at (unix seconds).
-  // Computes elapsed minutes (chart-x) and the planned target temp at that x.
-  // Extends the x-axis max so the line stays visible as the firing outruns the
-  // planned curve. No-op-safe; cheap enough to call every second.
   function setNowLine(startedAt) {
     if (!ensureAlive()) return
     if (!startedAt) { nowLine = null; chart.update('none'); return }
-
     const minutes = (Date.now() / 1000 - startedAt) / 60
     const planned = chart.data.datasets[0]?.data ?? []
-    const targetTemp = targetAtMinute(planned, minutes)
+    const targetTemp = targetAtMinute(planned, minutes)   // °C
     nowLine = { minutes, targetTemp }
-
-    // Keep "now" on-canvas once the firing runs past the planned end.
     const currentMax = chart.options.scales.x.max ?? 0
     if (minutes > currentMax) chart.options.scales.x.max = minutes + 5
-
     chart.update('none')
   }
 
-  // NOW-LINE: hide it (ended firings, or on deselect).
   function clearNowLine() {
     nowLine = null
+    if (!ensureAlive()) return
+    chart.update('none')
+  }
+
+  // G1: force a redraw when the unit toggles. Data is unchanged; only labels
+  // and ticks re-render. The unit ref is shared, so reading .value at draw time
+  // already reflects the new unit — this just repaints.
+  function setUnit() {
     if (!ensureAlive()) return
     chart.update('none')
   }
@@ -598,8 +575,9 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
   }
 
   return {
-    init, setSchedule, setReadings, setReductions,   // G11: setReductions exported
-    setNowLine, clearNowLine,                         // NOW-LINE
+    init, setSchedule, setReadings, setReductions,
+    setNowLine, clearNowLine,
+    setUnit,                                            // G1
     setManualMode, setSignalLost, clearSignalLost, resetZoom, resize, destroy,
   }
 }

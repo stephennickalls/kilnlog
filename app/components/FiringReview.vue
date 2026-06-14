@@ -10,6 +10,9 @@
   repeatable plan (the product's heart), so it visually echoes the schedules
   world it creates. "Fire this again" stays flame (immediate); Restart and
   Export stay quiet.
+
+  G1 (°F): peakTemp arrives as raw °C and is converted for the summary via
+  useTempUnit; the unit is shown explicitly ("Peak 1832°F") to avoid ambiguity.
 -->
 <template>
   <div class="bg-white border border-parchment-3 rounded-2xl px-4 py-3 sm:px-6 sm:py-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-5" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
@@ -58,9 +61,11 @@ import { computed } from 'vue'
 const props = defineProps({
   firing:     { type: Object, required: true },
   canRestart: { type: Boolean, default: true },
-  peakTemp:   { type: Number, default: null },
+  peakTemp:   { type: Number, default: null },   // raw °C
   duration:   { type: String, default: null },
 })
+
+const { displayTemp, unitLabel } = useTempUnit()
 
 const hasData = computed(() =>
   !!(props.firing.readings?.length || props.firing.schedule?.length)
@@ -68,7 +73,7 @@ const hasData = computed(() =>
 
 const summary = computed(() => {
   const parts = []
-  if (props.peakTemp !== null) parts.push(`Peak ${Math.round(props.peakTemp)}°`)
+  if (props.peakTemp !== null) parts.push(`Peak ${displayTemp(props.peakTemp)}${unitLabel.value}`)
   if (props.duration)          parts.push(props.duration)
   const n = props.firing.readings?.length
   if (n) parts.push(`${n} reading${n === 1 ? '' : 's'}`)

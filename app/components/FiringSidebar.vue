@@ -71,9 +71,19 @@
     </ul>
 
     <div class="p-3 border-t border-parchment-3">
-      <button class="w-full py-2.5 bg-flame text-parchment text-sm font-bold rounded-lg hover:bg-flame-dark transition-colors" @click="$emit('start')">
+      <!-- G5: one firing at a time. Disabled while a firing is active; the live
+           firing is already shown at the top of this list to tap into. -->
+      <button
+        class="w-full py-2.5 bg-flame text-parchment text-sm font-bold rounded-lg hover:bg-flame-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        :disabled="!!activeFiring"
+        :title="activeFiring ? 'A firing is already active — only one at a time' : ''"
+        @click="$emit('start')"
+      >
         + Start firing
       </button>
+      <p v-if="activeFiring" class="text-[11px] text-ink-faint text-center mt-1.5 leading-snug">
+        End <strong class="font-semibold">{{ activeFiring.name }}</strong> first — only one firing at a time.
+      </p>
     </div>
 
     <!-- Drag handle -->

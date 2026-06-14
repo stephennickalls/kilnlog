@@ -5,6 +5,10 @@
   celadon, raku cobalt) via useScheduleTheme — so the library parses by colour-
   temperature at a glance. Actions recede: whole-card tap = Edit; one Start
   footer; Duplicate/Delete in a ⋯ menu on hover/focus.
+
+  G1 (°F): the peak-temp meta line converts for display via useTempUnit and
+  shows the unit explicitly. The sparkline is pure geometry (°C in, self-
+  consistent) and is unchanged.
 -->
 <template>
   <div
@@ -65,7 +69,7 @@
     <div class="px-3 pb-2.5 pt-1 flex flex-col gap-0.5 flex-1">
       <p class="text-sm font-bold text-ink leading-snug truncate">{{ schedule.name }}</p>
       <p class="text-[11px] text-ink-muted tabular-nums">
-        {{ peakTemp }}° peak
+        {{ peakDisplay }}{{ unitLabel }} peak
         <span class="text-parchment-4 mx-0.5">·</span>{{ durationLabel }}
         <template v-if="schedule.cone"><span class="text-parchment-4 mx-0.5">·</span>Cone {{ schedule.cone }}</template>
       </p>
@@ -74,9 +78,11 @@
     <!-- Primary action footer -->
     <div class="px-2 pb-2" @click.stop>
       <button
-        class="w-full inline-flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold border transition-colors"
+        class="w-full inline-flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold border transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         :class="theme.startBtn"
-        @click="$emit('start')"
+        :disabled="startDisabled"
+        :title="startDisabled ? 'A firing is already active — only one at a time' : ''"
+        @click="onStart"
       >
         <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M6 4l10 6-10 6V4z"/></svg>
         Start firing
@@ -99,11 +105,19 @@ import { ref, computed } from 'vue'
 import { themeForType } from '~/composables/useScheduleTheme'
 
 const props = defineProps({
-  schedule: { type: Object,  required: true },
-  isPreset: { type: Boolean, default: false },
+  schedule:      { type: Object,  required: true },
+  isPreset:      { type: Boolean, default: false },
+  startDisabled: { type: Boolean, default: false },   // G5: one firing at a time
 })
 
 const emit = defineEmits(['edit', 'start', 'duplicate', 'confirm-delete'])
+
+const { displayTemp, unitLabel } = useTempUnit()
+
+function onStart() {
+  if (props.startDisabled) return
+  emit('start')
+}
 
 const menuOpen        = ref(false)
 const confirmingDelete = ref(false)
@@ -139,9 +153,11 @@ const points = computed(() => {
   return raw.map(p => ({ offsetMinutes: p.offset_minutes, targetTemp: p.target_temp }))
 })
 
-const peakTemp = computed(() =>
+// Peak in °C, then converted for display.
+const peakTempC = computed(() =>
   points.value.length ? Math.round(Math.max(...points.value.map(p => p.targetTemp))) : 0
 )
+const peakDisplay = computed(() => displayTemp(peakTempC.value))
 
 const durationLabel = computed(() => {
   if (!points.value.length) return '—'

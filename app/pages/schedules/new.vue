@@ -97,6 +97,14 @@
           <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Curve</label>
           <span v-if="form.type" class="text-[10px] font-bold px-2 py-0.5 rounded-full" :class="theme.badgeText">{{ form.type }}</span>
           <div class="flex-1" />
+          <!-- G11: plan reduction periods -->
+          <button
+            class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-[11px] font-bold transition-colors"
+            @click="showReductionModal = true"
+          >
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            Reduction{{ editReductions.length ? ` (${editReductions.length})` : '' }}
+          </button>
           <!-- G1: unit toggle right where temps are entered -->
           <TempUnitToggle />
         </div>
@@ -105,12 +113,21 @@
           v-if="isFromFiring"
           :model-value="editPoints"
           :background-points="rawPoints"
+          :reductions="editReductions"
           :stroke="theme.stroke"
           :fill="theme.fill"
           @update:model-value="onEditorChange"
         />
-        <ScheduleCurveEditor v-else v-model="editPoints" :stroke="theme.stroke" :fill="theme.fill" />
+        <ScheduleCurveEditor v-else v-model="editPoints" :reductions="editReductions" :stroke="theme.stroke" :fill="theme.fill" />
       </div>
+
+      <!-- G11: reduction planner -->
+      <ReductionPlannerModal
+        :open="showReductionModal"
+        :reductions="editReductions"
+        @close="showReductionModal = false"
+        @save="onReductionsSaved"
+      />
 
       <!-- ── SHARED: save ──────────────────────────────────────────────── -->
       <div class="pt-2 border-t border-parchment-3">
@@ -173,7 +190,14 @@ const regenerating      = ref(false)
 // Shared
 const form       = reactive({ name: '', type: 'bisque', cone: '' })
 const editPoints = ref(BISQUE_DEFAULT.map(p => ({ ...p })))
+const editReductions     = ref([])     // G11: [{ startTemp, endTemp|null }] °C
+const showReductionModal = ref(false)
 const theme      = computed(() => themeForType(form.type))
+
+function onReductionsSaved(list) {
+  editReductions.value = list
+  showReductionModal.value = false
+}
 
 // Plain create: seed from library
 const librarySchedules  = ref([])
@@ -288,6 +312,7 @@ async function save() {
         cone:   form.cone?.trim() || null,
         source: isFromFiring.value ? 'from_firing' : 'custom',
         points: editPoints.value,
+        reductions: editReductions.value,
       },
     })
     router.replace(`/schedules/${result.id}`)

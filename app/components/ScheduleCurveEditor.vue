@@ -77,6 +77,31 @@
         <!-- Raw readings underlay (background-points prop, from-firing mode) -->
         <path v-if="bgPath" :d="bgPath" fill="none" stroke="#d6d3d1" stroke-width="1" stroke-linejoin="round"/>
 
+        <!-- G11: planned reduction bands — dashed "planned" style, behind the
+             curve, distinct from the solid live-logged band. -->
+        <g v-for="(band, bi) in reductionBands" :key="'rb' + bi">
+          <rect
+            :x="band.left" :y="PAD_T"
+            :width="band.width" :height="svgHeight - PAD_T - PAD_B"
+            fill="rgba(99,102,241,0.07)"
+          />
+          <line
+            :x1="band.left" :y1="PAD_T" :x2="band.left" :y2="svgHeight - PAD_B"
+            stroke="rgba(99,102,241,0.5)" stroke-width="1" stroke-dasharray="3 3"
+          />
+          <line
+            v-if="!band.open"
+            :x1="band.right" :y1="PAD_T" :x2="band.right" :y2="svgHeight - PAD_B"
+            stroke="rgba(99,102,241,0.5)" stroke-width="1" stroke-dasharray="3 3"
+          />
+          <text
+            v-if="band.width > 34"
+            :x="band.left + 4" :y="PAD_T + 10"
+            font-size="8" font-family="Georgia, serif" font-weight="bold"
+            fill="rgba(79,70,229,0.9)"
+          >{{ band.open ? 'reduction (planned)' : 'reduction' }}</text>
+        </g>
+
         <!-- Filled area under curve -->
         <path
           v-if="sortedPoints.length >= 2"
@@ -238,6 +263,7 @@
 const props = defineProps({
   modelValue:       { type: Array,  default: () => [] }, // [{ offsetMinutes, targetTemp }] — °C
   backgroundPoints: { type: Array,  default: () => [] }, // raw readings shown as faint underlay — °C
+  reductions:       { type: Array,  default: () => [] }, // G11: [{ startTemp, endTemp|null }] — °C
   stroke:           { type: String, default: '#f97316' }, // curve + handle color
   fill:             { type: String, default: 'rgba(249,115,22,0.07)' }, // area fill
 })
@@ -354,6 +380,54 @@ const bgPath = computed(() => {
   let d = `M ${minsToX(pts[0].offsetMinutes)} ${tempToY(pts[0].targetTemp)}`
   for (let i = 1; i < pts.length; i++) d += ` L ${minsToX(pts[i].offsetMinutes)} ${tempToY(pts[i].targetTemp)}`
   return d
+})
+
+// G11: planned reduction bands. A reduction is defined by TEMPERATURES; the
+// band draws across TIME. Map start/end temps to x by walking the planned
+// curve in time order — find the first crossing of start_temp, then from there
+// the next crossing of end_temp. This lands a COOLING reduction (end < start)
+// on the descending leg naturally. Open (no end) runs to the plan's end.
+// Curve is °C; temps are °C; nothing here converts (display-agnostic geometry).
+function curveXAtTemp(curve, temp, fromX) {
+  for (let i = 0; i < curve.length - 1; i++) {
+    const a = curve[i], b = curve[i + 1]
+    if (b.x < fromX) continue
+    const lo = Math.min(a.y, b.y), hi = Math.max(a.y, b.y)
+    if (temp >= lo && temp <= hi) {
+      const span = b.y - a.y
+      const frac = span === 0 ? 0 : (temp - a.y) / span
+      const x = a.x + frac * (b.x - a.x)
+      if (x >= fromX - 1e-6) return x
+    }
+  }
+  return null
+}
+
+const reductionBands = computed(() => {
+  const curve = sortedPoints.value.map(p => ({ x: p.offsetMinutes, y: p.targetTemp }))
+  if (curve.length < 2) return []
+  const firstX = curve[0].x
+  const lastX  = curve[curve.length - 1].x
+  const out = []
+  for (const r of (props.reductions ?? [])) {
+    const startTemp = r.startTemp ?? r.start_temp
+    const endTemp   = (r.endTemp ?? r.end_temp ?? null)
+    if (startTemp == null) continue
+    const startMin = curveXAtTemp(curve, startTemp, firstX)
+    if (startMin === null) continue   // plan never reaches this temp
+    const open = endTemp === null || endTemp === undefined
+    let endMin
+    if (open) {
+      endMin = lastX
+    } else {
+      endMin = curveXAtTemp(curve, endTemp, startMin)
+      if (endMin === null) endMin = lastX
+    }
+    const xL = minsToX(Math.min(startMin, endMin))
+    const xR = minsToX(Math.max(startMin, endMin))
+    out.push({ left: xL, right: xR, width: Math.max(xR - xL, 1.5), open })
+  }
+  return out
 })
 
 // ── DEBUG ─────────────────────────────────────────────────────────────────────

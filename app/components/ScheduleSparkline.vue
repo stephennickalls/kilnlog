@@ -6,6 +6,12 @@
 
   Self-contained linear-path math (no axis chrome). Flat holds read as a flat
   line through the middle, never a dot, via the y-range guard.
+
+  G11: optional `reductions` ([{ startTemp, endTemp|null }] °C) render as very
+  faint shaded bands behind the curve — a glanceable "this schedule plans a
+  reduction here". No labels (it's a thumbnail). Mapped temp→x by walking the
+  curve in time order, so a cooling reduction (end below start) lands on the
+  descending leg. Temps are °C; geometry is display-agnostic.
 -->
 <template>
   <svg
@@ -15,6 +21,14 @@
     class="block"
     preserveAspectRatio="none"
   >
+    <!-- G11: planned reduction bands, behind everything -->
+    <rect
+      v-for="(b, i) in reductionBands" :key="'rb' + i"
+      :x="b.left" :y="PAD"
+      :width="b.width" :height="height - PAD * 2"
+      fill="rgba(99,102,241,0.10)"
+    />
+
     <path v-if="fillPath" :d="fillPath" :fill="fill" />
     <path
       v-if="linePath"
@@ -41,11 +55,12 @@
 import { computed } from 'vue'
 
 const props = defineProps({
-  points: { type: Array,  default: () => [] }, // [{ offsetMinutes, targetTemp }]
-  width:  { type: Number, default: 120 },
-  height: { type: Number, default: 40 },
-  stroke: { type: String, default: '#b8551c' },                 // theme.stroke
-  fill:   { type: String, default: 'rgba(184,85,28,0.07)' },    // theme.fill
+  points:     { type: Array,  default: () => [] }, // [{ offsetMinutes, targetTemp }]
+  reductions: { type: Array,  default: () => [] }, // G11: [{ startTemp, endTemp|null }] °C
+  width:      { type: Number, default: 120 },
+  height:     { type: Number, default: 40 },
+  stroke:     { type: String, default: '#b8551c' },                 // theme.stroke
+  fill:       { type: String, default: 'rgba(184,85,28,0.07)' },    // theme.fill
 })
 
 const PAD = 3
@@ -97,5 +112,43 @@ const fillPath = computed(() => {
   const firstX = xFor(pts[0].offsetMinutes)
   const lastX  = xFor(pts[pts.length - 1].offsetMinutes)
   return `${linePath.value} L ${lastX} ${bottom} L ${firstX} ${bottom} Z`
+})
+
+// G11: map reduction temps → x over the planned curve, in time order.
+function curveXAtTemp(curve, temp, fromM) {
+  for (let i = 0; i < curve.length - 1; i++) {
+    const a = curve[i], b = curve[i + 1]
+    if (b.offsetMinutes < fromM) continue
+    const lo = Math.min(a.targetTemp, b.targetTemp), hi = Math.max(a.targetTemp, b.targetTemp)
+    if (temp >= lo && temp <= hi) {
+      const span = b.targetTemp - a.targetTemp
+      const frac = span === 0 ? 0 : (temp - a.targetTemp) / span
+      const m = a.offsetMinutes + frac * (b.offsetMinutes - a.offsetMinutes)
+      if (m >= fromM - 1e-6) return m
+    }
+  }
+  return null
+}
+
+const reductionBands = computed(() => {
+  const curve = sorted.value
+  if (curve.length < 2) return []
+  const firstM = curve[0].offsetMinutes
+  const lastM  = curve[curve.length - 1].offsetMinutes
+  const out = []
+  for (const r of (props.reductions ?? [])) {
+    const startTemp = r.startTemp ?? r.start_temp
+    const endTemp   = (r.endTemp ?? r.end_temp ?? null)
+    if (startTemp == null) continue
+    const startM = curveXAtTemp(curve, startTemp, firstM)
+    if (startM === null) continue
+    const open = endTemp === null || endTemp === undefined
+    let endM = open ? lastM : curveXAtTemp(curve, endTemp, startM)
+    if (endM === null) endM = lastM
+    const xL = xFor(Math.min(startM, endM))
+    const xR = xFor(Math.max(startM, endM))
+    out.push({ left: xL, width: Math.max(xR - xL, 1) })
+  }
+  return out
 })
 </script>

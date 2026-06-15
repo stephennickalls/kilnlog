@@ -24,6 +24,7 @@
       <div class="rounded-lg overflow-hidden" :style="groundStyle">
         <ScheduleSparkline
           :points="points"
+          :reductions="reductions"
           :width="280"
           :height="72"
           :stroke="theme.stroke"
@@ -152,6 +153,14 @@ const points = computed(() => {
   const raw = props.schedule.points ?? props.schedule.schedule_library_points ?? []
   return raw.map(p => ({ offsetMinutes: p.offset_minutes, targetTemp: p.target_temp }))
 })
+
+// G11: planned reductions (start_temp/end_temp °C) for the sparkline bands.
+const reductions = computed(() =>
+  (props.schedule.reductions ?? []).map(r => ({
+    startTemp: r.start_temp ?? r.startTemp,
+    endTemp:   r.end_temp ?? r.endTemp ?? null,
+  }))
+)
 
 // Peak in °C, then converted for display.
 const peakTempC = computed(() =>

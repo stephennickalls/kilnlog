@@ -1,8 +1,11 @@
 // File: server/api/reductions/[id].put.js
 // PUT /api/reductions/:id — end (close) a reduction period.
 // Body: { endTemp: number }  (current reading at the moment of the tap)
-// Enforces endTemp > start_temp (matches the DB check; we validate here for a
-// clean 400 instead of a 23514 constraint error).
+//
+// G11 fast-follow: reductions can run on the COOLING leg (down firing), so the
+// end may be ABOVE or BELOW the start — it just can't equal it (zero-width is
+// meaningless). Matches the loosened DB check (end_temp <> start_temp). We
+// validate here for a clean 400 instead of a 23514 constraint error.
 const MIN_TEMP = -200
 const MAX_TEMP = 1400
 
@@ -18,7 +21,7 @@ export default defineEventHandler(async (event) => {
   }
 
   // Fetch the period; RLS already restricts to periods the caller owns, but
-  // read start_temp so we can validate ordering and give a clear message.
+  // read start_temp so we can validate and give a clear message.
   const { data: period } = await db
     .from('reduction_periods')
     .select('id, start_temp, end_temp')
@@ -29,10 +32,10 @@ export default defineEventHandler(async (event) => {
   if (period.end_temp !== null) {
     throw createError({ statusCode: 409, statusMessage: 'This reduction period is already closed.' })
   }
-  if (endTemp <= period.start_temp) {
+  if (endTemp === period.start_temp) {
     throw createError({
       statusCode: 400,
-      statusMessage: `End temperature must be above the start (${Math.round(period.start_temp)}°C).`,
+      statusMessage: `End temperature must differ from the start (${Math.round(period.start_temp)}°C).`,
     })
   }
 

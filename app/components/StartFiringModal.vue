@@ -61,16 +61,21 @@
 
               <span class="text-xs text-ink-faint">or load:</span>
 
-              <!-- Library preset dropdown -->
+              <!-- Library dropdown: your schedules first, then presets by type (G9) -->
               <div v-if="library.length" class="relative">
                 <select
                   class="appearance-none bg-white border border-parchment-3 rounded-lg pl-3 pr-7 py-1.5 text-xs text-ink font-semibold focus:outline-none focus:border-flame cursor-pointer font-serif max-w-[160px]"
                   :value="selectedLibraryId ?? ''"
                   @change="applyLibraryById($event.target.value)"
                 >
-                  <option value="" disabled>Preset library…</option>
-                  <optgroup v-for="type in libraryTypes" :key="type" :label="type.charAt(0).toUpperCase() + type.slice(1)">
-                    <option v-for="lib in library.filter(l => l.type === type)" :key="lib.id" :value="lib.id">
+                  <option value="" disabled>Library…</option>
+                  <optgroup v-if="myLibrary.length" label="Your schedules">
+                    <option v-for="lib in myLibrary" :key="lib.id" :value="lib.id">
+                      {{ lib.name }}{{ lib.cone ? ` · Cone ${lib.cone}` : '' }}
+                    </option>
+                  </optgroup>
+                  <optgroup v-for="type in presetTypes" :key="type" :label="type.charAt(0).toUpperCase() + type.slice(1)">
+                    <option v-for="lib in presetLibrary.filter(l => l.type === type)" :key="lib.id" :value="lib.id">
                       {{ lib.name }}{{ lib.cone ? ` · Cone ${lib.cone}` : '' }}
                     </option>
                   </optgroup>
@@ -150,7 +155,11 @@ const selectedPastId    = ref(null)
 const appliedLabel      = ref('')
 const loadingPast       = ref(false)
 
-const libraryTypes = computed(() => [...new Set(props.library.map(l => l.type))].sort())
+// G9: split the library by ownership so the dropdown can group the user's own
+// schedules above the built-in presets. RLS returns both (own + built-ins).
+const myLibrary     = computed(() => props.library.filter(l => l.user_id !== null))
+const presetLibrary = computed(() => props.library.filter(l => l.user_id === null))
+const presetTypes   = computed(() => [...new Set(presetLibrary.value.map(l => l.type))].sort())
 
 function applyQuick(type) {
   quickType.value         = type

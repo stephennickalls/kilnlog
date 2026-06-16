@@ -713,7 +713,7 @@ async function openStartModal() {
     selectFiring(activeFiring.value)
     return
   }
-  if (!library.value.length) library.value = await $fetch('/api/library')
+  if (!library.value.length) library.value = await $fetch('/api/schedules')  // G9: unified endpoint (was /api/library)
   showStartModal.value = true
 }
 

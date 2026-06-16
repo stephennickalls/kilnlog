@@ -4,8 +4,15 @@
 //
 // G11 fast-follow: nested-selects reduction_periods (library_id rows) so the
 // library cards can show faint planned-reduction bands on the sparkline.
+//
+// G9: this is now the ONE schedule-list endpoint (former /api/library deleted,
+// which repointed onto this). requireSubscription:false — this is a READ of
+// already-RLS-protected data (built-ins + the caller's own rows only), and it
+// must work during trial-edge / past-due grace states so the Start Firing modal
+// can still load curves. The paywall is enforced on the WRITE paths
+// (POST/PUT/DELETE schedules, POST firings/readings), not on reading your list.
 export default defineEventHandler(async (event) => {
-  const { db, user } = await useServerUser(event)
+  const { db, user } = await useServerUser(event, { requireSubscription: false })
 
   const { data, error } = await db
     .from('schedule_library')

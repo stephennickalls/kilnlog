@@ -208,6 +208,17 @@
       </svg>
     </div>
 
+    <!-- G11: legend — only when the schedule has reduction bands, so a new user
+         can read what the blue shading means at a glance. -->
+    <div v-if="reductionBands.length" class="flex items-center gap-2 px-0.5 -mt-0.5">
+      <span class="inline-flex items-center shrink-0" style="width:18px;height:11px">
+        <span class="w-full h-full rounded-sm" style="background:rgba(99,102,241,0.12);border-left:1.5px dashed rgba(99,102,241,0.7)"/>
+      </span>
+      <span class="text-[11px] text-ink-muted leading-snug">
+        Shaded = <strong class="text-indigo-700 font-semibold">planned reduction</strong> — when you intend to reduce. Your real firing decides the actual.
+      </span>
+    </div>
+
     <!-- DEBUG PANEL — hidden, keep for future debugging -->
     <div v-show="false" class="bg-ink text-green-400 font-mono text-[10px] rounded-lg p-3 leading-relaxed">
       <div class="text-yellow-300 font-bold mb-1">🐛 Drag Debug</div>
@@ -408,6 +419,15 @@ const reductionBands = computed(() => {
   if (curve.length < 2) return []
   const firstX = curve[0].x
   const lastX  = curve[curve.length - 1].x
+  // x of the hottest point at/after a given x — where an unreached end "tops out".
+  function peakXFrom(fromX) {
+    let bestX = fromX, bestY = -Infinity
+    for (const p of curve) {
+      if (p.x < fromX) continue
+      if (p.y > bestY) { bestY = p.y; bestX = p.x }
+    }
+    return bestX
+  }
   const out = []
   for (const r of (props.reductions ?? [])) {
     const startTemp = r.startTemp ?? r.start_temp
@@ -418,10 +438,13 @@ const reductionBands = computed(() => {
     const open = endTemp === null || endTemp === undefined
     let endMin
     if (open) {
+      // open band runs to the plan's end
       endMin = lastX
     } else {
       endMin = curveXAtTemp(curve, endTemp, startMin)
-      if (endMin === null) endMin = lastX
+      // end temp never reached on the curve → anchor to the peak after start,
+      // not the plan's end (which would wrongly stretch the band to the finish)
+      if (endMin === null) endMin = peakXFrom(startMin)
     }
     const xL = minsToX(Math.min(startMin, endMin))
     const xR = minsToX(Math.max(startMin, endMin))

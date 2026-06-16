@@ -37,33 +37,26 @@
         <ConeSelect v-model="form.cone" />
       </div>
 
+      <!-- Description (G10) -->
+      <div class="flex flex-col gap-1.5">
+        <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Description <span class="text-ink-faint/60 normal-case font-normal tracking-normal">(optional)</span></label>
+        <textarea
+          v-model="form.description"
+          rows="2"
+          maxlength="500"
+          placeholder="Notes about this schedule — when to use it, glaze pairings, quirks…"
+          class="w-full border border-parchment-3 rounded-xl px-4 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif resize-none"
+        />
+      </div>
+
       <!-- Curve -->
       <div class="flex flex-col gap-2">
         <div class="flex items-center gap-2">
           <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Curve</label>
           <span v-if="form.type" class="text-[10px] font-bold px-2 py-0.5 rounded-full" :class="theme.badgeText">{{ form.type }}</span>
-          <div class="flex-1" />
-          <!-- G11: plan reduction periods -->
-          <button
-            class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-[11px] font-bold transition-colors"
-            @click="showReductionModal = true"
-          >
-            <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-            Reduction{{ editReductions.length ? ` (${editReductions.length})` : '' }}
-          </button>
-          <!-- G1: unit toggle right where temps are entered -->
-          <TempUnitToggle />
         </div>
-        <ScheduleCurveEditor v-model="editPoints" :reductions="editReductions" :stroke="theme.stroke" :fill="theme.fill" />
+        <ScheduleCurveEditor v-model="editPoints" :stroke="theme.stroke" :fill="theme.fill" />
       </div>
-
-      <!-- G11: reduction planner -->
-      <ReductionPlannerModal
-        :open="showReductionModal"
-        :reductions="editReductions"
-        @close="showReductionModal = false"
-        @save="onReductionsSaved"
-      />
 
       <!-- Actions -->
       <div class="flex flex-col sm:flex-row gap-2 pt-2 border-t border-parchment-3">
@@ -73,22 +66,11 @@
           @click="save"
         >{{ saving ? 'Saving…' : 'Save schedule' }}</button>
         <button
-          class="flex-1 py-2.5 border border-celadon/40 bg-celadon-bg/60 text-celadon-dark hover:bg-celadon-bg text-sm font-semibold rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          :disabled="saving || !form.name.trim() || !!activeFiring"
-          :title="activeFiring ? 'A firing is already active — only one at a time' : ''"
+          class="flex-1 py-2.5 border border-celadon/40 bg-celadon-bg/60 text-celadon-dark hover:bg-celadon-bg text-sm font-semibold rounded-xl transition-colors disabled:opacity-40"
+          :disabled="saving || !form.name.trim()"
           @click="saveAndStart"
         >Save &amp; start firing →</button>
       </div>
-
-      <!-- G5: explain the disabled Save & start -->
-      <NuxtLink
-        v-if="activeFiring"
-        to="/app"
-        class="flex items-center gap-2 px-3 py-2 -mt-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs hover:bg-amber-100 transition-colors"
-      >
-        <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
-        <span><strong>{{ activeFiring.name }}</strong> is still firing — end it before starting another. You can still save this schedule.</span>
-      </NuxtLink>
 
     </main>
 
@@ -112,22 +94,11 @@ definePageMeta({ middleware: ['auth'] })
 const route  = useRoute()
 const router = useRouter()
 
-// G5: know whether a firing is active so "Save & start" can be disabled.
-const { activeFiring, loadActiveFiring } = useActiveFiring()
-onMounted(loadActiveFiring)
-
 const loading    = ref(true)
 const saving     = ref(false)
 const status     = ref('')
-const form       = reactive({ name: '', type: 'bisque', cone: '' })
+const form       = reactive({ name: '', type: 'bisque', cone: '', description: '' })
 const editPoints = ref([])
-const editReductions  = ref([])     // G11: [{ startTemp, endTemp|null }] in °C
-const showReductionModal = ref(false)
-
-function onReductionsSaved(list) {
-  editReductions.value = list
-  showReductionModal.value = false
-}
 
 const id    = computed(() => Number(route.params.id))
 const theme = computed(() => themeForType(form.type))
@@ -159,21 +130,17 @@ async function load() {
       const pts = (s.points ?? []).map(p => ({ offsetMinutes: p.offset_minutes, targetTemp: p.target_temp }))
       const copy = await $fetch('/api/schedules', {
         method: 'POST',
-        body: { name: `${s.name} (copy)`, type: s.type ?? 'bisque', cone: s.cone ?? null, source: 'preset_copy', points: pts },
+        body: { name: `${s.name} (copy)`, type: s.type ?? 'bisque', cone: s.cone ?? null, description: s.description ?? null, source: 'preset_copy', points: pts },
       })
       router.replace(`/schedules/${copy.id}?copyOf=${encodeURIComponent(s.name)}`)
       return
     }
 
-    form.name = s.name
-    form.type = s.type ?? 'bisque'
-    form.cone = s.cone ?? ''
+    form.name        = s.name
+    form.type        = s.type ?? 'bisque'
+    form.cone        = s.cone ?? ''
+    form.description = s.description ?? ''
     editPoints.value = (s.points ?? []).map(p => ({ offsetMinutes: p.offset_minutes, targetTemp: p.target_temp }))
-    // G11: hydrate planned reductions (stored as start_temp/end_temp °C)
-    editReductions.value = (s.reductions ?? []).map(r => ({
-      startTemp: r.start_temp,
-      endTemp:   r.end_temp ?? null,
-    }))
   } catch (err) {
     flash(`Couldn't load: ${err?.data?.message ?? err.message ?? 'error'}`)
   }
@@ -186,7 +153,7 @@ async function save() {
   try {
     await $fetch(`/api/schedules/${id.value}`, {
       method: 'PUT',
-      body: { name: form.name.trim(), type: form.type, cone: form.cone?.trim() || null, points: editPoints.value, reductions: editReductions.value },
+      body: { name: form.name.trim(), type: form.type, cone: form.cone?.trim() || null, description: form.description?.trim() || null, points: editPoints.value },
     })
     flash('Saved')
   } catch (err) {
@@ -198,16 +165,11 @@ async function save() {
 
 async function saveAndStart() {
   if (!form.name.trim() || saving.value) return
-  // G5 fallback — the button is disabled when active, but guard anyway.
-  if (activeFiring.value) {
-    flash(`"${activeFiring.value.name}" is still firing — end it before starting another.`)
-    return
-  }
   saving.value = true
   try {
     await $fetch(`/api/schedules/${id.value}`, {
       method: 'PUT',
-      body: { name: form.name.trim(), type: form.type, cone: form.cone?.trim() || null, points: editPoints.value, reductions: editReductions.value },
+      body: { name: form.name.trim(), type: form.type, cone: form.cone?.trim() || null, description: form.description?.trim() || null, points: editPoints.value },
     })
     router.push(`/app?startSchedule=${id.value}`)
   } catch (err) {

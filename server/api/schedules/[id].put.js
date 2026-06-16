@@ -1,31 +1,6 @@
 // server/api/schedules/[id].put.js
 // Ownership re-checked against user_id, so built-ins (user_id NULL) cannot be
 // edited here — the UI should Duplicate a preset before editing.
-//
-// G11 fast-follow: planned reductions are replaced wholesale (like points)
-// when a `reductions` array is provided. Each is { startTemp, endTemp|null };
-// end may be above OR below start (cooling) but not equal; null end = open band.
-const MIN_TEMP = -200
-const MAX_TEMP = 1400
-
-function sanitizeReductions(reductions) {
-  if (!Array.isArray(reductions)) return []
-  const out = []
-  for (const r of reductions) {
-    const startTemp = Number(r?.startTemp)
-    if (!Number.isFinite(startTemp) || startTemp < MIN_TEMP || startTemp > MAX_TEMP) continue
-    let endTemp = null
-    if (r?.endTemp !== null && r?.endTemp !== undefined && r?.endTemp !== '') {
-      const e = Number(r.endTemp)
-      if (!Number.isFinite(e) || e < MIN_TEMP || e > MAX_TEMP) continue
-      if (e === startTemp) continue
-      endTemp = e
-    }
-    out.push({ start_temp: startTemp, end_temp: endTemp })
-  }
-  return out
-}
-
 export default defineEventHandler(async (event) => {
   const { db, user } = await useServerUser(event)
   const id   = Number(getRouterParam(event, 'id'))
@@ -45,6 +20,7 @@ export default defineEventHandler(async (event) => {
   if (body.name !== undefined) updates.name = body.name.trim()
   if (body.type !== undefined) updates.type = body.type.trim()
   if (body.cone !== undefined) updates.cone = body.cone?.trim() || null
+  if (body.description !== undefined) updates.description = body.description?.trim()?.slice(0, 500) || null  // G10
 
   if (Object.keys(updates).length) {
     const { error } = await db.from('schedule_library').update(updates).eq('id', id)
@@ -63,20 +39,9 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  // G11: replace planned reductions wholesale when provided. Only the library_id
-  // rows for THIS schedule are touched (firing reductions are unaffected).
-  if (Array.isArray(body.reductions)) {
-    await db.from('reduction_periods').delete().eq('library_id', id)
-    const redRows = sanitizeReductions(body.reductions).map(r => ({ ...r, library_id: id }))
-    if (redRows.length) {
-      const { error: redErr } = await db.from('reduction_periods').insert(redRows)
-      if (redErr) throw await serverError('schedules.update.reductions_failed', redErr, { userId: user.id, scheduleId: id })
-    }
-  }
-
   const { data, error } = await db
     .from('schedule_library')
-    .select('*, points:schedule_library_points(*), reductions:reduction_periods(*)')
+    .select('*, points:schedule_library_points(*)')
     .eq('id', id)
     .single()
   if (error) throw await serverError('schedules.update.refetch_failed', error, { userId: user.id, scheduleId: id })

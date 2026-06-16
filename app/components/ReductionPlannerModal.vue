@@ -60,6 +60,7 @@
                     type="number" min="0" :max="maxInputTemp" placeholder="950"
                     class="w-full border border-parchment-3 rounded-lg px-2.5 py-1.5 text-sm text-ink bg-white focus:outline-none focus:border-flame font-serif"
                     @input="onStartInput(i, $event.target.value)"
+                    @blur="snapDisplay(i, 'start')"
                   >
                 </div>
                 <div class="flex flex-col gap-1">
@@ -69,6 +70,7 @@
                     type="number" min="0" :max="maxInputTemp" placeholder="—"
                     class="w-full border border-parchment-3 rounded-lg px-2.5 py-1.5 text-sm text-ink bg-white focus:outline-none focus:border-flame font-serif"
                     @input="onEndInput(i, $event.target.value)"
+                    @blur="snapDisplay(i, 'end')"
                   >
                 </div>
               </div>
@@ -120,6 +122,8 @@ const props = defineProps({
 const emit = defineEmits(['close', 'save'])
 
 const { displayTemp, toCelsius, unitLabel, maxInputTemp } = useTempUnit()
+const MAX_C = 1400
+const MIN_C = 0
 
 // Local editable rows. We keep the user's typed display values as strings while
 // editing, plus the resolved °C, so conversion happens once per edit.
@@ -136,22 +140,54 @@ watch(() => props.open, (isOpen) => {
   }))
 })
 
+// Bug fix: when the user toggles °C/°F while this modal is open, the stored °C
+// values are the truth but the displayed strings are stale. Re-derive the
+// display strings from °C on every unit change so the numbers track the toggle
+// and stay in the same real-world place.
+watch(unitLabel, () => {
+  for (const row of rows.value) {
+    row.startDisplay = row.startC != null && Number.isFinite(row.startC) ? String(displayTemp(row.startC)) : ''
+    row.endDisplay   = row.endC   != null && Number.isFinite(row.endC)   ? String(displayTemp(row.endC))   : ''
+  }
+})
+
 function addRow() {
   rows.value.push({ startC: null, endC: null, startDisplay: '', endDisplay: '', error: '' })
 }
 function removeRow(i) { rows.value.splice(i, 1) }
 
+// Convert a typed display value to °C and clamp to the valid kiln range, so a
+// value above the cap (e.g. 1500°C / 2732°F) can't be stored. Returns null for
+// empty input.
+function clampedC(val) {
+  if (val === '' || val === null || val === undefined) return null
+  const c = toCelsius(Number(val))
+  if (!Number.isFinite(c)) return null
+  return Math.min(Math.max(c, MIN_C), MAX_C)
+}
+
 function onStartInput(i, val) {
   const row = rows.value[i]
   row.startDisplay = val
-  row.startC = val === '' ? null : toCelsius(Number(val))
+  row.startC = clampedC(val)
   validateRow(row)
 }
 function onEndInput(i, val) {
   const row = rows.value[i]
   row.endDisplay = val
-  row.endC = val === '' ? null : toCelsius(Number(val))
+  row.endC = clampedC(val)
   validateRow(row)
+}
+
+// On blur, snap the field text to the clamped, stored value so a typed
+// out-of-range number (e.g. 1500°C) visibly corrects to the cap (1400°C).
+function snapDisplay(i, which) {
+  const row = rows.value[i]
+  if (which === 'start') {
+    row.startDisplay = row.startC != null && Number.isFinite(row.startC) ? String(displayTemp(row.startC)) : ''
+  } else {
+    row.endDisplay = row.endC != null && Number.isFinite(row.endC) ? String(displayTemp(row.endC)) : ''
+  }
 }
 
 function validateRow(row) {

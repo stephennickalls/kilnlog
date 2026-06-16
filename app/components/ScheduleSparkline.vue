@@ -135,6 +135,14 @@ const reductionBands = computed(() => {
   if (curve.length < 2) return []
   const firstM = curve[0].offsetMinutes
   const lastM  = curve[curve.length - 1].offsetMinutes
+  function peakMFrom(fromM) {
+    let bestM = fromM, bestT = -Infinity
+    for (const p of curve) {
+      if (p.offsetMinutes < fromM) continue
+      if (p.targetTemp > bestT) { bestT = p.targetTemp; bestM = p.offsetMinutes }
+    }
+    return bestM
+  }
   const out = []
   for (const r of (props.reductions ?? [])) {
     const startTemp = r.startTemp ?? r.start_temp
@@ -143,8 +151,13 @@ const reductionBands = computed(() => {
     const startM = curveXAtTemp(curve, startTemp, firstM)
     if (startM === null) continue
     const open = endTemp === null || endTemp === undefined
-    let endM = open ? lastM : curveXAtTemp(curve, endTemp, startM)
-    if (endM === null) endM = lastM
+    let endM
+    if (open) {
+      endM = lastM
+    } else {
+      endM = curveXAtTemp(curve, endTemp, startM)
+      if (endM === null) endM = peakMFrom(startM)   // unreached end → peak, not plan end
+    }
     const xL = xFor(Math.min(startM, endM))
     const xR = xFor(Math.max(startM, endM))
     out.push({ left: xL, width: Math.max(xR - xL, 1) })

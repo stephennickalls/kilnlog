@@ -16,7 +16,10 @@
           </NuxtLink>
           <h1 class="text-base sm:text-lg font-bold text-ink tracking-tight truncate">Schedules</h1>
         </div>
-        <NuxtLink to="/schedules/new" class="btn-primary shrink-0">+ New schedule</NuxtLink>
+        <div class="flex items-center gap-2 shrink-0">
+          <NuxtLink to="/schedules/new" class="btn-primary shrink-0">+ New schedule</NuxtLink>
+          <UserMenu />
+        </div>
       </div>
     </header>
 

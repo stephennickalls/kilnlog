@@ -219,19 +219,6 @@
       </span>
     </div>
 
-    <!-- DEBUG PANEL — hidden, keep for future debugging -->
-    <div v-show="false" class="bg-ink text-green-400 font-mono text-[10px] rounded-lg p-3 leading-relaxed">
-      <div class="text-yellow-300 font-bold mb-1">🐛 Drag Debug</div>
-      <div>draggingIdx: <span class="text-white">{{ draggingIdx ?? 'null' }}</span></div>
-      <div>svgRect: <span class="text-white">{{ debugSvgRect }}</span></div>
-      <div>lastEvent: <span class="text-white">{{ debugLastEvent }}</span></div>
-      <div>lastClientXY: <span class="text-white">{{ debugLastClientXY }}</span></div>
-      <div>lastSvgXY: <span class="text-white">{{ debugLastSvgXY }}</span></div>
-      <div>lastMinsTemp: <span class="text-white">{{ debugLastMinsTemp }}</span></div>
-      <div>docListeners: <span class="text-white">{{ debugDocListeners }}</span></div>
-      <div class="mt-1 text-parchment-4">Log: <span class="text-green-300">{{ debugLog.slice(-3).join(' | ') }}</span></div>
-    </div>
-
     <!-- Waypoints table — visible by default, collapsible -->
     <div class="flex flex-col gap-2 mt-1">
       <div class="flex items-center justify-between px-1">
@@ -453,31 +440,15 @@ const reductionBands = computed(() => {
   return out
 })
 
-// ── DEBUG ─────────────────────────────────────────────────────────────────────
-const debugLastEvent    = ref('none')
-const debugLastClientXY = ref('—')
-const debugLastSvgXY    = ref('—')
-const debugLastMinsTemp = ref('—')
-const debugSvgRect      = ref('—')
-const debugDocListeners = ref(0)
-const debugLog          = ref([])
-function dblog(msg) {
-  debugLog.value.push(msg)
-  if (debugLog.value.length > 20) debugLog.value.shift()
-}
-
 // ── Dragging ──────────────────────────────────────────────────────────────────
 const svgEl        = ref(null)
 const draggingId   = ref(null)   // track by _id, not sorted index
-const draggingIdx  = ref(null)   // kept for debug display only
 const tooltip      = ref(null)
 
 function getSvgPos(clientX, clientY) {
   const rect = svgEl.value.getBoundingClientRect()
-  debugSvgRect.value = `${Math.round(rect.left)},${Math.round(rect.top)} ${Math.round(rect.width)}×${Math.round(rect.height)}`
   const x = (clientX - rect.left) / rect.width  * svgWidth
   const y = (clientY - rect.top)  / rect.height * svgHeight
-  debugLastSvgXY.value = `${x.toFixed(1)}, ${y.toFixed(1)}`
   return { x, y }
 }
 
@@ -486,97 +457,65 @@ function getPointById(id) {
 }
 
 function doDrag(clientX, clientY) {
-  debugLastClientXY.value = `${clientX.toFixed(0)}, ${clientY.toFixed(0)}`
-  if (draggingId.value === null) {
-    dblog('doDrag called but draggingId is null!')
-    return
-  }
-  if (!svgEl.value) {
-    dblog('doDrag: svgEl is null!')
-    return
-  }
+  if (draggingId.value === null) return
+  if (!svgEl.value) return
   const { x, y } = getSvgPos(clientX, clientY)
   const pt = getPointById(draggingId.value)
-  if (!pt) {
-    dblog(`doDrag: no point found for _id ${draggingId.value}`)
-    return
-  }
+  if (!pt) return
   pt.offsetMinutes = xToMins(x)
   pt.targetTemp    = yToTemp(y)   // °C
-  draggingIdx.value = sortedPoints.value.findIndex(p => p._id === draggingId.value)
-  debugLastMinsTemp.value = `${pt.offsetMinutes}m, ${pt.targetTemp}°C`
   // Tooltip shows the temp in the user's unit.
   tooltip.value = { x, y, text: `${pt.offsetMinutes}m · ${displayTemp(pt.targetTemp)}${unitLabel.value}` }
 }
 
 function stopDrag() {
-  dblog(`stopDrag — was dragging _id ${draggingId.value}`)
   draggingId.value  = null
-  draggingIdx.value = null
   tooltip.value     = null
   document.removeEventListener('mousemove', onDocMouseMove)
   document.removeEventListener('mouseup',   onDocMouseUp)
   document.removeEventListener('touchmove', onDocTouchMove)
   document.removeEventListener('touchend',  onDocTouchEnd)
-  debugDocListeners.value = 0
   // Emit final positions (°C) now that drag is complete
   emit('update:modelValue', points.value.map(({ offsetMinutes, targetTemp }) => ({ offsetMinutes, targetTemp })))
 }
 
 function onDocMouseMove(e) {
-  debugLastEvent.value = `mousemove (doc)`
   doDrag(e.clientX, e.clientY)
 }
 function onDocMouseUp() {
-  debugLastEvent.value = 'mouseup (doc)'
   stopDrag()
 }
 function onDocTouchMove(e) {
-  debugLastEvent.value = `touchmove (doc) touches:${e.touches.length}`
   e.preventDefault()
   if (e.touches.length) doDrag(e.touches[0].clientX, e.touches[0].clientY)
 }
 function onDocTouchEnd() {
-  debugLastEvent.value = 'touchend (doc)'
   stopDrag()
 }
 
 function startDrag(sortedIdx, e) {
   const id = sortedPoints.value[sortedIdx]?._id ?? null
-  dblog(`startDrag(mouse) idx=${sortedIdx} _id=${id}`)
-  debugLastEvent.value = `mousedown on pt ${sortedIdx}`
   e.preventDefault()
   e.stopPropagation()
   draggingId.value  = id
-  draggingIdx.value = sortedIdx
   document.addEventListener('mousemove', onDocMouseMove)
   document.addEventListener('mouseup',   onDocMouseUp)
-  debugDocListeners.value = 2
 }
 
 function startDragTouch(sortedIdx, e) {
   const id = sortedPoints.value[sortedIdx]?._id ?? null
-  dblog(`startDragTouch idx=${sortedIdx} _id=${id} touches=${e.touches.length}`)
-  debugLastEvent.value = `touchstart on pt ${sortedIdx}`
-  debugLastClientXY.value = e.touches.length
-    ? `${e.touches[0].clientX.toFixed(0)}, ${e.touches[0].clientY.toFixed(0)}`
-    : 'no touches'
   e.preventDefault()
   e.stopPropagation()
   draggingId.value  = id
-  draggingIdx.value = sortedIdx
   document.addEventListener('touchmove', onDocTouchMove, { passive: false })
   document.addEventListener('touchend',  onDocTouchEnd)
-  debugDocListeners.value = 2
 }
 
 onUnmounted(() => { stopDrag() })
 
 // ── Adding points ─────────────────────────────────────────────────────────────
-const hoverAddPos = ref(null)
-
 function onSvgClick(e) {
-  if (draggingIdx.value !== null) return
+  if (draggingId.value !== null) return
   const { x, y } = getSvgPos(e.clientX, e.clientY)
   if (x < PAD_L || x > svgWidth - PAD_R || y < PAD_T || y > svgHeight - PAD_B) return
   points.value.push({ offsetMinutes: xToMins(x), targetTemp: yToTemp(y), _id: _nextId++ })

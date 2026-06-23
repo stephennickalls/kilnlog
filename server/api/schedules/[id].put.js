@@ -1,6 +1,29 @@
 // server/api/schedules/[id].put.js
 // Ownership re-checked against user_id, so built-ins (user_id NULL) cannot be
 // edited here — the UI should Duplicate a preset before editing.
+const MIN_TEMP = -200
+const MAX_TEMP = 1400
+const MAX_REDUCTIONS = 50
+
+function sanitizeReductions(input) {
+  if (!Array.isArray(input)) return []
+  const out = []
+  for (const r of input.slice(0, MAX_REDUCTIONS)) {
+    const start = Number(r?.startTemp ?? r?.start_temp)
+    if (!Number.isFinite(start) || start < MIN_TEMP || start > MAX_TEMP) continue
+    let end = null
+    const rawEnd = r?.endTemp ?? r?.end_temp
+    if (rawEnd !== null && rawEnd !== undefined && rawEnd !== '') {
+      const e = Number(rawEnd)
+      if (!Number.isFinite(e) || e < MIN_TEMP || e > MAX_TEMP) continue
+      if (Math.round(e) === Math.round(start)) continue   // end must differ
+      end = Math.round(e)
+    }
+    out.push({ start_temp: Math.round(start), end_temp: end })
+  }
+  return out
+}
+
 export default defineEventHandler(async (event) => {
   const { db, user } = await useServerUser(event)
   const id   = Number(getRouterParam(event, 'id'))
@@ -39,14 +62,26 @@ export default defineEventHandler(async (event) => {
     }
   }
 
+  // Replace planned reductions wholesale when provided (library_id rows).
+  if (Array.isArray(body.reductions)) {
+    await db.from('reduction_periods').delete().eq('library_id', id)
+    const rows = sanitizeReductions(body.reductions)
+      .map(r => ({ library_id: id, start_temp: r.start_temp, end_temp: r.end_temp }))
+    if (rows.length) {
+      const { error: redErr } = await db.from('reduction_periods').insert(rows)
+      if (redErr) throw await serverError('schedules.update.reductions_failed', redErr, { userId: user.id, scheduleId: id })
+    }
+  }
+
   const { data, error } = await db
     .from('schedule_library')
-    .select('*, points:schedule_library_points(*)')
+    .select('*, points:schedule_library_points(*), reductions:reduction_periods(*)')
     .eq('id', id)
     .single()
   if (error) throw await serverError('schedules.update.refetch_failed', error, { userId: user.id, scheduleId: id })
 
   data.points = (data.points ?? []).sort((a, b) => a.offset_minutes - b.offset_minutes)
+  data.reductions = data.reductions ?? []
   logger.info('schedules.update.success', { scheduleId: id, userId: user.id })
   return data
 })

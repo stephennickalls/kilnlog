@@ -1,50 +1,20 @@
 <!-- app/pages/app.vue -->
-<!--
-  Wired for:
-    Package 4 — delete confirm (ConfirmDialog), rename (RenameFiringModal),
-                auto-ended banner (AutoEndedBanner)
-    Package 6 — CSV export (useFiringExport)
-    G8        — PastDueBanner (payment-failure warning)
-    G11       — live reduction logging + chart bands (setReductions)
-    NOW-LINE  — current-time vertical line + planned-target marker
-    G1 (°F)   — useTempUnit init from server + header toggle (optimistic + persist);
-                chart repaints on toggle via setUnit(); FiringConsole gets raw °C
-                values (rateC/targetRateC/targetTempC) alongside display strings.
-  Components are Nuxt auto-imported from app/components; composables from app/composables.
--->
 <template>
   <div class="flex flex-col h-screen overflow-hidden font-serif bg-parchment">
 
     <!-- ── Header ───────────────────────────────────────────────────────────── -->
-    <header class="shrink-0 flex items-center justify-between px-4 sm:px-6 py-3 bg-parchment border-b border-parchment-3">
-      <div class="flex items-center gap-2">
+      <header class="shrink-0 flex items-center justify-between px-4 sm:px-6 pt-3 pb-1.5 bg-parchment border-b border-parchment-3">      <div class="flex items-center gap-2">
         <button class="sm:hidden p-1.5 -ml-1 rounded-lg text-ink-muted" @click="showFiringSheet = true">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
         </button>
         <NuxtLink to="/account" class="text-base sm:text-lg font-bold flex items-center gap-2 text-ink tracking-tight hover:text-flame transition-colors">🔥 KilnMonitor</NuxtLink>
       </div>
-      <div class="flex items-center gap-2 min-w-0">
-        <template v-if="selectedFiring">
-          <!-- G2: name is now a button that opens the rename modal -->
-          <button
-            class="group flex items-center gap-1 text-xs sm:text-sm font-semibold text-ink truncate max-w-[120px] sm:max-w-none hover:text-flame transition-colors"
-            title="Rename firing"
-            @click="showRenameModal = true"
-          >
-            <span class="truncate">{{ selectedFiring.name }}</span>
-            <svg class="w-3.5 h-3.5 shrink-0 opacity-0 group-hover:opacity-60 transition-opacity" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-          </button>
-          <span v-if="isLive && !isPaused" class="px-2 py-0.5 text-xs font-bold rounded-full bg-blue-100 text-blue-700 border border-blue-200 shrink-0">● ACTIVE</span>
-          <span v-else-if="isPaused" class="px-2 py-0.5 text-xs font-bold rounded-full bg-amber-100 text-amber-700 border border-amber-200 shrink-0">⏸ PAUSED</span>
-          <span v-else-if="!selectedFiring.ended_at" class="px-2 py-0.5 text-xs font-bold rounded-full bg-amber-100 text-amber-700 border border-amber-200 shrink-0">⏳</span>
-          <span v-else class="px-2 py-0.5 text-xs font-bold rounded-full bg-parchment-2 text-ink-faint border border-parchment-3 shrink-0">DONE</span>
-        </template>
-
-        <!-- G1: °C/°F toggle (shared component). Repaints the kiln chart on
-             change via setChartUnit; the flip + persist + revert live inside
-             the component. -->
+      <div class="flex items-center gap-2">
+        <!-- Firing title + status intentionally omitted here — they live in the
+             sidebar (desktop) and the mobile firing sheet, so showing them in
+             the header would just duplicate. Rename is triggered per-row from
+             the sidebar (@rename), not from the header. -->
         <TempUnitToggle size="md" @change="setChartUnit" />
-
         <UserMenu />
       </div>
     </header>
@@ -63,6 +33,7 @@
         @toggle="sidebarOpen = !sidebarOpen"
         @select="selectFiring"
         @start="openStartModal"
+        @rename="renamingFiring = $event"
         @drag="startDrag"
         @delete="deleteFiring"
       />
@@ -70,10 +41,9 @@
       <!-- Main content -->
       <main class="flex-1 flex flex-col min-w-0 overflow-hidden">
 
-        <!-- G8: payment-failure warning (renders only when past_due in grace). -->
-        <div class="shrink-0 px-3 pt-3 sm:px-5 sm:pt-5">
+
           <PastDueBanner />
-        </div>
+
 
         <!-- ── Empty state — nothing selected ── -->
         <FiringEmptyState
@@ -89,7 +59,7 @@
         <template v-else>
 
           <!-- Console (live) or Review (ended) -->
-          <div class="shrink-0 p-3 sm:p-5 sm:pb-0">
+          <div class="shrink-0 px-3 pb-3 pt-2 sm:px-5 sm:pb-0 sm:pt-2.5">
             <FiringConsole
               v-if="!selectedFiring.ended_at"
               ref="consoleRef"
@@ -247,6 +217,7 @@
     <StartFiringModal
       :open="showStartModal"
       :library="library"
+      :past-firings="pastFirings"
       :preselect="preselect"
       @close="showStartModal = false; preselect = null"
       @create="createFiring"
@@ -273,11 +244,12 @@
       @cancel="pendingDeleteFiring = null"
     />
 
-    <!-- G2: rename firing -->
+    <!-- Rename firing — triggered per-row from the sidebar (renamingFiring holds
+         the target). -->
     <RenameFiringModal
-      :open="showRenameModal"
-      :firing="selectedFiring"
-      @close="showRenameModal = false"
+      :open="!!renamingFiring"
+      :firing="renamingFiring"
+      @close="renamingFiring = null"
       @renamed="onFiringRenamed"
     />
 
@@ -328,7 +300,7 @@ const preselect            = ref(null) // D1/D2: points + name to pre-load into 
 const showTempModal        = ref(false)
 const showEndConfirm       = ref(false)
 const pendingDeleteFiring  = ref(null) // G4: firing awaiting delete confirmation
-const showRenameModal      = ref(false) // G2: rename dialog visibility
+const renamingFiring       = ref(null) // firing being renamed (sidebar-triggered); open when non-null
 const allFirings           = ref([])
 const selectedFiring       = ref(null)
 const currentTemp          = ref(null)  // raw °C
@@ -406,18 +378,29 @@ onMounted(async () => {
   await refreshFirings()
   if (activeFiring.value) await selectFiring(activeFiring.value)
 
-  // D2: handle ?startSchedule=id coming from the schedules page
+  // D2: ?startSchedule=id from the schedules page — start the firing
+  // immediately. The schedule was already chosen there; don't make the user
+  // pick again via the modal. Carries the schedule's points + planned reductions.
   if (route.query.startSchedule) {
-    try {
-      const sched = await $fetch(`/api/schedules/${route.query.startSchedule}`)
-      const points = (sched.points ?? []).map(p => ({
-        offsetMinutes: p.offset_minutes,
-        targetTemp:    p.target_temp,
-      }))
-      preselect.value = { name: sched.name, schedulePoints: points }
-    } catch { /* silent — modal opens with bisque default */ }
+    const schedId = route.query.startSchedule
     router.replace('/app')
-    await openStartModal()
+    if (activeFiring.value) {
+      toast.show(`"${activeFiring.value.name}" is still firing — only one firing at a time. End it first.`)
+      await selectFiring(activeFiring.value)
+    } else {
+      try {
+        const sched = await $fetch(`/api/schedules/${schedId}`)
+        await createFiring({
+          name:           sched.name,
+          notes:          '',
+          schedulePoints: (sched.points ?? []).map(p => ({ offsetMinutes: p.offset_minutes, targetTemp: p.target_temp })),
+          reductions:     (sched.reductions ?? []).map(r => ({ startTemp: r.start_temp, endTemp: r.end_temp ?? null })),
+          saveToLibrary:  false,
+        })
+      } catch (err) {
+        toast.show(`Couldn't start: ${err?.data?.message ?? err.message ?? 'error'}`)
+      }
+    }
   }
 
   document.addEventListener('visibilitychange', onVisibilityChange)
@@ -512,12 +495,39 @@ async function selectFiring(f, preloaded = null) {
   }
 }
 
+// payload: { name, notes, schedulePoints, reductions, saveToLibrary }
 async function createFiring(payload) {
   try {
     const firing = await $fetch('/api/firings', {
       method: 'POST',
-      body: { ...payload, startedAt: Math.floor(Date.now() / 1000) },
+      body: {
+        name: payload.name,
+        notes: payload.notes,
+        schedulePoints: payload.schedulePoints,
+        reductions: payload.reductions,        // [{ startTemp, endTemp|null }] °C
+        startedAt: Math.floor(Date.now() / 1000),
+      },
     })
+
+    // Optional: also persist the plan as a reusable library schedule.
+    if (payload.saveToLibrary) {
+      try {
+        await $fetch('/api/schedules', {
+          method: 'POST',
+          body: {
+            name: payload.name,
+            type: 'glaze',
+            source: 'custom',
+            points: payload.schedulePoints,
+            reductions: payload.reductions,    // [{ startTemp, endTemp|null }] °C
+          },
+        })
+        library.value = []   // force refetch on next modal open
+      } catch {
+        toast.show('Firing started, but saving to library failed.')
+      }
+    }
+
     showStartModal.value = false
     preselect.value = null
     refreshFirings()
@@ -694,9 +704,9 @@ async function performDeleteFiring(f) {
   }
 }
 
-// G2: apply a rename returned by RenameFiringModal
+// Apply a rename returned by RenameFiringModal (firing may not be the selected one)
 function onFiringRenamed(updated) {
-  showRenameModal.value = false
+  renamingFiring.value = null
   if (selectedFiring.value?.id === updated.id) {
     selectedFiring.value = { ...selectedFiring.value, name: updated.name }
   }

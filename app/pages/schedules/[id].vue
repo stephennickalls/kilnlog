@@ -54,8 +54,17 @@
         <div class="flex items-center gap-2">
           <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Curve</label>
           <span v-if="form.type" class="text-[10px] font-bold px-2 py-0.5 rounded-full" :class="theme.badgeText">{{ form.type }}</span>
+          <div class="flex-1" />
+          <!-- Reduction planner trigger (above the curve/table) -->
+          <button
+            class="flex items-center gap-1.5 text-xs font-semibold text-indigo-700 hover:text-indigo-900 transition-colors"
+            @click="showReductionPlanner = true"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            {{ editReductions.length ? `Edit reduction (${editReductions.length})` : 'Add reduction' }}
+          </button>
         </div>
-        <ScheduleCurveEditor v-model="editPoints" :stroke="theme.stroke" :fill="theme.fill" />
+        <ScheduleCurveEditor v-model="editPoints" :reductions="editReductions" :stroke="theme.stroke" :fill="theme.fill" />
       </div>
 
       <!-- Actions -->
@@ -73,6 +82,14 @@
       </div>
 
     </main>
+
+    <!-- Reduction planner -->
+    <ReductionPlannerModal
+      :open="showReductionPlanner"
+      :reductions="editReductions"
+      @close="showReductionPlanner = false"
+      @save="onReductionsSaved"
+    />
 
     <Teleport to="body">
       <Transition name="toast">
@@ -94,11 +111,13 @@ definePageMeta({ middleware: ['auth'] })
 const route  = useRoute()
 const router = useRouter()
 
-const loading    = ref(true)
-const saving     = ref(false)
-const status     = ref('')
-const form       = reactive({ name: '', type: 'bisque', cone: '', description: '' })
-const editPoints = ref([])
+const loading            = ref(true)
+const saving             = ref(false)
+const status             = ref('')
+const form               = reactive({ name: '', type: 'bisque', cone: '', description: '' })
+const editPoints         = ref([])
+const editReductions     = ref([])   // [{ startTemp, endTemp|null }] °C
+const showReductionPlanner = ref(false)
 
 const id    = computed(() => Number(route.params.id))
 const theme = computed(() => themeForType(form.type))
@@ -106,6 +125,11 @@ const theme = computed(() => themeForType(form.type))
 function flash(msg) {
   status.value = msg
   setTimeout(() => { if (status.value === msg) status.value = '' }, 2800)
+}
+
+function onReductionsSaved(list) {
+  editReductions.value = list
+  showReductionPlanner.value = false
 }
 
 watch(id, load, { immediate: true })
@@ -128,33 +152,43 @@ async function load() {
 
     if (s.user_id === null) {
       const pts = (s.points ?? []).map(p => ({ offsetMinutes: p.offset_minutes, targetTemp: p.target_temp }))
+      const reds = (s.reductions ?? []).map(r => ({ startTemp: r.start_temp, endTemp: r.end_temp ?? null }))
       const copy = await $fetch('/api/schedules', {
         method: 'POST',
-        body: { name: `${s.name} (copy)`, type: s.type ?? 'bisque', cone: s.cone ?? null, description: s.description ?? null, source: 'preset_copy', points: pts },
+        body: { name: `${s.name} (copy)`, type: s.type ?? 'bisque', cone: s.cone ?? null, description: s.description ?? null, source: 'preset_copy', points: pts, reductions: reds },
       })
       router.replace(`/schedules/${copy.id}?copyOf=${encodeURIComponent(s.name)}`)
       return
     }
 
-    form.name        = s.name
-    form.type        = s.type ?? 'bisque'
-    form.cone        = s.cone ?? ''
-    form.description = s.description ?? ''
-    editPoints.value = (s.points ?? []).map(p => ({ offsetMinutes: p.offset_minutes, targetTemp: p.target_temp }))
+    form.name            = s.name
+    form.type            = s.type ?? 'bisque'
+    form.cone            = s.cone ?? ''
+    form.description     = s.description ?? ''
+    editPoints.value     = (s.points ?? []).map(p => ({ offsetMinutes: p.offset_minutes, targetTemp: p.target_temp }))
+    editReductions.value = (s.reductions ?? []).map(r => ({ startTemp: r.start_temp, endTemp: r.end_temp ?? null }))
   } catch (err) {
     flash(`Couldn't load: ${err?.data?.message ?? err.message ?? 'error'}`)
   }
   loading.value = false
 }
 
+function saveBody() {
+  return {
+    name: form.name.trim(),
+    type: form.type,
+    cone: form.cone?.trim() || null,
+    description: form.description?.trim() || null,
+    points: editPoints.value,
+    reductions: editReductions.value,   // [{ startTemp, endTemp|null }] °C
+  }
+}
+
 async function save() {
   if (!form.name.trim() || saving.value) return
   saving.value = true
   try {
-    await $fetch(`/api/schedules/${id.value}`, {
-      method: 'PUT',
-      body: { name: form.name.trim(), type: form.type, cone: form.cone?.trim() || null, description: form.description?.trim() || null, points: editPoints.value },
-    })
+    await $fetch(`/api/schedules/${id.value}`, { method: 'PUT', body: saveBody() })
     flash('Saved')
   } catch (err) {
     flash(`Couldn't save: ${err?.data?.message ?? err.message ?? 'error'}`)
@@ -167,10 +201,7 @@ async function saveAndStart() {
   if (!form.name.trim() || saving.value) return
   saving.value = true
   try {
-    await $fetch(`/api/schedules/${id.value}`, {
-      method: 'PUT',
-      body: { name: form.name.trim(), type: form.type, cone: form.cone?.trim() || null, description: form.description?.trim() || null, points: editPoints.value },
-    })
+    await $fetch(`/api/schedules/${id.value}`, { method: 'PUT', body: saveBody() })
     router.push(`/app?startSchedule=${id.value}`)
   } catch (err) {
     flash(`Couldn't save: ${err?.data?.message ?? err.message ?? 'error'}`)

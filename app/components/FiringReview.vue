@@ -1,21 +1,12 @@
 <!-- app/components/FiringReview.vue -->
 <!--
-  Shown when an ENDED firing is selected. Read-only review: a summary line
-  plus the repeatability actions. "Fire again" and "Save as schedule" are
-  the headline features; Restart picks the exact firing back up; Export (G3)
-  downloads the full record as CSV.
+  Shown when an ENDED firing is selected. Read-only review summary + actions.
+  Desktop (sm+): full button row. Mobile: title + ellipsis menu to save space.
   `canRestart` is false when another firing is already active.
-
-  "Save as schedule" is celadon — it's the act that turns a good firing into a
-  repeatable plan (the product's heart), so it visually echoes the schedules
-  world it creates. "Fire this again" stays flame (immediate); Restart and
-  Export stay quiet.
-
-  G1 (°F): peakTemp arrives as raw °C and is converted for the summary via
-  useTempUnit; the unit is shown explicitly ("Peak 1832°F") to avoid ambiguity.
+  G1 (°F): peakTemp arrives as raw °C, converted for the summary via useTempUnit.
 -->
 <template>
-  <div class="bg-white border border-parchment-3 rounded-2xl px-4 py-3 sm:px-6 sm:py-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-5" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
+  <div class="bg-white border border-parchment-3 rounded-2xl px-4 py-3 sm:px-6 sm:py-4 flex items-start sm:items-center gap-3 sm:gap-5" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
 
     <!-- Summary -->
     <div class="flex-1 min-w-0">
@@ -27,9 +18,9 @@
       <p class="text-xs sm:text-sm text-ink-muted mt-0.5">{{ summary }}</p>
     </div>
 
-    <!-- Actions -->
-    <div class="grid grid-cols-2 sm:flex gap-2 shrink-0">
-      <button class="col-span-2 sm:col-auto flex items-center justify-center gap-2 px-4 py-2.5 bg-flame hover:bg-flame-dark text-parchment text-sm font-bold rounded-xl transition-colors" @click="$emit('fire-again', firing)">
+    <!-- Actions: desktop button row -->
+    <div class="hidden sm:flex gap-2 shrink-0">
+      <button class="flex items-center justify-center gap-2 px-4 py-2.5 bg-flame hover:bg-flame-dark text-parchment text-sm font-bold rounded-xl transition-colors" @click="$emit('fire-again', firing)">
         🔥 Fire this again
       </button>
       <button class="flex items-center justify-center gap-2 px-4 py-2.5 border border-celadon/30 bg-celadon-bg text-celadon-dark hover:bg-celadon hover:text-parchment text-sm font-bold rounded-xl transition-colors" @click="$emit('save-as-schedule', firing)">
@@ -52,11 +43,55 @@
         ↓ Export
       </button>
     </div>
+
+    <!-- Actions: mobile ellipsis menu -->
+    <div class="sm:hidden relative shrink-0">
+      <button
+        class="p-2 -mr-1 rounded-lg text-ink-muted hover:bg-parchment-2 transition-colors"
+        title="Actions"
+        @click="menuOpen = !menuOpen"
+      >
+        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
+      </button>
+
+      <!-- Backdrop -->
+      <div v-if="menuOpen" class="fixed inset-0 z-40" @click="menuOpen = false" />
+
+      <!-- Menu -->
+      <div
+        v-if="menuOpen"
+        class="absolute right-0 top-full mt-1 z-50 w-52 bg-white border border-parchment-3 rounded-xl py-1.5 flex flex-col"
+        style="box-shadow:0 8px 28px rgba(58,30,8,0.16)"
+      >
+        <button class="flex items-center gap-2.5 px-4 py-2.5 text-sm font-bold text-flame hover:bg-flame-bg text-left transition-colors" @click="pick('fire-again')">
+          🔥 Fire this again
+        </button>
+        <button class="flex items-center gap-2.5 px-4 py-2.5 text-sm font-bold text-celadon-dark hover:bg-celadon-bg text-left transition-colors" @click="pick('save-as-schedule')">
+          ✨ Save as schedule
+        </button>
+        <div class="my-1 border-t border-parchment-3" />
+        <button
+          class="flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-ink-muted hover:bg-parchment-2 text-left transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          :disabled="!canRestart"
+          @click="pick('restart')"
+        >
+          ↺ Restart
+        </button>
+        <button
+          class="flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-ink-muted hover:bg-parchment-2 text-left transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          :disabled="!hasData"
+          @click="pick('export')"
+        >
+          ↓ Export
+        </button>
+      </div>
+    </div>
+
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 
 const props = defineProps({
   firing:     { type: Object, required: true },
@@ -65,7 +100,16 @@ const props = defineProps({
   duration:   { type: String, default: null },
 })
 
+const emit = defineEmits(['fire-again', 'save-as-schedule', 'restart', 'export'])
+
 const { displayTemp, unitLabel } = useTempUnit()
+
+const menuOpen = ref(false)
+
+function pick(event) {
+  menuOpen.value = false
+  emit(event, props.firing)
+}
 
 const hasData = computed(() =>
   !!(props.firing.readings?.length || props.firing.schedule?.length)
@@ -79,6 +123,4 @@ const summary = computed(() => {
   if (n) parts.push(`${n} reading${n === 1 ? '' : 's'}`)
   return parts.join(' · ') || 'No readings logged'
 })
-
-defineEmits(['fire-again', 'save-as-schedule', 'restart', 'export'])
 </script>

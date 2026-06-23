@@ -8,8 +8,10 @@
   read and its own grace calculation, so app.vue needs only a one-line
   <PastDueBanner /> insertion — no new state, props, or wiring in the parent.
 
-  Renders nothing unless the user is past_due AND still inside grace.
-  "Update payment method" opens the Stripe billing portal.
+  Renders nothing unless the user is past_due AND still inside grace. Because
+  it renders nothing in the common case, it owns its own spacing (mx/mt on the
+  visible root) rather than relying on a wrapper in app.vue — that way there's
+  zero gap above the stats bar when no banner is shown.
 
   Dismissible PER SESSION: the dismiss is in-memory only (a ref), so it hides
   for the current view but returns on reload / next visit — the app keeps
@@ -23,7 +25,7 @@
   <Transition name="fade">
     <div
       v-if="show"
-      class="flex items-start gap-3 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800"
+      class="flex items-start gap-3 px-4 py-3 mx-3 mt-3 sm:mx-5 sm:mt-5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800"
     >
       <svg class="w-5 h-5 shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
         <path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>

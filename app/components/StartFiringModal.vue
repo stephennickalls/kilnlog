@@ -1,10 +1,8 @@
 <!-- app/components/StartFiringModal.vue -->
 <!--
-  Start firing modal. Emits @create { name, notes, schedulePoints } — FROZEN
-  contract, app.vue createFiring depends on this exactly.
-
-  Glaze quick-start is celadon when active (category encoding: glaze = celadon
-  world). Bisque stays flame. Everything else unchanged.
+  Emits @create { name, notes, schedulePoints, reductions, saveToLibrary }.
+  reductions: [{ startTemp, endTemp|null }] °C. Reduction trigger sits ABOVE
+  the curve editor. saveToLibrary persists the plan as a reusable schedule.
 -->
 <template>
   <Teleport to="body">
@@ -24,7 +22,13 @@
           <!-- Name -->
           <div class="flex flex-col gap-1.5">
             <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Name</label>
-            <input v-model="form.name" type="text" placeholder="e.g. Cone 10 reduction" class="w-full border border-parchment-3 rounded-xl px-4 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif">
+            <input
+              :value="form.name"
+              type="text"
+              placeholder="e.g. Cone 10 reduction"
+              class="w-full border border-parchment-3 rounded-xl px-4 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif"
+              @input="onNameInput($event.target.value)"
+            >
           </div>
 
           <!-- Notes -->
@@ -33,81 +37,81 @@
             <textarea v-model="form.notes" rows="2" placeholder="Clay body, glazes, weather..." class="w-full border border-parchment-3 rounded-xl px-4 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif resize-none" />
           </div>
 
-          <!-- Schedule section -->
+          <!-- Plan for this firing -->
           <div class="flex flex-col gap-3">
             <div class="flex items-center gap-2">
-              <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Schedule curve</label>
+              <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Plan for this firing</label>
               <div class="flex-1" />
-              <!-- G1: unit toggle right where temps are entered -->
               <TempUnitToggle />
             </div>
 
-            <!-- Controls row -->
-            <div class="flex items-center gap-2 flex-wrap">
-
-              <!-- Bisque / Glaze quick-start — bisque=flame, glaze=celadon -->
-              <div class="flex rounded-lg border border-parchment-3 overflow-hidden text-xs font-semibold shrink-0">
-                <button
-                  class="px-3 py-1.5 transition-colors"
-                  :class="quickType === 'bisque' ? 'bg-flame text-parchment' : 'bg-white text-ink-muted hover:bg-parchment-2'"
-                  @click="applyQuick('bisque')"
-                >🏺 Bisque</button>
-                <button
-                  class="px-3 py-1.5 border-l border-parchment-3 transition-colors"
-                  :class="quickType === 'glaze' ? 'bg-celadon text-parchment' : 'bg-white text-ink-muted hover:bg-celadon-bg'"
-                  @click="applyQuick('glaze')"
-                >✨ Glaze</button>
-              </div>
-
-              <span class="text-xs text-ink-faint">or load:</span>
-
-              <!-- Library dropdown: your schedules first, then presets by type (G9) -->
-              <div v-if="library.length" class="relative">
+            <!-- ONE "Start from" control -->
+            <div class="flex flex-col gap-1.5">
+              <div class="relative">
                 <select
-                  class="appearance-none bg-white border border-parchment-3 rounded-lg pl-3 pr-7 py-1.5 text-xs text-ink font-semibold focus:outline-none focus:border-flame cursor-pointer font-serif max-w-[160px]"
-                  :value="selectedLibraryId ?? ''"
-                  @change="applyLibraryById($event.target.value)"
+                  class="w-full border border-parchment-3 rounded-xl px-4 py-2.5 pr-9 text-sm text-ink bg-white focus:outline-none focus:border-flame font-serif appearance-none"
+                  :value="startFrom"
+                  @change="applyStartFrom($event.target.value)"
                 >
-                  <option value="" disabled>Library…</option>
+                  <option v-if="preselect" value="preselect">Continuing: {{ preselect.name || 'loaded plan' }}</option>
+                  <option value="blank">Blank curve</option>
+                  <optgroup label="Starters">
+                    <option value="starter:bisque">🏺 Bisque starter</option>
+                    <option value="starter:glaze">✨ Glaze starter</option>
+                  </optgroup>
                   <optgroup v-if="myLibrary.length" label="Your schedules">
-                    <option v-for="lib in myLibrary" :key="lib.id" :value="lib.id">
+                    <option v-for="lib in myLibrary" :key="'my'+lib.id" :value="'lib:'+lib.id">
                       {{ lib.name }}{{ lib.cone ? ` · Cone ${lib.cone}` : '' }}
                     </option>
                   </optgroup>
-                  <optgroup v-for="type in presetTypes" :key="type" :label="type.charAt(0).toUpperCase() + type.slice(1)">
-                    <option v-for="lib in presetLibrary.filter(l => l.type === type)" :key="lib.id" :value="lib.id">
+                  <optgroup v-for="type in presetTypes" :key="'pt'+type" :label="`${type.charAt(0).toUpperCase() + type.slice(1)} presets`">
+                    <option v-for="lib in presetsOfType(type)" :key="'pr'+lib.id" :value="'lib:'+lib.id">
                       {{ lib.name }}{{ lib.cone ? ` · Cone ${lib.cone}` : '' }}
                     </option>
                   </optgroup>
+                  <optgroup v-if="pastFirings.length" label="Your past firings">
+                    <option v-for="f in pastFirings" :key="'pf'+f.id" :value="'past:'+f.id">
+                      {{ f.name }} · {{ formatDate(f.created_at) }}
+                    </option>
+                  </optgroup>
                 </select>
-                <svg class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-ink-faint" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+                <svg class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-muted pointer-events-none" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
               </div>
 
-              <!-- Past firings dropdown -->
-              <div v-if="pastFirings.length" class="relative">
-                <select
-                  class="appearance-none bg-white border border-parchment-3 rounded-lg pl-3 pr-7 py-1.5 text-xs text-ink font-semibold focus:outline-none focus:border-flame cursor-pointer font-serif max-w-[160px]"
-                  :value="selectedPastId ?? ''"
-                  @change="loadPastFiring($event.target.value)"
-                >
-                  <option value="" disabled>Past firings…</option>
-                  <option v-for="f in pastFirings" :key="f.id" :value="f.id">{{ f.name }} · {{ formatDate(f.created_at) }}</option>
-                </select>
-                <svg class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-ink-faint" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
-              </div>
-
+              <p v-if="loadingPast" class="text-[11px] text-ink-faint">Loading plan…</p>
+              <p v-else class="text-[11px] text-ink-muted leading-snug">
+                Pick a starting point, then drag to adjust. This plan is saved with <strong>this firing only</strong> — unless you tick "save to library" below.
+              </p>
             </div>
 
-            <!-- Applied label / loading state -->
-            <p v-if="loadingPast" class="text-[11px] text-ink-faint -mt-1">Loading…</p>
-            <p v-else-if="appliedLabel" class="text-[11px] text-flame font-semibold -mt-1 flex items-center gap-1">
-              <svg class="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-              {{ appliedLabel }}
-            </p>
+            <!-- Reduction planner trigger + summary (above the editor) -->
+            <div class="flex items-center justify-between gap-2 px-0.5">
+              <span class="text-[11px] text-ink-muted">
+                {{ reductions.length
+                  ? `${reductions.length} planned reduction${reductions.length === 1 ? '' : 's'}`
+                  : 'No reductions planned' }}
+              </span>
+              <button
+                class="flex items-center gap-1.5 text-xs font-semibold text-indigo-700 hover:text-indigo-900 transition-colors"
+                @click="showReductionPlanner = true"
+              >
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+                {{ reductions.length ? 'Edit reduction' : 'Add reduction' }}
+              </button>
+            </div>
 
-            <!-- Curve editor -->
-            <ScheduleCurveEditor v-model="form.schedulePoints" />
+            <!-- Curve editor (model stays °C) -->
+            <ScheduleCurveEditor v-model="form.schedulePoints" :reductions="reductions" />
           </div>
+
+          <!-- Save to library -->
+          <label class="flex items-start gap-2.5 px-3 py-2.5 rounded-xl border border-parchment-3 bg-white cursor-pointer">
+            <input type="checkbox" :checked="saveToLibrary" class="mt-0.5 accent-flame" @change="saveToLibrary = $event.target.checked">
+            <span class="flex flex-col gap-0.5">
+              <span class="text-sm font-semibold text-ink">Also save this plan to my library</span>
+              <span class="text-[11px] text-ink-muted leading-snug">Keep this curve (and its reductions) as a reusable schedule you can start again later.</span>
+            </span>
+          </label>
 
         </div>
 
@@ -119,15 +123,24 @@
 
       </div>
     </div>
+
+    <!-- Reduction planner -->
+    <ReductionPlannerModal
+      :open="showReductionPlanner"
+      :reductions="reductions"
+      @close="showReductionPlanner = false"
+      @save="onReductionsSaved"
+    />
   </Teleport>
 </template>
 
 <script setup>
+// app/components/StartFiringModal.vue
 const props = defineProps({
   open:        Boolean,
-  library:     { type: Array, default: () => [] },
-  pastFirings: { type: Array, default: () => [] },
-  preselect:   { type: Object, default: null },  // { name?, schedulePoints }
+  library:     { type: Array, default: () => [] },  // built-ins + own (/api/schedules)
+  pastFirings: { type: Array, default: () => [] },  // user's finished firings
+  preselect:   { type: Object, default: null },     // { name?, schedulePoints, reductions? }
 })
 
 const emit = defineEmits(['close', 'create'])
@@ -149,63 +162,12 @@ const GLAZE_POINTS = [
   { offsetMinutes: 600, targetTemp: 100  },
 ]
 
-const quickType         = ref('bisque')
-const selectedLibraryId = ref(null)
-const selectedPastId    = ref(null)
-const appliedLabel      = ref('')
-const loadingPast       = ref(false)
-
-// G9: split the library by ownership so the dropdown can group the user's own
-// schedules above the built-in presets. RLS returns both (own + built-ins).
-const myLibrary     = computed(() => props.library.filter(l => l.user_id !== null))
-const presetLibrary = computed(() => props.library.filter(l => l.user_id === null))
-const presetTypes   = computed(() => [...new Set(presetLibrary.value.map(l => l.type))].sort())
-
-function applyQuick(type) {
-  quickType.value         = type
-  selectedLibraryId.value = null
-  selectedPastId.value    = null
-  appliedLabel.value      = ''
-  form.schedulePoints     = type === 'bisque' ? BISQUE_POINTS.map(p => ({ ...p })) : GLAZE_POINTS.map(p => ({ ...p }))
-  if (!form.name.trim()) form.name = type === 'bisque' ? 'Bisque firing' : 'Glaze firing'
-}
-
-function applyLibraryById(idStr) {
-  const lib = props.library.find(l => String(l.id) === String(idStr))
-  if (!lib) return
-  selectedLibraryId.value = lib.id
-  selectedPastId.value    = null
-  quickType.value         = null
-  appliedLabel.value      = lib.name + (lib.cone ? ` — Cone ${lib.cone}` : '')
-  form.schedulePoints     = lib.points.map(p => ({ offsetMinutes: p.offset_minutes, targetTemp: p.target_temp }))
-  if (!form.name.trim()) form.name = lib.name
-}
-
-async function loadPastFiring(idStr) {
-  if (!idStr) return
-  loadingPast.value       = true
-  selectedPastId.value    = Number(idStr)
-  selectedLibraryId.value = null
-  quickType.value         = null
-  appliedLabel.value      = ''
-  try {
-    const data = await $fetch(`/api/firings/${idStr}`)
-    if (data.schedule?.length) {
-      form.schedulePoints = data.schedule.map(p => ({ offsetMinutes: p.offset_minutes, targetTemp: p.target_temp }))
-      appliedLabel.value  = data.name
-    } else {
-      appliedLabel.value = `${data.name} — no schedule saved`
-    }
-  } catch {
-    appliedLabel.value = 'Could not load firing'
-  }
-  loadingPast.value = false
-}
-
-function formatDate(unix) {
-  if (!unix) return ''
-  return new Date(unix * 1000).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })
-}
+const startFrom            = ref('starter:bisque')
+const loadingPast          = ref(false)
+const nameAutoFilled       = ref(true)
+const reductions           = ref([])          // [{ startTemp, endTemp|null }] °C
+const saveToLibrary        = ref(false)
+const showReductionPlanner = ref(false)
 
 const form = reactive({
   name:           '',
@@ -213,27 +175,122 @@ const form = reactive({
   schedulePoints: BISQUE_POINTS.map(p => ({ ...p })),
 })
 
-watch(() => props.open, (val) => {
-  if (val) {
-    if (props.preselect) {
-      form.name           = props.preselect.name ?? ''
-      form.notes          = ''
-      form.schedulePoints = (props.preselect.schedulePoints ?? []).map(p => ({ ...p }))
-      quickType.value         = null
-      selectedLibraryId.value = null
-      selectedPastId.value    = null
-      appliedLabel.value      = props.preselect.name ?? ''
-      loadingPast.value       = false
-    } else {
-      form.name            = ''
-      form.notes           = ''
-      form.schedulePoints  = BISQUE_POINTS.map(p => ({ ...p }))
-      quickType.value         = 'bisque'
-      selectedLibraryId.value = null
-      selectedPastId.value    = null
-      appliedLabel.value      = ''
-      loadingPast.value       = false
+// ── Source groupings ──────────────────────────────────────────────────────────
+const myLibrary     = computed(() => props.library.filter(l => l.user_id !== null))
+const presetLibrary = computed(() => props.library.filter(l => l.user_id === null))
+const presetTypes   = computed(() => [...new Set(presetLibrary.value.map(l => l.type))].sort())
+function presetsOfType(type) { return presetLibrary.value.filter(l => l.type === type) }
+
+// ── Name helpers ──────────────────────────────────────────────────────────────
+function todayShort() {
+  return new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })
+}
+function suggestedName(token) {
+  if (token === 'starter:bisque') return `Bisque firing — ${todayShort()}`
+  if (token === 'starter:glaze')  return `Glaze firing — ${todayShort()}`
+  if (token === 'blank')          return `Firing — ${todayShort()}`
+  if (token.startsWith('lib:')) {
+    const lib = props.library.find(l => String(l.id) === token.slice(4))
+    return lib?.name ?? ''
+  }
+  if (token.startsWith('past:')) {
+    const f = props.pastFirings.find(x => String(x.id) === token.slice(5))
+    return f?.name ?? ''
+  }
+  return ''
+}
+function maybeFillName(token) {
+  if (!nameAutoFilled.value) return
+  const s = suggestedName(token)
+  if (s) form.name = s
+}
+function onNameInput(val) {
+  form.name = val
+  nameAutoFilled.value = false
+}
+
+// ── Reductions from planner ───────────────────────────────────────────────────
+function onReductionsSaved(list) {
+  reductions.value = list
+  showReductionPlanner.value = false
+}
+
+// ── Apply a "Start from" selection ────────────────────────────────────────────
+// Library schedules and past firings carry their own reductions; selecting one
+// adopts them. Starters/blank clear reductions.
+async function applyStartFrom(token) {
+  startFrom.value = token
+
+  if (token === 'preselect') return
+  if (token === 'blank') {
+    form.schedulePoints = []
+    reductions.value = []
+    maybeFillName(token)
+    return
+  }
+  if (token === 'starter:bisque') {
+    form.schedulePoints = BISQUE_POINTS.map(p => ({ ...p }))
+    reductions.value = []
+    maybeFillName(token)
+    return
+  }
+  if (token === 'starter:glaze') {
+    form.schedulePoints = GLAZE_POINTS.map(p => ({ ...p }))
+    reductions.value = []
+    maybeFillName(token)
+    return
+  }
+  if (token.startsWith('lib:')) {
+    const lib = props.library.find(l => String(l.id) === token.slice(4))
+    if (lib) {
+      form.schedulePoints = (lib.points ?? []).map(p => ({ offsetMinutes: p.offset_minutes, targetTemp: p.target_temp }))
+      reductions.value = (lib.reductions ?? []).map(r => ({ startTemp: r.start_temp, endTemp: r.end_temp ?? null }))
+      maybeFillName(token)
     }
+    return
+  }
+  if (token.startsWith('past:')) {
+    loadingPast.value = true
+    try {
+      const data = await $fetch(`/api/firings/${token.slice(5)}`)
+      form.schedulePoints = (data.schedule ?? []).map(p => ({ offsetMinutes: p.offset_minutes, targetTemp: p.target_temp }))
+      reductions.value = (data.reductions ?? []).map(r => ({ startTemp: r.start_temp, endTemp: r.end_temp ?? null }))
+      maybeFillName(token)
+    } catch {
+      // leave existing curve on failure
+    } finally {
+      loadingPast.value = false
+    }
+    return
+  }
+}
+
+function formatDate(unix) {
+  if (!unix) return ''
+  return new Date(unix * 1000).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })
+}
+
+// ── Open: seed from preselect, else default to bisque starter ─────────────────
+watch(() => props.open, (val) => {
+  if (!val) return
+  loadingPast.value          = false
+  nameAutoFilled.value       = true
+  saveToLibrary.value        = false
+  showReductionPlanner.value = false
+  form.notes                 = ''
+
+  if (props.preselect) {
+    form.name           = props.preselect.name ?? ''
+    form.schedulePoints = (props.preselect.schedulePoints ?? []).map(p => ({ ...p }))
+    reductions.value    = (props.preselect.reductions ?? []).map(r => ({ ...r }))
+    startFrom.value     = 'preselect'
+    nameAutoFilled.value = false
+  } else {
+    startFrom.value     = 'starter:bisque'
+    form.schedulePoints = BISQUE_POINTS.map(p => ({ ...p }))
+    reductions.value    = []
+    form.name           = ''
+    maybeFillName('starter:bisque')
   }
 })
 
@@ -243,6 +300,8 @@ function submit() {
     name:           form.name,
     notes:          form.notes,
     schedulePoints: form.schedulePoints,
+    reductions:     reductions.value,        // [{ startTemp, endTemp|null }] °C
+    saveToLibrary:  saveToLibrary.value,
   })
 }
 </script>

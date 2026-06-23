@@ -20,10 +20,10 @@
 
     <ul class="flex-1 overflow-y-auto divide-y divide-parchment-3">
 
-      <!-- Active firing -->
-      <li v-if="activeFiring">
+      <!-- Active firing — select; rename on hover -->
+      <li v-if="activeFiring" class="group relative">
         <button
-          class="w-full flex flex-col px-4 py-3 text-left transition-colors"
+          class="w-full flex flex-col px-4 py-3 pr-10 text-left transition-colors"
           :class="selectedId === activeFiring.id ? 'bg-flame-bg border-l-2 border-flame' : 'hover:bg-parchment-2'"
           @click="$emit('select', activeFiring)"
         >
@@ -32,16 +32,23 @@
             <span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"/>Live
           </span>
         </button>
+        <button
+          class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-parchment-4 hover:text-flame hover:bg-flame-bg transition-all opacity-0 group-hover:opacity-100"
+          title="Rename firing"
+          @click.stop="$emit('rename', activeFiring)"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </button>
       </li>
 
       <li v-if="!pastFirings.length && !activeFiring" class="px-4 py-4 text-xs text-ink-faint">
         No firings yet
       </li>
 
-      <!-- Past firings — select only, delete on hover -->
+      <!-- Past firings — select; rename + delete on hover -->
       <li v-for="f in pastFirings" :key="f.id" class="group relative">
         <button
-          class="w-full flex flex-col px-4 py-3 pr-10 text-left transition-colors"
+          class="w-full flex flex-col px-4 py-3 pr-16 text-left transition-colors"
           :class="selectedId === f.id ? 'bg-flame-bg border-l-2 border-flame' : 'hover:bg-parchment-2'"
           @click="$emit('select', f)"
         >
@@ -52,25 +59,45 @@
           <span v-else class="text-xs text-ink-faint mt-0.5">{{ formatDate(f.created_at) }}</span>
         </button>
 
-        <!-- Delete -->
-        <button
-          v-if="confirmDeleteId !== f.id"
-          class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-parchment-4 hover:text-red-400 hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
-          @click.stop="confirmDeleteId = f.id"
-        >
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
-          </svg>
-        </button>
-        <button
-          v-else
-          class="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 rounded text-xs font-bold text-white bg-red-500 hover:bg-red-600 transition-colors"
-          @click.stop="confirmDelete(f)"
-        >Delete?</button>
+        <!-- Row actions: rename + delete (delete has a confirm state) -->
+        <div class="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+          <button
+            v-if="confirmDeleteId !== f.id"
+            class="p-1.5 rounded-md text-parchment-4 hover:text-flame hover:bg-flame-bg transition-all opacity-0 group-hover:opacity-100"
+            title="Rename firing"
+            @click.stop="$emit('rename', f)"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button
+            v-if="confirmDeleteId !== f.id"
+            class="p-1.5 rounded-md text-parchment-4 hover:text-red-400 hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
+            title="Delete firing"
+            @click.stop="confirmDeleteId = f.id"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/>
+            </svg>
+          </button>
+          <button
+            v-else
+            class="px-2 py-1 rounded text-xs font-bold text-white bg-red-500 hover:bg-red-600 transition-colors"
+            @click.stop="confirmDelete(f)"
+          >Delete?</button>
+        </div>
       </li>
     </ul>
 
-    <div class="p-3 border-t border-parchment-3">
+    <div class="p-3 border-t border-parchment-3 flex flex-col gap-2">
+      <!-- Top-level nav to the schedule library (celadon = schedules world) -->
+      <NuxtLink
+        to="/schedules"
+        class="flex items-center justify-center gap-2 py-2.5 border border-celadon/40 bg-celadon-bg/60 text-celadon-dark hover:bg-celadon-bg text-sm font-semibold rounded-lg transition-colors"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+        Schedule library
+      </NuxtLink>
+
       <!-- G5: one firing at a time. Disabled while a firing is active; the live
            firing is already shown at the top of this list to tap into. -->
       <button
@@ -99,7 +126,7 @@
   </aside>
 
   <!-- Collapsed rail -->
-  <div v-else class="shrink-0 w-10 bg-parchment border-r border-parchment-3 flex flex-col items-center py-3">
+  <div v-else class="shrink-0 w-10 bg-parchment border-r border-parchment-3 flex flex-col items-center py-3 gap-2">
     <button class="p-1 rounded-md hover:bg-parchment-2 transition-colors text-ink-faint hover:text-ink" @click="$emit('toggle')">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
         <rect x="3" y="3" width="18" height="18" rx="2"/>
@@ -107,10 +134,19 @@
         <path d="M11 8l3 4-3 4"/>
       </svg>
     </button>
+    <!-- Schedule library (collapsed rail) -->
+    <NuxtLink
+      to="/schedules"
+      title="Schedule library"
+      class="p-1 rounded-md hover:bg-celadon-bg transition-colors text-celadon-dark"
+    >
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+    </NuxtLink>
   </div>
 </template>
 
 <script setup>
+// app/components/FiringSidebar.vue
 const props = defineProps({
   open:         Boolean,
   width:        Number,
@@ -119,7 +155,7 @@ const props = defineProps({
   pastFirings:  { type: Array, default: () => [] },
 })
 
-const emit = defineEmits(['toggle', 'select', 'start', 'drag', 'delete'])
+const emit = defineEmits(['toggle', 'select', 'start', 'rename', 'drag', 'delete'])
 
 const confirmDeleteId = ref(null)
 

@@ -9,10 +9,9 @@
   Teleported bottom sheet so it can't be clipped; desktop keeps its anchored dropdown
   (with a backdrop for outside-click).
 
-  Mobile layout (iPhone-width fix): the compact strip no longer forces current →
-  arrow → target → delta onto one baseline row (they collided at ~390px). Left zone
-  is now a labelled Current / Target pair with the delta as its own chip beneath,
-  then rate + readings; LOG + menu stay fixed-width on the right.
+  Mobile layout (iPhone-width): Current is the hero number; beneath it a single
+  status line reads "→ target N° · Δ" (target + how far off) with the delta colour,
+  then a small rate line. "Readings" is desktop-only (not needed live on a phone).
 
   G11: the overflow menu gains a reduction toggle — "Start reduction" when none is
   open, "End reduction" when one is in progress. Emits a single 'reduction' action;
@@ -108,37 +107,26 @@
 
     <!-- ─────────────── Compact (below lg) ─────────────── -->
     <div class="lg:hidden bg-white border border-parchment-3 rounded-2xl flex items-stretch overflow-hidden" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
-      <button class="flex-1 min-w-0 px-3 py-2.5 text-left" @click="$emit('open-temp')">
-        <!-- Row 1: Current + Target, each labelled; no cramped single baseline -->
-        <div class="flex items-end gap-3 min-w-0">
-          <div class="min-w-0">
-            <div class="text-[9px] font-semibold uppercase tracking-wide text-ink-faint leading-none">Current</div>
-            <div class="flex items-baseline gap-0.5 mt-0.5">
-              <span class="text-3xl font-bold tabular-nums leading-none transition-colors" :class="currentColorClass">{{ currentDisplay ?? '—' }}</span>
-              <span class="text-[11px] font-medium" :class="currentTemp !== null ? currentColorClass : 'text-parchment-4'">{{ unitLabel }}</span>
-            </div>
-          </div>
-          <template v-if="targetTemp !== null">
-            <svg class="w-3.5 h-3.5 mb-1 shrink-0" :class="delta ? delta.textClass : 'text-ink-faint'" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-            <div class="min-w-0">
-              <div class="text-[9px] font-semibold uppercase tracking-wide text-ink-faint leading-none">Target</div>
-              <div class="flex items-baseline gap-0.5 mt-0.5">
-                <span class="text-xl font-bold tabular-nums leading-none text-parchment-4">{{ targetTemp }}</span>
-                <span class="text-[10px] text-ink-faint">{{ unitLabel }}</span>
-              </div>
-            </div>
-          </template>
+      <button class="flex-1 min-w-0 px-3.5 py-3 text-left flex flex-col justify-center gap-1" @click="$emit('open-temp')">
+        <!-- Hero: current temp -->
+        <div class="flex items-baseline gap-1">
+          <span class="text-[9px] font-semibold uppercase tracking-wide text-ink-faint mr-0.5">Now</span>
+          <span class="text-4xl font-bold tabular-nums leading-none transition-colors" :class="currentColorClass">{{ currentDisplay ?? '—' }}</span>
+          <span class="text-sm font-medium" :class="currentTemp !== null ? currentColorClass : 'text-parchment-4'">{{ unitLabel }}</span>
         </div>
 
-        <!-- Row 2: delta chip (own line — no longer wedged between numbers) -->
-        <div v-if="delta" class="mt-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold" :class="delta.class">
-          <span>{{ delta.icon }}</span> {{ delta.label }}
+        <!-- Status line: target + delta, in one readable sentence -->
+        <div v-if="targetTemp !== null" class="flex items-center gap-1.5 min-w-0">
+          <svg class="w-3 h-3 shrink-0 text-ink-faint" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          <span class="text-xs text-ink-muted whitespace-nowrap">target <b class="font-bold text-ink-muted tabular-nums">{{ targetTemp }}{{ unitLabel }}</b></span>
+          <span v-if="delta" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[11px] font-bold shrink-0" :class="delta.class">
+            {{ delta.icon }} {{ delta.label }}
+          </span>
         </div>
 
-        <!-- Row 3: rate + readings -->
-        <div class="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5 items-center">
+        <!-- Rate line -->
+        <div class="flex items-center gap-2 mt-0.5">
           <span class="text-[11px] text-ink-muted">Rate <b class="font-bold" :class="rateColorClass">{{ rateShort }}</b><span class="text-ink-faint">/{{ targetRate }}</span></span>
-          <span class="text-[11px] text-ink-muted">Readings <b class="font-bold text-ink">{{ readingCount }}</b></span>
           <span v-if="reductionOpen" class="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600"><span class="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"/>Reduction</span>
         </div>
       </button>

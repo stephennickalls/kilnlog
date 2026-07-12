@@ -43,6 +43,9 @@ class="w-3.5 h-3.5 text-ink-faint transition-transform" :class="open ? 'rotate-1
 </template>
 
 <script setup>
+// PERF (Jul 2026): was supabase.auth.getUser() — a network round trip to
+// Supabase Auth just to show an email we already have. getSession() reads the
+// session from local storage; the email renders on first paint.
 const supabase = useSupabaseClient()
 const root  = ref(null)
 const open  = ref(false)
@@ -51,8 +54,8 @@ const email = ref('')
 const initial = computed(() => (email.value?.[0] ?? '?').toUpperCase())
 
 onMounted(async () => {
-  const { data: { user } } = await supabase.auth.getUser()
-  email.value = user?.email ?? ''
+  const { data: { session } } = await supabase.auth.getSession()  // local, no network
+  email.value = session?.user?.email ?? ''
   document.addEventListener('click', onOutside)
 })
 onUnmounted(() => document.removeEventListener('click', onOutside))

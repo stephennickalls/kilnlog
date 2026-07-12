@@ -284,9 +284,9 @@ const route  = useRoute()          // D2: needed for ?startSchedule param
 
 const { exportFiring } = useFiringExport()   // Package 6
 
-// G1: hydrate the shared unit from the server on load (loadUnit). The toggle
-// UI lives in TempUnitToggle; app.vue only seeds the initial value and repaints
-// the chart when the toggle emits `change`.
+// G1: hydrate the shared unit from the server on load (now via /api/bootstrap).
+// The toggle UI lives in TempUnitToggle; app.vue only seeds the initial value
+// and repaints the chart when the toggle emits `change`.
 const { setUnit: setUnitState } = useTempUnit()
 
 const chartCanvas          = ref(null)
@@ -361,9 +361,22 @@ function tickNow() {
   if (selectedFiring.value?.started_at) setNowLine(selectedFiring.value.started_at)
 }
 
-// G1: hydrate the saved unit on load. The toggle itself lives in the shared
-// TempUnitToggle component (header); it flips + persists + reverts and emits
-// `change`, which we handle with setChartUnit to repaint the kiln canvas.
+// PERF REFACTOR (Jul 2026): the old mount sequence was three serial API calls
+// (/api/preferences → /api/firings → /api/firings/:id), each a separate
+// Netlify Function invocation paying its own auth + profile round trips.
+// /api/bootstrap returns all three payloads in ONE invocation; the active
+// firing detail feeds selectFiring's existing `preloaded` path, so no refetch.
+// If bootstrap fails for any reason we fall back to the old serial path so a
+// deploy mismatch can never blank the page.
+async function loadBootstrap() {
+  const boot = await $fetch('/api/bootstrap')
+  setUnitState(boot.temp_unit === 'F' ? 'F' : 'C')
+  setChartUnit()
+  allFirings.value = boot.firings ?? []
+  if (boot.activeFiring) await selectFiring(boot.activeFiring, boot.activeFiring)
+}
+
+// Legacy fallback — kept intentionally; also used by other error paths.
 async function loadUnit() {
   try {
     const { temp_unit } = await $fetch('/api/preferences')
@@ -374,9 +387,15 @@ async function loadUnit() {
 
 onMounted(async () => {
   await init()
-  await loadUnit()           // G1: hydrate unit before first paint of values
-  await refreshFirings()
-  if (activeFiring.value) await selectFiring(activeFiring.value)
+
+  try {
+    await loadBootstrap()
+  } catch (err) {
+    console.error('Bootstrap failed, falling back to serial load:', err)
+    await loadUnit()
+    await refreshFirings()
+    if (activeFiring.value) await selectFiring(activeFiring.value)
+  }
 
   // D2: ?startSchedule=id from the schedules page — start the firing
   // immediately. The schedule was already chosen there; don't make the user

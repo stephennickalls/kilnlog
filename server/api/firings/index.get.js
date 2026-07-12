@@ -1,65 +1,15 @@
 // server/api/firings/index.get.js
 // GET /api/firings — list all firings for the authenticated user.
-// On each call, checks for stale active firings and auto-ends them:
-//   No readings for 2 hours, OR
-//   Started but never had a reading, and started > 1 hour ago.
-// EXEMPT from auto-end:
-//   - Paused firings (paused_at set) — the user deliberately suspended them.
-//   - Just-restarted firings whose only readings predate the restart — they
-//     pick up where they left off; normal staleness resumes once a fresh
-//     reading is logged after restarted_at.
-
-const TWO_HOURS = 2 * 60 * 60
-const ONE_HOUR  = 1 * 60 * 60
+//
+// PERF REFACTOR (Jul 2026): the auto-end staleness sweep moved to the shared
+// server/utils/autoEndStale.js (also used by /api/bootstrap), and now fetches
+// only the latest reading timestamp per active firing instead of every
+// timestamp. Rules and exemptions are unchanged — see that file.
 
 export default defineEventHandler(async (event) => {
   const { db, user } = await useServerUser(event)
 
-  const { data: activeFirings, error: activeError } = await db
-    .from('firings')
-    .select(`
-      id, started_at, paused_at, restarted_at,
-      readings:readings(timestamp)
-    `)
-    .eq('user_id', user.id)
-    .is('ended_at', null)
-    .not('started_at', 'is', null)
-
-  if (activeError) throw await serverError('firings.list.active_query_failed', activeError, { userId: user.id })
-
-  const now = Math.floor(Date.now() / 1000)
-  const toAutoEnd = []
-
-  for (const firing of activeFirings ?? []) {
-    if (firing.paused_at) continue
-
-    const readings = firing.readings ?? []
-    const lastTs = readings.length
-      ? readings.reduce((max, r) => r.timestamp > max ? r.timestamp : max, readings[0].timestamp)
-      : null
-
-    // A just-restarted firing has only stale readings (all older than the
-    // restart). Exempt it until the user logs a fresh reading — then the
-    // normal staleness rules resume from that reading onward.
-    if (firing.restarted_at && (lastTs === null || lastTs < firing.restarted_at)) continue
-
-    if (lastTs === null) {
-      if (now - firing.started_at > ONE_HOUR) toAutoEnd.push(firing.id)
-    } else if (now - lastTs > TWO_HOURS) {
-      toAutoEnd.push(firing.id)
-    }
-  }
-
-  if (toAutoEnd.length) {
-    await Promise.all(
-      toAutoEnd.map(id =>
-        db.from('firings')
-          .update({ ended_at: now, auto_ended: true })
-          .eq('id', id)
-          .eq('user_id', user.id)
-      )
-    )
-  }
+  await autoEndStale(db, user.id)
 
   const { data, error } = await db
     .from('firings')

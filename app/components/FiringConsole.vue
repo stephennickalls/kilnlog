@@ -4,12 +4,13 @@
   encodes state (blue=behind, amber=ahead, CELADON=on track). Desktop (lg+): compact
   row. Below lg: tight strip.
 
-  Mobile layout (iPhone-width): the compact strip is now TWO siblings —
+  Mobile layout (iPhone-width): the compact strip is TWO siblings —
     [ pill: text zone + LOG ]  [ standalone ⋮ menu ]
   The menu lives OUTSIDE the overflow-hidden pill, so LOG can no longer overlap it,
   and the text zone (flex-1, min-w-0, overflow-hidden) truncates instead of sliding
   under the buttons. Info stack in the text zone: hero Current → status line
-  "→ target N° · Δ" → rate. "Readings" is desktop-only (not needed live on a phone).
+  "target N° · Δ" → rate. The arrow glyph is dropped on mobile to reclaim width.
+  "Readings" is desktop-only (not needed live on a phone).
 
   Mobile menu: a Teleported bottom sheet (can't be clipped); desktop keeps its
   anchored dropdown with a backdrop for outside-click.
@@ -121,9 +122,8 @@
             <span class="text-sm font-medium" :class="currentTemp !== null ? currentColorClass : 'text-parchment-4'">{{ unitLabel }}</span>
           </div>
 
-          <!-- Status line: target + delta -->
+          <!-- Status line: target + delta (arrow dropped — reclaims width on narrow phones) -->
           <div v-if="targetTemp !== null" class="flex items-center gap-1.5 min-w-0">
-            <svg class="w-3 h-3 shrink-0 text-ink-faint" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
             <span class="text-xs text-ink-muted whitespace-nowrap shrink-0">target <b class="font-bold text-ink-muted tabular-nums">{{ targetTemp }}{{ unitLabel }}</b></span>
             <span v-if="delta" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[11px] font-bold shrink-0 whitespace-nowrap" :class="delta.class">
               {{ delta.icon }} {{ delta.label }}

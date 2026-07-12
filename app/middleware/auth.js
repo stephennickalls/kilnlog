@@ -1,10 +1,16 @@
 // app/middleware/auth.js
 //
-// PACKAGE 7 (G8) — client-side access check now mirrors the server's
-// past_due grace window (see hasAccess in server/utils/useServerUser.js).
-// Without this the UI would bounce a past_due-but-in-grace user to /subscribe
-// even though the server still serves their data. PAST_DUE_GRACE_DAYS must
-// match the server constant.
+// PACKAGE 7 (G8) — client-side access check mirrors the server's past_due
+// grace window (see hasAccess in server/utils/useServerUser.js).
+// PAST_DUE_GRACE_DAYS must match the server constant.
+//
+// PERF REFACTOR (Jul 2026): the profiles fetch used to run on EVERY route
+// navigation, blocking each page behind a browser→Supabase round trip. The
+// result is now cached in useState for the lifetime of the SPA session — one
+// fetch on the first guarded navigation, instant thereafter. The server is
+// the real gate (routes 402 when access lapses), so a stale "ok" here can
+// never leak data; it can only briefly show a shell whose API calls fail,
+// exactly as before. Sign-out clears state by full navigation.
 const PAST_DUE_GRACE_DAYS = 7
 
 export default defineNuxtRouteMiddleware(async (to) => {
@@ -14,11 +20,17 @@ export default defineNuxtRouteMiddleware(async (to) => {
   const publicRoutes = ['/login', '/signup', '/forgot-password', '/reset-password', '/subscribe', '/confirm']
   const isPublic = publicRoutes.some(r => to.path.startsWith(r))
 
-  const { data: { session } } = await supabase.auth.getSession()
+  const { data: { session } } = await supabase.auth.getSession()   // local, no network
 
   if (!session) return isPublic ? undefined : navigateTo('/login')
   if (to.path === '/login' || to.path === '/signup') return navigateTo('/app')
   if (isPublic || to.path === '/account') return
+
+  // Cached access verdict: { userId, ok } — refetch only if user changed.
+  const access = useState('access-check', () => null)
+  if (access.value?.userId === session.user.id) {
+    return access.value.ok ? undefined : navigateTo('/subscribe')
+  }
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -39,6 +51,8 @@ export default defineNuxtRouteMiddleware(async (to) => {
     (profile.subscription_status === 'trialing' && profile.trial_ends_at && new Date(profile.trial_ends_at) > now) ||
     (profile.subscription_status === 'canceled' && profile.subscription_ends_at && new Date(profile.subscription_ends_at) > now) ||
     inPastDueGrace
+
+  access.value = { userId: session.user.id, ok }
 
   if (!ok) return navigateTo('/subscribe')
 })

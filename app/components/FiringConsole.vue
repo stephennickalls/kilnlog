@@ -4,14 +4,15 @@
   encodes state (blue=behind, amber=ahead, CELADON=on track). Desktop (lg+): compact
   row. Below lg: tight strip.
 
-  Mobile menu fix: the compact strip is overflow-hidden (for the rounded pill), which
-  clipped an absolutely-positioned dropdown. The mobile overflow menu is now a
-  Teleported bottom sheet so it can't be clipped; desktop keeps its anchored dropdown
-  (with a backdrop for outside-click).
+  Mobile layout (iPhone-width): the compact strip is now TWO siblings —
+    [ pill: text zone + LOG ]  [ standalone ⋮ menu ]
+  The menu lives OUTSIDE the overflow-hidden pill, so LOG can no longer overlap it,
+  and the text zone (flex-1, min-w-0, overflow-hidden) truncates instead of sliding
+  under the buttons. Info stack in the text zone: hero Current → status line
+  "→ target N° · Δ" → rate. "Readings" is desktop-only (not needed live on a phone).
 
-  Mobile layout (iPhone-width): Current is the hero number; beneath it a single
-  status line reads "→ target N° · Δ" (target + how far off) with the delta colour,
-  then a small rate line. "Readings" is desktop-only (not needed live on a phone).
+  Mobile menu: a Teleported bottom sheet (can't be clipped); desktop keeps its
+  anchored dropdown with a backdrop for outside-click.
 
   G11: the overflow menu gains a reduction toggle — "Start reduction" when none is
   open, "End reduction" when one is in progress. Emits a single 'reduction' action;
@@ -20,8 +21,8 @@
   G1 (°F): currentTemp / targetTemp arrive as raw °C numbers and are converted
   for display via useTempUnit. The on-track / ahead / behind comparison stays in
   °C (both operands °C), and the difference shown to the user is converted with
-  displayDelta (a delta has no +32 offset). Rate colour now reads the raw °C
-  rate props (rateC / targetRateC) instead of re-parsing formatted strings.
+  displayDelta (a delta has no +32 offset). Rate colour reads the raw °C rate
+  props (rateC / targetRateC) instead of re-parsing formatted strings.
 -->
 <template>
   <div class="flex flex-col gap-2">
@@ -106,38 +107,44 @@
     </div>
 
     <!-- ─────────────── Compact (below lg) ─────────────── -->
-    <div class="lg:hidden bg-white border border-parchment-3 rounded-2xl flex items-stretch overflow-hidden" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
-      <button class="flex-1 min-w-0 px-3.5 py-3 text-left flex flex-col justify-center gap-1" @click="$emit('open-temp')">
-        <!-- Hero: current temp -->
-        <div class="flex items-baseline gap-1">
-          <span class="text-[9px] font-semibold uppercase tracking-wide text-ink-faint mr-0.5">Now</span>
-          <span class="text-4xl font-bold tabular-nums leading-none transition-colors" :class="currentColorClass">{{ currentDisplay ?? '—' }}</span>
-          <span class="text-sm font-medium" :class="currentTemp !== null ? currentColorClass : 'text-parchment-4'">{{ unitLabel }}</span>
-        </div>
+    <!-- Two siblings: the pill (text + LOG) and a standalone menu button. The
+         menu is OUTSIDE the overflow-hidden pill so LOG cannot overlap it. -->
+    <div class="lg:hidden flex items-stretch gap-2">
 
-        <!-- Status line: target + delta, in one readable sentence -->
-        <div v-if="targetTemp !== null" class="flex items-center gap-1.5 min-w-0">
-          <svg class="w-3 h-3 shrink-0 text-ink-faint" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-          <span class="text-xs text-ink-muted whitespace-nowrap">target <b class="font-bold text-ink-muted tabular-nums">{{ targetTemp }}{{ unitLabel }}</b></span>
-          <span v-if="delta" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[11px] font-bold shrink-0" :class="delta.class">
-            {{ delta.icon }} {{ delta.label }}
-          </span>
-        </div>
+      <!-- Pill: text zone + LOG -->
+      <div class="flex-1 min-w-0 bg-white border border-parchment-3 rounded-2xl flex items-stretch overflow-hidden" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
+        <button class="flex-1 min-w-0 overflow-hidden px-3.5 py-3 text-left flex flex-col justify-center gap-1" @click="$emit('open-temp')">
+          <!-- Hero: current temp -->
+          <div class="flex items-baseline gap-1">
+            <span class="text-[9px] font-semibold uppercase tracking-wide text-ink-faint mr-0.5">Now</span>
+            <span class="text-4xl font-bold tabular-nums leading-none transition-colors" :class="currentColorClass">{{ currentDisplay ?? '—' }}</span>
+            <span class="text-sm font-medium" :class="currentTemp !== null ? currentColorClass : 'text-parchment-4'">{{ unitLabel }}</span>
+          </div>
 
-        <!-- Rate line -->
-        <div class="flex items-center gap-2 mt-0.5">
-          <span class="text-[11px] text-ink-muted">Rate <b class="font-bold" :class="rateColorClass">{{ rateShort }}</b><span class="text-ink-faint">/{{ targetRate }}</span></span>
-          <span v-if="reductionOpen" class="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600"><span class="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"/>Reduction</span>
-        </div>
-      </button>
+          <!-- Status line: target + delta -->
+          <div v-if="targetTemp !== null" class="flex items-center gap-1.5 min-w-0">
+            <svg class="w-3 h-3 shrink-0 text-ink-faint" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            <span class="text-xs text-ink-muted whitespace-nowrap shrink-0">target <b class="font-bold text-ink-muted tabular-nums">{{ targetTemp }}{{ unitLabel }}</b></span>
+            <span v-if="delta" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[11px] font-bold shrink-0 whitespace-nowrap" :class="delta.class">
+              {{ delta.icon }} {{ delta.label }}
+            </span>
+          </div>
 
-      <button v-if="isLive" class="w-[76px] shrink-0 bg-flame active:bg-flame-dark text-parchment flex flex-col items-center justify-center gap-1 transition-colors" @click="$emit('log-reading')">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-        <span class="text-[10px] font-bold uppercase">Log</span>
-      </button>
+          <!-- Rate line -->
+          <div class="flex items-center gap-2 mt-0.5">
+            <span class="text-[11px] text-ink-muted whitespace-nowrap">Rate <b class="font-bold" :class="rateColorClass">{{ rateShort }}</b><span class="text-ink-faint">/{{ targetRate }}</span></span>
+            <span v-if="reductionOpen" class="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"/>Reduction</span>
+          </div>
+        </button>
 
-      <!-- Mobile menu trigger (sheet teleported below to escape overflow-hidden) -->
-      <button class="w-10 shrink-0 bg-parchment-2/40 border-l border-parchment-3 flex items-center justify-center text-ink-muted active:bg-parchment-2" @click="menuOpen = !menuOpen">
+        <button v-if="isLive" class="w-[76px] shrink-0 bg-flame active:bg-flame-dark text-parchment flex flex-col items-center justify-center gap-1 transition-colors" @click="$emit('log-reading')">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          <span class="text-[10px] font-bold uppercase">Log</span>
+        </button>
+      </div>
+
+      <!-- Standalone menu (sheet teleported below to escape overflow-hidden) -->
+      <button class="shrink-0 w-12 bg-white border border-parchment-3 rounded-2xl flex items-center justify-center text-ink-muted active:bg-parchment-2 transition-colors" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)" @click="menuOpen = !menuOpen">
         <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
       </button>
     </div>

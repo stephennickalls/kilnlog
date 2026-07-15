@@ -8,20 +8,34 @@
 <template>
   <div class="min-h-screen bg-parchment font-serif">
 
+   <!-- app/pages/schedules/index.vue — replace the existing <header> block -->
     <header class="sticky top-0 z-20 bg-parchment/95 backdrop-blur border-b border-parchment-3">
       <div class="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-6 py-3">
-        <div class="flex items-center gap-2 min-w-0">
-          <NuxtLink to="/app" class="p-1.5 -ml-1 rounded-lg text-ink-muted hover:text-flame hover:bg-parchment-2 transition-colors shrink-0">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+        <div class="flex items-center gap-3 min-w-0">
+
+          <!-- Brand — same mark as the app header, links to the app -->
+          <NuxtLink to="/app" class="text-base sm:text-lg font-bold flex items-center gap-2 text-ink tracking-tight hover:text-flame transition-colors shrink-0">
+            🔥 KilnMonitor
           </NuxtLink>
+
+          <span class="text-parchment-4 shrink-0">/</span>
           <h1 class="text-base sm:text-lg font-bold text-ink tracking-tight truncate">Schedules</h1>
         </div>
+
         <div class="flex items-center gap-2 shrink-0">
+          <!-- Explicit, labeled way back -->
+          <NuxtLink
+            to="/app"
+            class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold border border-parchment-3 rounded-lg text-ink-muted hover:bg-parchment-2 hover:text-ink transition-colors"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+            Back to app
+          </NuxtLink>
           <NuxtLink to="/schedules/new" class="btn-primary shrink-0">+ New schedule</NuxtLink>
           <UserMenu />
         </div>
       </div>
-    </header>
+</header>
 
     <main class="max-w-6xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-10">
 

@@ -789,6 +789,22 @@ async function reloadReadings() {
   if (!selectedFiring.value) return
   try {
     const data = await $fetch(`/api/firings/${selectedFiring.value.id}`)
+
+    // The firing may have been ended server-side (pg_cron auto-end, or another
+    // device) while this tab was asleep. Adopt the full server state, not just
+    // the readings — otherwise the UI shows Live forever.
+    if (data.ended_at && !selectedFiring.value.ended_at) {
+      stopAllIntervals()
+      clearNowLine()
+      isLive.value = isPaused.value = false
+      selectedFiring.value = data
+      setSchedule(data.schedule ?? [], data.schedule_offset ?? 0)
+      setReadings(data.readings ?? [], data.started_at)
+      setReductions(data.reductions ?? [])
+      refreshFirings()          // sidebar: Live → Finished
+      return
+    }
+
     selectedFiring.value.readings = data.readings
     selectedFiring.value.schedule = data.schedule
     selectedFiring.value.reductions = data.reductions ?? selectedFiring.value.reductions

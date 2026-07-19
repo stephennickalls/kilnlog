@@ -11,13 +11,19 @@
 // the real gate (routes 402 when access lapses), so a stale "ok" here can
 // never leak data; it can only briefly show a shell whose API calls fail,
 // exactly as before. Sign-out clears state by full navigation.
+//
+// BETA-TEMP: during beta recruitment, lapsed/expired users are sent to
+// /register-interest instead of /subscribe. /subscribe itself still exists
+// and self-redirects (see subscribe.vue), so it stays in publicRoutes to
+// avoid an auth bounce. Grep "BETA-TEMP" to revert.
 const PAST_DUE_GRACE_DAYS = 7
 
 export default defineNuxtRouteMiddleware(async (to) => {
   if (import.meta.server) return
 
   const supabase = useSupabaseClient()
-  const publicRoutes = ['/login', '/signup', '/forgot-password', '/reset-password', '/subscribe', '/confirm']
+  // BETA-TEMP: added '/register-interest'
+  const publicRoutes = ['/login', '/signup', '/forgot-password', '/reset-password', '/subscribe', '/register-interest', '/confirm']
   const isPublic = publicRoutes.some(r => to.path.startsWith(r))
 
   const { data: { session } } = await supabase.auth.getSession()   // local, no network
@@ -29,7 +35,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
   // Cached access verdict: { userId, ok } — refetch only if user changed.
   const access = useState('access-check', () => null)
   if (access.value?.userId === session.user.id) {
-    return access.value.ok ? undefined : navigateTo('/subscribe')
+    return access.value.ok ? undefined : navigateTo('/register-interest')  // BETA-TEMP (was /subscribe)
   }
 
   const { data: profile } = await supabase
@@ -54,5 +60,5 @@ export default defineNuxtRouteMiddleware(async (to) => {
 
   access.value = { userId: session.user.id, ok }
 
-  if (!ok) return navigateTo('/subscribe')
+  if (!ok) return navigateTo('/register-interest')  // BETA-TEMP (was /subscribe)
 })

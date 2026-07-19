@@ -1,7 +1,7 @@
 <!-- app/pages/subscribe.vue -->
 <template>
   <div
-v-if="mounted"
+    v-if="mounted"
     class="min-h-screen bg-parchment font-serif flex flex-col lg:flex-row"
     style="background-image: radial-gradient(ellipse at 80% 20%, rgba(176,92,26,0.06) 0%, transparent 55%)"
   >
@@ -79,7 +79,7 @@ v-if="mounted"
 
     <!-- ── Right — marketing (desktop only) ───────────────────────────────── -->
     <div
-class="hidden lg:flex flex-1 bg-ink items-center justify-center px-16"
+      class="hidden lg:flex flex-1 bg-ink items-center justify-center px-16"
       style="background-image: radial-gradient(ellipse at 20% 50%, rgba(176,92,26,0.18) 0%, transparent 60%)"
     >
       <div class="max-w-md">
@@ -110,7 +110,13 @@ class="hidden lg:flex flex-1 bg-ink items-center justify-center px-16"
 
 <script setup>
 // app/pages/subscribe.vue
-definePageMeta({ layout: false })
+//
+// BETA-TEMP: subscriptions are paused during beta recruitment, so any direct
+// visit to /subscribe now redirects to /register-interest. The full
+// trial-expired UI below is left intact — to restore the page, delete the
+// `redirect` key from definePageMeta (revert to `{ layout: false }`).
+// Grep "BETA-TEMP" to find every temporary beta change.
+definePageMeta({ layout: false, redirect: '/register-interest' })
 
 const supabase = useSupabaseClient()
 const error    = ref('')

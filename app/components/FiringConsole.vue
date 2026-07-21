@@ -4,6 +4,15 @@
   encodes state (blue=behind, amber=ahead, CELADON=on track). Desktop (lg+): compact
   row. Below lg: tight strip.
 
+  BRAND (Option B): the current/target card is the app's one persistent ink+glow
+  surface — ink ground with a flame radial wash, echoing the landing page's
+  "Firing insight" tile and the beta banner. State colours shift to their LIGHT
+  variants on this surface (celadon-light / amber-400 / blue-400) so the
+  on-track language stays legible; the delta chip keeps its light state-pill
+  styling for maximum pop. The rate card (desktop) stays white, so rate colour
+  needs BOTH palettes: rateColorClass (light surface) + rateColorClassDark
+  (ink surface, mobile strip).
+
   Mobile layout (iPhone-width): the compact strip is TWO siblings —
     [ pill: text zone + LOG ]  [ standalone ⋮ menu ]
   The menu lives OUTSIDE the overflow-hidden pill, so LOG can no longer overlap it,
@@ -31,27 +40,32 @@
     <!-- ─────────────── Desktop (lg+) ─────────────── -->
     <div class="hidden lg:flex gap-2 items-stretch">
 
-      <div class="bg-white border border-parchment-3 rounded-xl flex items-center gap-5 px-5 py-2" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
+      <!-- BRAND: ink + flame glow (was bg-white border-parchment-3) -->
+      <div
+        class="bg-ink border border-white/10 rounded-xl flex items-center gap-5 px-5 py-2"
+        style="box-shadow:0 2px 12px rgba(34,23,8,0.25); background-image: radial-gradient(ellipse at 22% 45%, rgba(184,85,28,0.35) 0%, transparent 62%)"
+      >
         <button class="flex items-end gap-5 text-left" @click="$emit('open-temp')">
           <div>
-            <div class="text-[10px] font-semibold uppercase tracking-widest text-ink-faint">Current</div>
+            <div class="text-[10px] font-semibold uppercase tracking-widest text-parchment-4/70">Current</div>
             <div class="flex items-baseline gap-1">
               <span class="text-4xl font-bold tabular-nums leading-none transition-colors" :class="currentColorClass">{{ currentDisplay ?? '—' }}</span>
-              <span class="text-sm font-medium" :class="currentTemp !== null ? currentColorClass : 'text-parchment-4'">{{ unitLabel }}</span>
+              <span class="text-sm font-medium" :class="currentTemp !== null ? currentColorClass : 'text-parchment-4/50'">{{ unitLabel }}</span>
             </div>
           </div>
           <template v-if="targetTemp !== null">
-            <svg class="w-4 h-4 mb-1.5 shrink-0" :class="delta ? delta.textClass : 'text-ink-faint'" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            <svg class="w-4 h-4 mb-1.5 shrink-0" :class="delta ? delta.textClass : 'text-parchment-4/60'" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
             <div>
-              <div class="text-[10px] font-semibold uppercase tracking-widest text-ink-faint">Target</div>
+              <div class="text-[10px] font-semibold uppercase tracking-widest text-parchment-4/70">Target</div>
               <div class="flex items-baseline gap-1">
                 <span class="text-4xl font-bold tabular-nums leading-none text-parchment-4">{{ targetTemp }}</span>
-                <span class="text-sm font-medium text-parchment-4">{{ unitLabel }}</span>
+                <span class="text-sm font-medium text-parchment-4/70">{{ unitLabel }}</span>
               </div>
             </div>
           </template>
         </button>
 
+        <!-- Light state pill — deliberately unchanged so state reads loudest on the ink -->
         <div v-if="delta" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-sm font-bold shrink-0" :class="delta.class">
           <span>{{ delta.icon }}</span> {{ delta.label }}
         </div>
@@ -112,19 +126,22 @@
          menu is OUTSIDE the overflow-hidden pill so LOG cannot overlap it. -->
     <div class="lg:hidden flex items-stretch gap-2">
 
-      <!-- Pill: text zone + LOG -->
-      <div class="flex-1 min-w-0 bg-white border border-parchment-3 rounded-2xl flex items-stretch overflow-hidden" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
+      <!-- Pill: text zone + LOG — BRAND ink+glow ground; LOG stays flame -->
+      <div
+        class="flex-1 min-w-0 bg-ink border border-white/10 rounded-2xl flex items-stretch overflow-hidden"
+        style="box-shadow:0 2px 12px rgba(34,23,8,0.25); background-image: radial-gradient(ellipse at 18% 40%, rgba(184,85,28,0.35) 0%, transparent 60%)"
+      >
         <button class="flex-1 min-w-0 overflow-hidden px-3.5 py-3 text-left flex flex-col justify-center gap-1" @click="$emit('open-temp')">
           <!-- Hero: current temp -->
           <div class="flex items-baseline gap-1">
-            <span class="text-[9px] font-semibold uppercase tracking-wide text-ink-faint mr-0.5">Now</span>
+            <span class="text-[9px] font-semibold uppercase tracking-wide text-parchment-4/70 mr-0.5">Now</span>
             <span class="text-4xl font-bold tabular-nums leading-none transition-colors" :class="currentColorClass">{{ currentDisplay ?? '—' }}</span>
-            <span class="text-sm font-medium" :class="currentTemp !== null ? currentColorClass : 'text-parchment-4'">{{ unitLabel }}</span>
+            <span class="text-sm font-medium" :class="currentTemp !== null ? currentColorClass : 'text-parchment-4/50'">{{ unitLabel }}</span>
           </div>
 
           <!-- Status line: target + delta (arrow dropped — reclaims width on narrow phones) -->
           <div v-if="targetTemp !== null" class="flex items-center gap-1.5 min-w-0">
-            <span class="text-xs text-ink-muted whitespace-nowrap shrink-0">target <b class="font-bold text-ink-muted tabular-nums">{{ targetTemp }}{{ unitLabel }}</b></span>
+            <span class="text-xs text-parchment-4/80 whitespace-nowrap shrink-0">target <b class="font-bold text-parchment-3 tabular-nums">{{ targetTemp }}{{ unitLabel }}</b></span>
             <span v-if="delta" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[11px] font-bold shrink-0 whitespace-nowrap" :class="delta.class">
               {{ delta.icon }} {{ delta.label }}
             </span>
@@ -132,8 +149,8 @@
 
           <!-- Rate line -->
           <div class="flex items-center gap-2 mt-0.5">
-            <span class="text-[11px] text-ink-muted whitespace-nowrap">Rate <b class="font-bold" :class="rateColorClass">{{ rateShort }}</b><span class="text-ink-faint">/{{ targetRate }}</span></span>
-            <span v-if="reductionOpen" class="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"/>Reduction</span>
+            <span class="text-[11px] text-parchment-4/80 whitespace-nowrap">Rate <b class="font-bold" :class="rateColorClassDark">{{ rateShort }}</b><span class="text-parchment-4/50">/{{ targetRate }}</span></span>
+            <span v-if="reductionOpen" class="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-300 shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"/>Reduction</span>
           </div>
         </button>
 
@@ -205,6 +222,7 @@ const currentDisplay = computed(() =>
 
 // Rate colour from raw °C rates — no string parsing. Thresholds are in °C/min;
 // comparing two °C rates is unit-agnostic, so no conversion needed here.
+// LIGHT-surface palette (desktop white rate card).
 const rateColorClass = computed(() => {
   const actual = props.rateC
   const target = props.targetRateC
@@ -216,27 +234,43 @@ const rateColorClass = computed(() => {
   return 'text-celadon'
 })
 
+// BRAND: same logic, INK-surface palette (mobile strip lives on the ink card).
+const rateColorClassDark = computed(() => {
+  const actual = props.rateC
+  const target = props.targetRateC
+  if (actual === null) return 'text-parchment-4/60'
+  if (target === null) return 'text-celadon-light'
+  const diff = actual - target
+  if (diff > 1.5)  return 'text-amber-400'
+  if (diff < -1.5) return 'text-blue-400'
+  return 'text-celadon-light'
+})
+
 // Mobile short rate: strip the unit suffix from the formatted string.
 const rateShort = computed(() =>
   (props.rateOfChange ?? '—').replace('°/m', '').replace('°C/m', '').replace('°F/m', '')
 )
 
+// BRAND: both hero-temp surfaces are ink now, so the state colours here are the
+// light variants (delta.textClass below is dark-surface-tuned).
 const currentColorClass = computed(() => {
-  if (props.currentTemp === null) return 'text-parchment-4'
-  if (!delta.value) return 'text-flame'
+  if (props.currentTemp === null) return 'text-parchment-4/50'
+  if (!delta.value) return 'text-flame-light'
   return delta.value.textClass
 })
 
 // Delta computed in °C (both operands °C). The 15°C on-track window is a °C
 // threshold and stays °C. The NUMBER shown to the user converts via displayDelta.
+// `class` (the chip) keeps LIGHT state-pill styling — it pops hardest on ink.
+// `textClass` is the on-ink text colour for the hero number + arrow.
 const delta = computed(() => {
   if (props.currentTemp === null || props.targetTempC === null) return null
   const dC = Math.round(props.currentTemp - props.targetTempC)
   const absC = Math.abs(dC)
   const absDisplay = Math.abs(displayDelta(dC))
-  if (absC <= 15) return { icon: '✓', label: 'On track', short: 'on track', class: 'bg-celadon-bg text-celadon-dark', textClass: 'text-celadon' }
-  if (dC > 15)    return { icon: '↑', label: `${absDisplay}° ahead`, short: `${absDisplay}°`, class: 'bg-amber-50 text-amber-700', textClass: 'text-amber-600' }
-  return { icon: '↓', label: `${absDisplay}° behind`, short: `${absDisplay}°`, class: 'bg-blue-50 text-blue-700', textClass: 'text-blue-600' }
+  if (absC <= 15) return { icon: '✓', label: 'On track', short: 'on track', class: 'bg-celadon-bg text-celadon-dark', textClass: 'text-celadon-light' }
+  if (dC > 15)    return { icon: '↑', label: `${absDisplay}° ahead`, short: `${absDisplay}°`, class: 'bg-amber-50 text-amber-700', textClass: 'text-amber-400' }
+  return { icon: '↓', label: `${absDisplay}° behind`, short: `${absDisplay}°`, class: 'bg-blue-50 text-blue-700', textClass: 'text-blue-400' }
 })
 
 defineExpose({ closeMenu: () => { menuOpen.value = false } })

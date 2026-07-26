@@ -330,6 +330,7 @@
           <NuxtLink to="/login" class="hover:text-parchment transition-colors">Sign in</NuxtLink>
           <NuxtLink to="/signup" class="hover:text-parchment transition-colors">Sign up</NuxtLink>
           <NuxtLink to="/privacy" class="hover:text-parchment transition-colors">Privacy</NuxtLink>
+          <NuxtLink to="/terms" class="hover:text-parchment transition-colors">Terms</NuxtLink>
         </div>
       </div>
     </footer>

@@ -328,8 +328,8 @@
         <span class="text-[0.825rem] text-ink-muted">&copy; {{ new Date().getFullYear() }} KilnMonitor. Made by a potter, for potters.</span>
         <div class="flex gap-7 text-[0.825rem] text-ink-muted">
           <NuxtLink to="/login" class="hover:text-parchment transition-colors">Sign in</NuxtLink>
-          <!-- BETA-TEMP: was to="/signup" · "Sign up" -->
-          <NuxtLink to="/register-interest" class="hover:text-parchment transition-colors">Join the beta</NuxtLink>
+          <NuxtLink to="/signup" class="hover:text-parchment transition-colors">Sign up</NuxtLink>
+          <NuxtLink to="/privacy" class="hover:text-parchment transition-colors">Privacy</NuxtLink>
         </div>
       </div>
     </footer>

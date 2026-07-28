@@ -321,14 +321,16 @@
       </div>
     </section>
 
-    <!-- Footer -->
+       <!-- Footer -->
     <footer class="bg-ink border-t border-white/[0.08] px-10 py-7">
       <div class="max-w-[1200px] mx-auto flex items-center justify-between gap-4 flex-wrap">
         <span class="text-[0.95rem] font-bold text-parchment">KilnMonitor</span>
         <span class="text-[0.825rem] text-ink-muted">&copy; {{ new Date().getFullYear() }} KilnMonitor. Made by a potter, for potters.</span>
         <div class="flex gap-7 text-[0.825rem] text-ink-muted">
           <NuxtLink to="/login" class="hover:text-parchment transition-colors">Sign in</NuxtLink>
-          <NuxtLink to="/signup" class="hover:text-parchment transition-colors">Sign up</NuxtLink>
+          <!-- BETA-TEMP: was <NuxtLink to="/signup">Sign up</NuxtLink> — public
+               signup is closed during beta. Restore when going live. -->
+          <NuxtLink to="/register-interest" class="hover:text-parchment transition-colors">Join the beta</NuxtLink>
           <NuxtLink to="/privacy" class="hover:text-parchment transition-colors">Privacy</NuxtLink>
           <NuxtLink to="/terms" class="hover:text-parchment transition-colors">Terms</NuxtLink>
         </div>

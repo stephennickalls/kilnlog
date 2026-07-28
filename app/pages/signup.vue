@@ -1,4 +1,18 @@
 <!-- app/pages/signup.vue -->
+<!--
+  BETA-TEMP: this page is CLOSED during beta recruitment. The inline middleware
+  in definePageMeta below redirects every visit to /register-interest, so the
+  route can't be reached by typing the URL, by an old bookmark, or by a stale
+  link. The form itself is left intact and untouched so that going live is a
+  one-line revert.
+
+  To go live: delete the `middleware` key from definePageMeta (marked below),
+  and restore the "Sign up free" link in app/pages/login.vue and the "Sign up"
+  link in the app/pages/index.vue footer. Grep "BETA-TEMP" for all of them.
+
+  Chrome (background, card, brand mark, "← Back to home") lives in
+  app/layouts/auth.vue. This file is just the sign-up form.
+-->
 <template>
   <div>
     <div class="text-center bg-flame-bg border border-flame rounded-lg px-4 py-2.5 text-sm font-semibold text-flame mb-5">
@@ -90,11 +104,16 @@
 
 <script setup>
 // app/pages/signup.vue
-// Chrome (background, card, brand mark, "← Back to home") lives in
-// app/layouts/auth.vue. This file is just the sign-up form.
 definePageMeta({
   layout:   'auth',
   subtitle: 'Start your 30-day free trial',
+
+  // BETA-TEMP: closed for public signup during beta. Runs before the page
+  // renders (server and client), so the form never flashes. Delete this whole
+  // `middleware` key to reopen public registration.
+  middleware: [
+    () => navigateTo('/register-interest', { redirectCode: 302 }),
+  ],
 })
 
 const supabase = useSupabaseClient()

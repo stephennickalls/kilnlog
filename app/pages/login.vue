@@ -65,9 +65,18 @@
       </button>
     </form>
 
+    <!--
+      BETA-TEMP: was —
+        <p class="text-center mt-5 text-sm text-ink-muted">
+          Don't have an account?
+          <NuxtLink to="/signup" class="text-flame font-semibold hover:underline">Sign up free</NuxtLink>
+        </p>
+      Public signup is closed during beta, so this points at the interest form
+      instead. Restore the block above when going live.
+    -->
     <p class="text-center mt-5 text-sm text-ink-muted">
-      Don't have an account?
-      <NuxtLink to="/signup" class="text-flame font-semibold hover:underline">Sign up free</NuxtLink>
+      Not a beta tester yet?
+      <NuxtLink to="/register-interest" class="text-flame font-semibold hover:underline">Request access</NuxtLink>
     </p>
   </div>
 </template>

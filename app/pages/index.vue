@@ -282,7 +282,7 @@
               <span class="text-[4.5rem] font-bold text-ink leading-none tracking-[-0.04em]">49</span>
               <span class="text-[1.1rem] text-ink-faint">NZD / year</span>
             </div>
-            <p class="text-[0.9rem] text-ink-faint mb-8">That's just $4.08 per month — less than a bag of clay.</p>
+            <p class="text-[0.9rem] text-ink-faint mb-8">That's just $4.08 per month.</p>
             <!-- BETA-TEMP: was to="/signup" · "Start 30-day free trial" -->
             <NuxtLink to="/register-interest" class="inline-flex items-center gap-2 bg-flame text-parchment px-8 py-4 rounded text-[1.05rem] font-semibold hover:bg-flame-dark transition-all hover:-translate-y-px">
               Register for free beta access

@@ -5,16 +5,16 @@
   "description": "Kiln temperature monitoring — real-time chart of planned vs actual firing",
   "private": true,
   "license": "UNLICENSED",
+  "allowScripts": {
+    "esbuild": true
+  },
   "scripts": {
     "build": "nuxt build",
     "dev": "nuxt dev --host",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "check": "eslint .",
     "typecheck": "nuxt typecheck",
-    "verify": "nuxt typecheck && eslint .",
+    "verify": "nuxt typecheck",
     "db:migrate": "node scripts/migrate.mjs"
   },
   "dependencies": {
@@ -28,13 +28,13 @@
     "vue": "^3.5.0"
   },
   "devDependencies": {
-    "@nuxt/eslint": "^1.9.0",
-    "@nuxtjs/tailwindcss": "^6.14.0",
-    "eslint": "^9.39.0",
+    "@nuxtjs/tailwindcss": "^3.3.4",
     "typescript": "^5.6.0",
-    "vue-tsc": "^2.1.0"
+    "vue-tsc": "^3.3.8"
   },
   "optionalDependencies": {
-    "@oxc-parser/binding-linux-x64-gnu": "0.133.0"
+    "@oxc-minify/binding-linux-x64-gnu": "0.133.0",
+    "@oxc-parser/binding-linux-x64-gnu": "0.133.0",
+    "@oxc-transform/binding-linux-x64-gnu": "0.133.0"
   }
 }

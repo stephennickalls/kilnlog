@@ -13,6 +13,8 @@
     - nav + hero + pricing + final CTAs: to="/register-interest" (was /signup)
       and their beta wording
     - hero kicker, pricing sub-line, hero reassurance line reworded for beta
+    - pricing section: $49 figure hidden, "Pricing announced at launch" shown
+      instead (original markup preserved in the comment at that spot)
   Reverting the CTAs: swap to="/register-interest" back to to="/signup" and
   restore the original button text noted in each BETA-TEMP comment.
 -->
@@ -81,7 +83,7 @@
             <NuxtLink to="/login" class="inline-flex items-center px-6 py-3 border-[1.5px] border-parchment-3 rounded text-[1rem] text-ink-muted hover:border-flame-light hover:text-ink transition-colors">Sign in</NuxtLink>
           </div>
           <!-- BETA-TEMP: was "30 days free · No credit card required · $49 NZD/year after" -->
-          <p class="text-[0.825rem] text-ink-faint">Free early access for selected testers · No credit card · $49 NZD/year after launch</p>
+          <p class="text-[0.825rem] text-ink-faint">Free early access for selected testers</p>
         </div>
 
         <!-- Chart + fire cards grid -->
@@ -277,19 +279,27 @@
         <div class="bg-white border border-parchment-3 rounded-[14px] p-12 shadow-[0_4px_24px_rgba(58,30,8,0.07)] grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-14 items-start">
           <div>
             <span class="inline-block bg-flame-bg border border-flame-light text-flame text-[0.75rem] font-bold uppercase tracking-[0.1em] px-3 py-1 rounded mb-5">Annual plan</span>
-            <div class="flex items-baseline gap-1 mb-2">
-              <span class="text-[1.625rem] font-bold text-ink-muted self-start mt-2">$</span>
-              <span class="text-[4.5rem] font-bold text-ink leading-none tracking-[-0.04em]">49</span>
-              <span class="text-[1.1rem] text-ink-faint">NZD / year</span>
+
+            <!-- BETA-TEMP: price hidden during beta. Was —
+              <div class="flex items-baseline gap-1 mb-2">
+                <span class="text-[1.625rem] font-bold text-ink-muted self-start mt-2">$</span>
+                <span class="text-[4.5rem] font-bold text-ink leading-none tracking-[-0.04em]">49</span>
+                <span class="text-[1.1rem] text-ink-faint">NZD / year</span>
+              </div>
+              <p class="text-[0.9rem] text-ink-faint mb-8">That's just $4.08 per month.</p>
+            -->
+            <div class="mb-2">
+              <span class="text-[2.5rem] font-bold text-ink leading-none tracking-tight">Pricing announced at launch</span>
             </div>
-            <p class="text-[0.9rem] text-ink-faint mb-8">That's just $4.08 per month.</p>
+            <p class="text-[0.9rem] text-ink-faint mb-8">One simple annual plan — priced for potters, not enterprises. Beta testers receive in 12 months free.</p>
+
             <!-- BETA-TEMP: was to="/signup" · "Start 30-day free trial" -->
             <NuxtLink to="/register-interest" class="inline-flex items-center gap-2 bg-flame text-parchment px-8 py-4 rounded text-[1.05rem] font-semibold hover:bg-flame-dark transition-all hover:-translate-y-px">
               Register for free beta access
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </NuxtLink>
             <!-- BETA-TEMP: was "No credit card required to start" -->
-            <p class="text-[0.825rem] text-ink-faint mt-3">Free during beta — selected testers get 12 months free.</p>
+            <p class="text-[0.825rem] text-ink-faint mt-3">Free during beta — no credit card, ever, until launch.</p>
           </div>
 
           <div class="hidden md:block w-px bg-parchment-3 self-stretch"/>
@@ -321,7 +331,7 @@
       </div>
     </section>
 
-       <!-- Footer -->
+    <!-- Footer -->
     <footer class="bg-ink border-t border-white/[0.08] px-10 py-7">
       <div class="max-w-[1200px] mx-auto flex items-center justify-between gap-4 flex-wrap">
         <span class="text-[0.95rem] font-bold text-parchment">KilnMonitor</span>

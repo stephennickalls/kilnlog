@@ -59,106 +59,32 @@
           </div>
         </div>
 
-        <!-- Subscription -->
+        <!-- Membership -->
+        <!--
+          BETA-TEMP: pricing hidden during beta. The original Subscription card
+          (trial countdown, subscribe/portal buttons, past_due grace UI) is
+          preserved in git history — restore it when billing goes live.
+          Grep "BETA-TEMP" to find all beta patches.
+        -->
         <div class="bg-white border border-parchment-3 rounded-2xl overflow-hidden" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
           <div class="px-5 py-4 border-b border-parchment-3">
-            <p class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Subscription</p>
+            <p class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Membership</p>
           </div>
-          <div class="px-5 py-4 flex flex-col gap-4">
-
-            <template v-if="profile?.subscription_status === 'trialing'">
-              <div class="flex items-center justify-between">
-                <span class="text-sm text-ink-muted">Status</span>
-                <span class="px-2.5 py-1 text-xs font-bold rounded-full bg-orange-50 text-orange-700 border border-orange-200">Free Trial</span>
-              </div>
-              <div class="flex items-center justify-between">
-                <span class="text-sm text-ink-muted">Trial ends</span>
-                <span class="text-sm font-semibold text-ink">{{ formatDate(profile.trial_ends_at) }}</span>
-              </div>
-              <p class="text-xs text-ink-faint">{{ daysLeft }} day{{ daysLeft !== 1 ? 's' : '' }} remaining</p>
-              <button
-                class="w-full py-2.5 bg-flame text-parchment text-sm font-bold rounded-xl hover:bg-flame-dark transition-colors disabled:opacity-50"
-                :disabled="billingLoading"
-                @click="checkout"
-              >
-                <span v-if="billingLoading" class="flex items-center justify-center gap-2">
-                  <span class="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin"/>
-                  Redirecting…
-                </span>
-                <span v-else>Subscribe now — $49 NZD/yr</span>
-              </button>
-            </template>
-
-            <template v-else-if="profile?.subscription_status === 'active'">
-              <div class="flex items-center justify-between">
-                <span class="text-sm text-ink-muted">Status</span>
-                <span class="px-2.5 py-1 text-xs font-bold rounded-full bg-green-50 text-green-700 border border-green-200">Active</span>
-              </div>
-              <div v-if="profile.subscription_ends_at" class="flex items-center justify-between">
-                <span class="text-sm text-ink-muted">Renews</span>
-                <span class="text-sm font-semibold text-ink">{{ formatDate(profile.subscription_ends_at) }}</span>
-              </div>
-              <button
-                class="w-full py-2.5 border border-parchment-3 text-ink-muted text-sm font-semibold rounded-xl hover:bg-parchment-2 transition-colors disabled:opacity-50"
-                :disabled="billingLoading"
-                @click="portal"
-              >
-                <span v-if="billingLoading" class="flex items-center justify-center gap-2">
-                  <span class="w-3.5 h-3.5 border-2 border-parchment-3 border-t-ink-muted rounded-full animate-spin"/>
-                  Redirecting…
-                </span>
-                <span v-else>Manage billing →</span>
-              </button>
-            </template>
-
-            <!-- G8: failed payment, still inside the grace window. -->
-            <template v-else-if="profile?.subscription_status === 'past_due' && inGrace">
-              <div class="flex items-center justify-between">
-                <span class="text-sm text-ink-muted">Status</span>
-                <span class="px-2.5 py-1 text-xs font-bold rounded-full bg-amber-50 text-amber-700 border border-amber-200">Payment failed</span>
-              </div>
-              <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-relaxed">
-                We couldn't charge your card. Your access stays on until
-                <span class="font-semibold">{{ graceEndsLabel }}</span> — update your
-                payment method to keep it active.
-              </p>
-              <button
-                class="w-full py-2.5 bg-flame text-parchment text-sm font-bold rounded-xl hover:bg-flame-dark transition-colors disabled:opacity-50"
-                :disabled="billingLoading"
-                @click="portal"
-              >
-                <span v-if="billingLoading" class="flex items-center justify-center gap-2">
-                  <span class="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin"/>
-                  Redirecting…
-                </span>
-                <span v-else>Update payment method →</span>
-              </button>
-            </template>
-
-            <template v-else>
-              <div class="flex items-center justify-between">
-                <span class="text-sm text-ink-muted">Status</span>
-                <span class="px-2.5 py-1 text-xs font-bold rounded-full bg-parchment-2 text-ink-faint border border-parchment-3">Inactive</span>
-              </div>
-              <p class="text-xs text-ink-muted">Your subscription is not active.</p>
-              <button
-                class="w-full py-2.5 bg-flame text-parchment text-sm font-bold rounded-xl hover:bg-flame-dark transition-colors disabled:opacity-50"
-                :disabled="billingLoading"
-                @click="checkout"
-              >
-                <span v-if="billingLoading" class="flex items-center justify-center gap-2">
-                  <span class="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin"/>
-                  Redirecting…
-                </span>
-                <span v-else>Resubscribe — $49 NZD/yr</span>
-              </button>
-            </template>
-
-            <!-- Billing error -->
-            <p v-if="billingError" class="text-xs text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-              {{ billingError }}
+          <div class="px-5 py-4 flex flex-col gap-3">
+            <div class="flex items-center justify-between">
+              <span class="text-sm text-ink-muted">Status</span>
+              <span class="px-2.5 py-1 text-xs font-bold rounded-full bg-flame-bg text-flame border border-flame/30">Beta tester</span>
+            </div>
+            <p class="text-xs text-ink-muted leading-relaxed">
+              You're on free access as a KilnMonitor beta tester — thank you for
+              helping shape the app. We'll be in touch well before any pricing
+              kicks in.
             </p>
-
+            <p class="text-xs text-ink-muted leading-relaxed">
+              Found a bug, or have an idea? Email
+              <a href="mailto:kilnmonitor@gmail.com?subject=KilnMonitor%20beta%20feedback" class="text-flame font-semibold hover:underline">kilnmonitor@gmail.com</a>
+              — every message gets read.
+            </p>
           </div>
         </div>
 
@@ -234,7 +160,7 @@
 definePageMeta({ middleware: 'auth' })
 
 // G8 — keep in sync with PAST_DUE_GRACE_DAYS in server/utils/useServerUser.js
-// and app/middleware/auth.js.
+// and app/middleware/auth.js. (BETA-TEMP: unused while pricing is hidden.)
 const PAST_DUE_GRACE_DAYS = 7
 
 const supabase     = useSupabaseClient()
@@ -242,6 +168,7 @@ const { exportAllData, deleteAccount } = useAccountData()   // G7
 
 const loading      = ref(true)
 const loadError    = ref('')
+// BETA-TEMP: billing state unused while pricing is hidden; kept for revert.
 const billingLoading = ref(false)
 const billingError = ref('')
 const user         = ref(null)
@@ -273,6 +200,10 @@ async function load() {
 }
 
 onMounted(load)
+
+// BETA-TEMP: the computeds and billing functions below are unreferenced while
+// the beta Membership card replaces the Subscription card. Kept intact for the
+// pricing revert — do not delete.
 
 const daysLeft = computed(() => {
   if (!profile.value?.trial_ends_at) return 0

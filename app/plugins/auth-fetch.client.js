@@ -1,23 +1,19 @@
 // app/plugins/auth-fetch.client.js
 //
-// Injects the Supabase Bearer token into every $fetch call.
-// Caches the token in memory and only calls getSession() when:
-//   1. We have no token yet, or
-//   2. The token expires within the next 60 seconds
-// This eliminates a Supabase round trip on every single API call.
+// Injects the Supabase Bearer token into every $fetch call and self-heals 401s.
 //
-// SELF-HEALING (Jul 2026): a stale cached token used to be a dead end — if the
-// access token expired and the silent refresh failed or raced (back-navigation,
-// tab sleep, refresh-token rotation from a second device), every /api/* call
-// 401'd forever and the app sat "logged in" but broken. Now any 401 response:
-//   1. clears the token cache,
-//   2. forces ONE session refresh (deduped across concurrent 401s),
-//   3. retries the request once with the fresh token (ofetch retry re-runs
-//      onRequest, which picks up the new token),
-//   4. and if the refresh proves there is genuinely no session, hard-redirects
-//      to /login (full page load, so all SPA state resets cleanly).
-// Retrying on 401 is safe for mutations: the server rejected auth before doing
-// any work, so no side effect can be duplicated.
+// HOW THE INTERCEPT WORKS (Jul 2026 fix): components use Nuxt's auto-imported
+// $fetch, which is bound at BUILD time — so the old `globalThis.$fetch = ...`
+// patch alone was never in the call path, and every /api/* request went out
+// with no Authorization header (the beta 401 bug). The named `$fetch` export
+// at the bottom of this file is now the auto-import target (see the imports
+// override in nuxt.config.ts); it delegates lazily to globalThis.$fetch,
+// which this plugin patches before any component code runs.
+//
+// SELF-HEALING: any 401 clears the token cache, forces ONE deduped session
+// refresh, retries the request once with the fresh token, and hard-redirects
+// to /login if there is genuinely no session. Retrying on 401 is safe for
+// mutations: the server rejected auth before doing any work.
 
 export default defineNuxtPlugin(() => {
   const supabase = useSupabaseClient()
@@ -30,12 +26,12 @@ export default defineNuxtPlugin(() => {
     const now = Math.floor(Date.now() / 1000)
 
     // Return cached token if it's still valid for more than 60 seconds
-    if (cachedToken && cachedExpiry - now > 60) {
-      return cachedToken
-    }
+    if (cachedToken && cachedExpiry - now > 60) return cachedToken
 
     // Fetch a fresh session — this will auto-refresh if needed
-    const { data: { session } } = await supabase.auth.getSession()
+    const { data: { session }, error } = await supabase.auth.getSession()
+    if (error) console.warn('[auth-fetch] getSession failed:', error.message)
+
     if (!session?.access_token) {
       cachedToken  = null
       cachedExpiry = 0
@@ -48,8 +44,7 @@ export default defineNuxtPlugin(() => {
   }
 
   // One forced refresh at a time — a burst of parallel 401s (bootstrap +
-  // preferences + firings) must not fire three competing refresh calls, which
-  // is exactly the rotation race that causes this mess in the first place.
+  // preferences + firings) must not fire competing refresh calls.
   function forceRefresh() {
     if (!refreshing) {
       refreshing = supabase.auth
@@ -80,10 +75,10 @@ export default defineNuxtPlugin(() => {
     onRequest: async ({ options }) => {
       const token = await getToken()
       if (token) {
-        options.headers = {
-          ...options.headers,
-          Authorization: `Bearer ${token}`,
-        }
+        // Headers-safe merge — spreading a Headers instance yields {}.
+        const h = new Headers(options.headers)
+        h.set('Authorization', `Bearer ${token}`)
+        options.headers = h
       }
     },
 
@@ -101,9 +96,8 @@ export default defineNuxtPlugin(() => {
         return  // ofetch retries; onRequest attaches the fresh token
       }
 
-      // No recoverable session. Don't leave the SPA in half-authed limbo —
-      // full-reload to /login resets everything (plugin cache, useState,
-      // component state). Skip if we're already on a public auth page.
+      // No recoverable session. Full-reload to /login resets everything
+      // (plugin cache, useState, component state). Skip on public pages.
       if (error) console.warn('Session refresh failed after 401:', error)
       const path = window.location.pathname
       const publicPaths = ['/login', '/signup', '/forgot-password', '/reset-password', '/register-interest', '/confirm', '/subscribe']
@@ -113,3 +107,12 @@ export default defineNuxtPlugin(() => {
     },
   })
 })
+
+// ── Auto-import target ───────────────────────────────────────────────────────
+// nuxt.config.ts routes the `$fetch` auto-import here. Lazy delegation:
+// globalThis.$fetch is the patched instance by the time any component calls it.
+const delegatingFetch = (...args) => globalThis.$fetch(...args)
+delegatingFetch.raw    = (...args) => globalThis.$fetch.raw(...args)
+delegatingFetch.native = (...args) => globalThis.$fetch.native(...args)
+delegatingFetch.create = (...args) => globalThis.$fetch.create(...args)
+export { delegatingFetch as $fetch }

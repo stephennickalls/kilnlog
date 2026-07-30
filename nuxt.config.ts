@@ -23,6 +23,11 @@
 // IMPORTANT: the Supabase origin must appear literally in connect-src. It is
 // read from SUPABASE_URL at build time below. If that env var is absent at
 // build, the wildcard *.supabase.co fallback keeps Supabase reachable.
+//
+// AUTH FIX (Jul 2026): the `imports` block routes the $fetch auto-import
+// through app/plugins/auth-fetch.client.js so its interceptors (Bearer token,
+// 401 self-heal) apply to every component call. Without this, components bind
+// the stock ofetch $fetch at build time and API calls go out unauthenticated.
 
 const SUPABASE_ORIGIN = (() => {
   try {
@@ -76,6 +81,13 @@ export default defineNuxtConfig({
       tailwindcss: {},
       autoprefixer: {},
     },
+  },
+
+  // AUTH FIX (Jul 2026) — see header comment.
+  imports: {
+    imports: [
+      { name: '$fetch', from: '~/plugins/auth-fetch.client', priority: 20 },
+    ],
   },
 
   // S9 — security headers on every route. The webhook route is exempted from

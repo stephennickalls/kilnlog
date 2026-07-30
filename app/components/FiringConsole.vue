@@ -28,6 +28,10 @@
   open, "End reduction" when one is in progress. Emits a single 'reduction' action;
   the parent captures the current temperature and calls the API.
 
+  NOTES (Jul 2026): the overflow menu also carries a 'notes' action, sitting with
+  recalibrate / reduction / end. It emits only — app.vue owns the modal and the
+  PUT (firings.notes already exists server-side; no API work was needed).
+
   G1 (°F): currentTemp / targetTemp arrive as raw °C numbers and are converted
   for display via useTempUnit. The on-track / ahead / behind comparison stays in
   °C (both operands °C), and the difference shown to the user is converted with
@@ -112,6 +116,10 @@
           <button v-if="isLive" class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-indigo-700 hover:bg-indigo-50 transition-colors text-left" @click="emitAction('reduction')">
             <span class="text-base">{{ reductionOpen ? '⊟' : '⊞' }}</span> {{ reductionOpen ? 'End reduction' : 'Start reduction' }}
           </button>
+          <!-- Notes — parent owns the modal + PUT -->
+          <button class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-ink hover:bg-parchment-2 transition-colors text-left" @click="emitAction('notes')">
+            <span class="text-base">📝</span> Notes
+          </button>
           <div class="h-px bg-parchment-3 my-0.5 mx-2"/>
           <button class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-red-500 hover:bg-red-50 transition-colors text-left" @click="emitAction('end')">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5.64 5.64a9 9 0 1012.72 0M12 3v9"/></svg>
@@ -177,6 +185,8 @@
           <button v-if="isLive" class="w-full py-3 border border-indigo-200 bg-indigo-50 text-indigo-700 text-sm font-bold rounded-xl" @click="emitAction('reduction')">
             {{ reductionOpen ? '⊟ End reduction' : '⊞ Start reduction' }}
           </button>
+          <!-- Notes — parent owns the modal + PUT -->
+          <button class="w-full py-3 border border-parchment-3 bg-white text-ink text-sm font-bold rounded-xl" @click="emitAction('notes')">📝 Notes</button>
           <button class="w-full py-3 border border-red-300 text-red-500 text-sm font-bold rounded-xl" @click="emitAction('end')">End firing</button>
           <button class="w-full py-2.5 border border-parchment-3 text-ink-muted text-sm font-semibold rounded-xl mt-1" @click="menuOpen = false">Cancel</button>
         </div>
@@ -207,7 +217,7 @@ const props = defineProps({
   reductionOpen: { type: Boolean, default: false },   // G11
 })
 
-const emit = defineEmits(['open-temp', 'log-reading', 'pause', 'resume', 'recalibrate', 'end', 'reduction'])
+const emit = defineEmits(['open-temp', 'log-reading', 'pause', 'resume', 'recalibrate', 'end', 'reduction', 'notes'])
 
 const { displayTemp, displayDelta, unitLabel } = useTempUnit()
 

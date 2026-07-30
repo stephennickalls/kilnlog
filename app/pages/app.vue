@@ -81,6 +81,7 @@
               @recalibrate="openRecalibrate"
               @end="showEndConfirm = true"
               @reduction="onToggleReduction"
+              @notes="openNotes"
             />
             <FiringReview
               v-else
@@ -125,6 +126,37 @@
           <div class="flex gap-2 mt-4">
             <button class="flex-1 py-2.5 bg-celadon hover:bg-celadon-dark text-white text-sm font-bold rounded-lg transition-colors" @click="recalibrate">Recalibrate now</button>
             <button class="px-4 py-2.5 border border-parchment-3 text-ink-muted text-sm font-semibold rounded-lg hover:bg-parchment-2 transition-colors" @click="showRecalibrateInfo = false">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- ── Notes modal ───────────────────────────────────────────────────────── -->
+    <!-- Triggered from FiringConsole's overflow menu (@notes). firings.notes
+         already existed server-side (POST /api/firings + PUT /api/firings/:id
+         both accept it); this is the UI that was missing. -->
+    <Teleport to="body">
+      <div v-if="showNotesModal" class="fixed inset-0 z-[70] flex items-end sm:items-center justify-center" style="background:rgba(26,18,8,0.6)" @click.self="showNotesModal = false">
+        <div class="bg-parchment w-full sm:w-[440px] sm:rounded-2xl rounded-t-2xl p-5 sm:p-6 flex flex-col gap-3 border border-parchment-3" style="box-shadow:0 -8px 40px rgba(26,18,8,0.15)">
+          <div class="flex flex-col gap-0.5">
+            <h2 class="text-base font-bold text-ink">Notes</h2>
+            <p class="text-xs text-ink-muted truncate">{{ selectedFiring?.name }}</p>
+          </div>
+          <textarea
+            v-model="notesDraft"
+            rows="7"
+            maxlength="5000"
+            class="input !py-2 resize-y leading-relaxed"
+            placeholder="Load, atmosphere, glaze tests, anything worth remembering…"
+          />
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-[11px] text-ink-faint tabular-nums">{{ notesDraft.length }}/5000</span>
+            <div class="flex gap-2">
+              <button class="btn-ghost !py-2" :disabled="notesSaving" @click="showNotesModal = false">Cancel</button>
+              <button class="btn-primary !py-2" :disabled="notesSaving" @click="saveNotes">
+                {{ notesSaving ? 'Saving…' : 'Save notes' }}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -314,6 +346,11 @@ const sidebarWidth         = ref(280)
 const MIN_WIDTH            = 180
 const isDragging           = ref(false)
 const nowUnix              = ref(Math.floor(Date.now() / 1000))
+
+// Notes modal (firings.notes — CRUD already exists on the API)
+const showNotesModal = ref(false)
+const notesDraft     = ref('')
+const notesSaving    = ref(false)
 
 let elapsedTickInterval = null
 
@@ -553,6 +590,37 @@ async function createFiring(payload) {
     await selectFiring({ id: firing.id })
   } catch (err) {
     toast.show(err?.data?.statusMessage ?? err?.data?.message ?? 'Could not start firing.')
+  }
+}
+
+// ── Notes ────────────────────────────────────────────────────────────────────
+// Opened from FiringConsole's overflow menu. The draft is seeded from the
+// selected firing each time the modal opens, so cancelling discards cleanly.
+function openNotes() {
+  notesDraft.value = selectedFiring.value?.notes ?? ''
+  showNotesModal.value = true
+}
+
+async function saveNotes() {
+  const f = selectedFiring.value
+  if (!f) return
+  notesSaving.value = true
+  try {
+    // Empty string → null so the DB doesn't hold blank strings (the server
+    // does the same coercion; sending null is just explicit).
+    const updated = await $fetch(`/api/firings/${f.id}`, {
+      method: 'PUT',
+      body: { notes: notesDraft.value.trim() || null },
+    })
+    selectedFiring.value = { ...f, notes: updated.notes }
+    const i = allFirings.value.findIndex(x => x.id === f.id)
+    if (i !== -1) allFirings.value[i] = { ...allFirings.value[i], notes: updated.notes }
+    showNotesModal.value = false
+    toast.show('Notes saved.', 'success')
+  } catch (err) {
+    toast.show(`Couldn\u2019t save notes: ${err?.data?.statusMessage ?? err?.data?.message ?? 'Unknown error'}`)
+  } finally {
+    notesSaving.value = false
   }
 }
 

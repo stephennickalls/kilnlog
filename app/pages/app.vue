@@ -93,6 +93,7 @@
               @save-as-schedule="saveAsSchedule"
               @restart="restartFiring"
               @export="onExportFiring"
+              @notes="openNotes"
             />
           </div>
 

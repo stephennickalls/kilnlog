@@ -245,6 +245,15 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
         ctx.moveTo(left, chartArea.top)
         ctx.lineTo(left, chartArea.bottom)
         ctx.stroke()
+        // REDUCTION-TIME: closed bands get a dashed RIGHT edge too, so the end
+        // is as legible as the start. Open bands stay right-edge-less — their
+        // edge is the advancing NOW.
+        if (!band.open) {
+          ctx.beginPath()
+          ctx.moveTo(right, chartArea.top)
+          ctx.lineTo(right, chartArea.bottom)
+          ctx.stroke()
+        }
         ctx.setLineDash([])
 
         if (width > 30) {

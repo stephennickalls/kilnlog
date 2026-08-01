@@ -111,15 +111,11 @@
       </button>
 
       <!-- REDUCTION TOGGLE (lg+): same block form as Log reading / Cone down,
-           so the three live actions read as one family. Closed → cobalt tint
-           "Start reduction"; open → solid cobalt with a pulsing dot, and the
-           same button ends it. -->
+           solid cobalt like its siblings, darker on hover. State lives in the
+           label + pulsing dot: "Reduction" closed, "End reduction" + pulse open. -->
       <button
         v-if="isLive"
-        class="w-28 shrink-0 rounded-xl flex flex-col items-center justify-center gap-1 transition-colors"
-        :class="reductionOpen
-          ? 'bg-cobalt hover:bg-cobalt-dark text-white'
-          : 'bg-cobalt-bg border border-cobalt/30 text-cobalt-dark hover:bg-cobalt hover:text-white hover:border-cobalt'"
+        class="w-28 shrink-0 bg-cobalt hover:bg-cobalt-dark active:bg-cobalt-dark text-white rounded-xl flex flex-col items-center justify-center gap-1 transition-colors"
         @click="$emit('reduction')"
       >
         <span class="text-xl leading-none flex items-center gap-1.5">
@@ -213,14 +209,11 @@
       </button>
 
       <!-- REDUCTION TOGGLE: standalone beside the cone button when there's
-           room (same showConeButton condition). Closed → cobalt tint; open →
-           solid cobalt with pulse. Otherwise it stays in the ⋮ sheet. -->
+           room (same showConeButton condition). Solid cobalt like its
+           siblings; state lives in the label + pulsing dot. -->
       <button
         v-if="isLive && showConeButton"
-        class="hidden md:flex shrink-0 w-[88px] rounded-2xl flex-col items-center justify-center gap-1 transition-colors"
-        :class="reductionOpen
-          ? 'bg-cobalt active:bg-cobalt-dark text-white'
-          : 'bg-cobalt-bg border border-cobalt/30 text-cobalt-dark active:bg-cobalt active:text-white'"
+        class="hidden md:flex shrink-0 w-[88px] bg-cobalt active:bg-cobalt-dark text-white rounded-2xl flex-col items-center justify-center gap-1 transition-colors"
         @click="$emit('reduction')"
       >
         <span class="text-base leading-none flex items-center gap-1">

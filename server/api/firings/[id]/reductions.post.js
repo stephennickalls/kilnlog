@@ -5,6 +5,10 @@
 // Opens a period with end_temp = null. The partial unique index
 // reduction_one_open_per_firing guarantees only one open period at a time;
 // a second start while one is open returns 409.
+//
+// REDUCTION-TIME (Aug 2026): created_at is the band's time anchor on the
+// chart; ended_at (null while open) is returned so the client-side row shape
+// matches what the PUT returns on close.
 const MIN_TEMP = -200
 const MAX_TEMP = 1400
 
@@ -27,7 +31,7 @@ export default defineEventHandler(async (event) => {
   const { data, error } = await db
     .from('reduction_periods')
     .insert({ firing_id: firingId, start_temp: startTemp, end_temp: null })
-    .select('id, start_temp, end_temp, created_at')
+    .select('id, start_temp, end_temp, created_at, ended_at')
     .single()
 
   if (error) {

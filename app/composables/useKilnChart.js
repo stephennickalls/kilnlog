@@ -18,6 +18,15 @@
 //   - setUnit() lets the parent force a re-render (axis ticks + labels) when the
 //     user flips the toggle. The unit ref is captured once; we read .value at
 //     draw/format time so it's always current, and setUnit() triggers a redraw.
+//
+// CONE DROPS CHANGE SUMMARY (Aug 2026, search "CONE DROPS"):
+//   - coneDropsPlugin: ▽ marker + cone label at each witnessed drop,
+//     afterDatasetsDraw (on top, same layer as the now-line). y-position is the
+//     snapshotted temp_at_drop when present, else the actual curve at that
+//     minute; the marker floats above the line so it never sits on the stroke.
+//   - setConeDrops(drops, startedAt) maps rows → { cone, minutes, tempC } and
+//     caches in lastConeDrops (already-mapped, so rebuild needs no replay call —
+//     the plugin reads the cache directly).
 
 import { nextTick } from 'vue'
 import { Chart, registerables } from 'chart.js'
@@ -53,6 +62,8 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
   let lastSchedule   = { points: [], offset: 0 }
   let lastReadings   = { rows: [], startedAt: 0 }
   let lastReductions = []
+  let lastReductionsStartedAt = 0   // REDUCTION-TIME: firing start for time-anchored bands
+  let lastConeDrops  = []        // CONE DROPS: [{ cone, minutes, tempC|null }]
 
   let reductionBands = []        // G11: { startX, endX, open } in minutes
   let nowLine = null             // NOW-LINE: null | { minutes, targetTemp (°C) }
@@ -117,7 +128,28 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     return null
   }
 
+  // REDUCTION-TIME: like minuteAtTemp, but only considers crossings at or
+  // after fromX — used to place a legacy closed reduction's end without
+  // snapping back to an earlier crossing of the same temperature.
+  function minuteAtTempAfter(actualPoints, temp, fromX) {
+    if (!actualPoints.length) return null
+    for (let i = 0; i < actualPoints.length - 1; i++) {
+      const a = actualPoints[i], b = actualPoints[i + 1]
+      if (b.x < fromX) continue
+      const lo = Math.min(a.y, b.y), hi = Math.max(a.y, b.y)
+      if (temp >= lo && temp <= hi) {
+        const span = b.y - a.y
+        const frac = span === 0 ? 0 : (temp - a.y) / span
+        const x = a.x + frac * (b.x - a.x)
+        if (x >= fromX) return x
+      }
+    }
+    return null
+  }
+
   // NOW-LINE: map x(minute) → planned curve's y(temp, °C). Stays °C.
+  // (Generic linear interpolation over {x,y} points — CONE DROPS reuses it
+  // against the ACTUAL curve as the fallback y-position.)
   function targetAtMinute(plannedPoints, minute) {
     if (!plannedPoints.length) return null
     if (minute <= plannedPoints[0].x) return plannedPoints[0].y
@@ -134,10 +166,46 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     return null
   }
 
+  // REDUCTION-TIME FIX (Aug 2026): live-firing reductions anchor by TIME.
+  // The old temp-only mapping had two live bugs: (1) "start reduction" used the
+  // last reading's temp, so the band's left edge sat at that PAST reading's
+  // minute instead of NOW, and (2) once the next reading landed, the band
+  // appeared to have been running across the whole gap. Now: rows carrying
+  // created_at (all firing reductions) map start = created_at, end = ended_at
+  // or the live NOW minute while open. Rows without timestamps (library
+  // schedules' planned reductions, which have no timeline) keep the original
+  // temp → actual-curve mapping.
   function computeReductionBands() {
     const actual = chart?.data?.datasets?.[1]?.data ?? []
+    const startedAt = lastReductionsStartedAt
     const bands = []
     for (const p of lastReductions) {
+      const open = p.end_temp == null && !p.ended_at
+
+      if (startedAt && p.created_at) {
+        // Time-anchored (live/ended firing rows)
+        const startX = (p.created_at - startedAt) / 60
+        let endX
+        if (p.ended_at) {
+          endX = (p.ended_at - startedAt) / 60
+        } else if (open) {
+          endX = (Date.now() / 1000 - startedAt) / 60          // tracks NOW
+        } else {
+          // Legacy/degraded closed row (end_temp set, ended_at missing — old
+          // data, or a PUT that didn't return ended_at). The FIRST crossing of
+          // end_temp is usually ≤ startX (you end near the temp you started),
+          // which used to collapse the band to a sliver. Scan for a crossing
+          // AFTER startX instead; if none, extend to the last reading.
+          const e = minuteAtTempAfter(actual, p.end_temp, startX)
+          endX = e !== null ? e
+               : (actual.length ? Math.max(actual[actual.length - 1].x, startX) : startX)
+        }
+        if (endX < startX) endX = startX
+        bands.push({ startX, endX, open })
+        continue
+      }
+
+      // Temp-anchored fallback (planned/library reductions)
       const startX = minuteAtTemp(actual, p.start_temp)
       if (startX === null) continue
       let endX
@@ -148,7 +216,7 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
         endX = e === null ? (actual.length ? actual[actual.length - 1].x : startX) : e
       }
       if (endX < startX) [endX] = [startX]
-      bands.push({ startX, endX, open: p.end_temp == null })
+      bands.push({ startX, endX, open })
     }
     reductionBands = bands
   }
@@ -167,10 +235,10 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
         const right = Math.min(Math.max(xPix1, xPix2), chartArea.right)
         const width = Math.max(right - left, 1.5)
 
-        ctx.fillStyle = band.open ? 'rgba(99,102,241,0.10)' : 'rgba(71,85,105,0.12)'
+        ctx.fillStyle = band.open ? 'rgba(58,90,120,0.10)' : 'rgba(58,90,120,0.14)'
         ctx.fillRect(left, chartArea.top, width, chartArea.bottom - chartArea.top)
 
-        ctx.strokeStyle = band.open ? 'rgba(99,102,241,0.55)' : 'rgba(71,85,105,0.5)'
+        ctx.strokeStyle = band.open ? 'rgba(58,90,120,0.55)' : 'rgba(58,90,120,0.45)'
         ctx.lineWidth = 1
         ctx.setLineDash([3, 3])
         ctx.beginPath()
@@ -181,7 +249,7 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
 
         if (width > 30) {
           ctx.font = 'bold 9px sans-serif'
-          ctx.fillStyle = band.open ? 'rgba(79,70,229,0.9)' : 'rgba(51,65,85,0.8)'
+          ctx.fillStyle = band.open ? 'rgba(40,64,87,0.9)' : 'rgba(40,64,87,0.75)'
           ctx.textAlign = 'left'
           ctx.fillText(band.open ? 'Reduction…' : 'Reduction', left + 4, chartArea.top + 12)
         }
@@ -246,6 +314,51 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     },
   }
 
+  // CONE DROPS: ▽ marker + cone label at each witnessed drop. Drawn on top
+  // (afterDatasetsDraw, same layer as the now-line). Celadon, matching the
+  // Cone-down button — heat-work witnessed is the celadon event. y comes from
+  // the snapshotted temp when present, else the actual curve at that minute;
+  // the marker floats above so it never sits on the orange stroke.
+  const coneDropsPlugin = {
+    id: 'coneDrops',
+    afterDatasetsDraw(chart) {
+      if (!lastConeDrops.length) return
+      const { ctx, chartArea, scales } = chart
+      if (!chartArea || !scales?.x || !scales?.y) return
+      const actual = chart.data.datasets[1]?.data ?? []
+      ctx.save()
+      for (const d of lastConeDrops) {
+        const xPix = scales.x.getPixelForValue(d.minutes)
+        if (xPix < chartArea.left - 0.5 || xPix > chartArea.right + 0.5) continue
+
+        const tempC = d.tempC ?? targetAtMinute(actual, d.minutes)
+        const yPix = tempC == null
+          ? chartArea.top + 26
+          : Math.max(chartArea.top + 22, scales.y.getPixelForValue(tempC) - 20)
+
+        // ▽ marker — celadon (#5f8a78), white stroke for lift off the curves
+        ctx.beginPath()
+        ctx.moveTo(xPix - 8, yPix - 6)
+        ctx.lineTo(xPix + 8, yPix - 6)
+        ctx.lineTo(xPix, yPix + 7)
+        ctx.closePath()
+        ctx.fillStyle = 'rgba(95,138,120,1)'
+        ctx.fill()
+        ctx.strokeStyle = '#fff'
+        ctx.lineWidth = 1.5
+        ctx.stroke()
+
+        // cone label above — celadon-dark
+        ctx.font = 'bold 12px sans-serif'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'bottom'
+        ctx.fillStyle = 'rgba(63,99,84,1)'
+        ctx.fillText(d.cone, xPix, yPix - 10)
+      }
+      ctx.restore()
+    },
+  }
+
   function isAlive() {
     if (!chart || !canvasRef.value) return false
     if (chart.canvas !== canvasRef.value) return false
@@ -267,7 +380,9 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     buildChart()
     if (lastSchedule.points.length) setSchedule(lastSchedule.points, lastSchedule.offset)
     if (lastReadings.rows.length)   setReadings(lastReadings.rows, lastReadings.startedAt)
-    if (lastReductions.length)      setReductions(lastReductions)
+    if (lastReductions.length)      setReductions(lastReductions, lastReductionsStartedAt)
+    // CONE DROPS: lastConeDrops is cached already-mapped; the plugin reads it
+    // directly, so no replay call is needed here.
   }
 
   // autoFitY works in °C (the data space). The axis is °C; only tick LABELS
@@ -308,7 +423,8 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     if (!canvasRef.value) return
     if (chart) { try { chart.destroy() } catch {} }
 
-    const extraPlugins = [reductionBandsPlugin, nowLinePlugin, ...(showLabels ? [curveLabelsPlugin] : [])]
+    // CONE DROPS: coneDropsPlugin added to the always-on set.
+    const extraPlugins = [reductionBandsPlugin, nowLinePlugin, coneDropsPlugin, ...(showLabels ? [curveLabelsPlugin] : [])]
 
     const config = {
       type: 'line',
@@ -474,10 +590,25 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     chart.update('none')
   }
 
-  function setReductions(periods) {
+  function setReductions(periods, startedAt = 0) {
     lastReductions = periods ?? []
+    lastReductionsStartedAt = startedAt || 0   // REDUCTION-TIME
     if (!ensureAlive()) return
     computeReductionBands()
+    chart.update('none')
+  }
+
+  // CONE DROPS: map rows → plugin-ready points. Caches mapped data so a
+  // rebuild redraws markers without a replay call.
+  function setConeDrops(drops, startedAt) {
+    lastConeDrops = (drops ?? [])
+      .filter(d => startedAt && d.dropped_at)
+      .map(d => ({
+        cone:    d.cone,
+        minutes: Math.round((d.dropped_at - startedAt) / 60),
+        tempC:   d.temp_at_drop ?? null,
+      }))
+    if (!ensureAlive()) return
     chart.update('none')
   }
 
@@ -488,6 +619,9 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     const planned = chart.data.datasets[0]?.data ?? []
     const targetTemp = targetAtMinute(planned, minutes)   // °C
     nowLine = { minutes, targetTemp }
+    // REDUCTION-TIME: an open time-anchored band's right edge is NOW, so it
+    // advances with the same tick as the now-line. Cheap — a handful of rows.
+    computeReductionBands()
     const currentMax = chart.options.scales.x.max ?? 0
     if (minutes > currentMax) chart.options.scales.x.max = minutes + 5
     chart.update('none')
@@ -576,6 +710,7 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
 
   return {
     init, setSchedule, setReadings, setReductions,
+    setConeDrops,                                       // CONE DROPS
     setNowLine, clearNowLine,
     setUnit,                                            // G1
     setManualMode, setSignalLost, clearSignalLost, resetZoom, resize, destroy,

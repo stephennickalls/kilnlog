@@ -9,7 +9,7 @@
 //   {
 //     temp_unit:    'C' | 'F',
 //     firings:      [...],          // all firings, newest first (list shape)
-//     activeFiring: {...} | null,   // full detail: schedule+readings+reductions
+//     activeFiring: {...} | null,   // full detail: schedule+readings+reductions+cone_drops
 //   }
 //
 // Round-trip plan inside the function (Supabase queries):
@@ -17,6 +17,9 @@
 //      +1 update only when something is actually stale)
 //   2. Promise.all: firings list + active-firing detail (active id is known
 //      from the sweep's own query of active firings)
+//
+// CONE DROPS (Aug 2026): active-firing detail now nested-selects cone_drops so
+// the chart can draw drop markers on first paint, same pattern as reductions.
 //
 // requireSubscription stays true — /app is a paid surface, same as the routes
 // this replaces (preferences was requireSubscription:false, but it's bundled
@@ -60,7 +63,8 @@ export default defineEventHandler(async (event) => {
         *,
         schedule:schedule(*),
         readings:readings(*),
-        reductions:reduction_periods(id, start_temp, end_temp, created_at)
+        reductions:reduction_periods(id, start_temp, end_temp, created_at, ended_at),
+        cone_drops:cone_drops(id, cone, dropped_at, temp_at_drop)
       `)
       .eq('id', activeId)
       .eq('user_id', user.id)
@@ -75,6 +79,7 @@ export default defineEventHandler(async (event) => {
     data.schedule   = (data.schedule ?? []).sort((a, b) => a.offset_minutes - b.offset_minutes)
     data.readings   = (data.readings ?? []).sort((a, b) => a.timestamp - b.timestamp)
     data.reductions = (data.reductions ?? []).sort((a, b) => a.created_at - b.created_at)
+    data.cone_drops = (data.cone_drops ?? []).sort((a, b) => a.dropped_at - b.dropped_at)
     activeFiring = data
   }
 

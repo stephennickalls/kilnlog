@@ -95,12 +95,40 @@
         <span class="text-xs font-bold uppercase tracking-wide">Log reading</span>
       </button>
 
-      <div class="flex-1"/>
+      <!-- CONE DROPS: standalone action, always broken out at lg+. Solid
+           celadon — the equal-weight twin of the flame Log Reading button
+           (option D). The filled ▽ glyph is the same mark the chart draws at
+           each drop, so button and marker read as one concept. -->
+      <button
+        v-if="isLive"
+        class="w-28 shrink-0 bg-celadon hover:bg-celadon-dark active:bg-celadon-dark text-white rounded-xl flex flex-col items-center justify-center gap-1 transition-colors"
+        @click="$emit('cone-drop')"
+      >
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M4 6 h16 L12 20 Z" stroke-linejoin="round"/>
+        </svg>
+        <span class="text-xs font-bold uppercase tracking-wide">Cone down</span>
+      </button>
 
-      <!-- Reduction in-progress chip (desktop) -->
-      <div v-if="reductionOpen" class="self-center inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 shrink-0">
-        <span class="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"/> Reduction
-      </div>
+      <!-- REDUCTION TOGGLE (lg+): same block form as Log reading / Cone down,
+           so the three live actions read as one family. Closed → cobalt tint
+           "Start reduction"; open → solid cobalt with a pulsing dot, and the
+           same button ends it. -->
+      <button
+        v-if="isLive"
+        class="w-28 shrink-0 rounded-xl flex flex-col items-center justify-center gap-1 transition-colors"
+        :class="reductionOpen
+          ? 'bg-cobalt hover:bg-cobalt-dark text-white'
+          : 'bg-cobalt-bg border border-cobalt/30 text-cobalt-dark hover:bg-cobalt hover:text-white hover:border-cobalt'"
+        @click="$emit('reduction')"
+      >
+        <span class="text-xl leading-none flex items-center gap-1.5">
+          <span v-if="reductionOpen" class="w-2 h-2 rounded-full bg-white animate-pulse"/>{{ reductionOpen ? '⊟' : '⊞' }}
+        </span>
+        <span class="text-xs font-bold uppercase tracking-wide">{{ reductionOpen ? 'End reduction' : 'Reduction' }}</span>
+      </button>
+
+      <div class="flex-1"/>
 
       <div class="relative shrink-0 flex">
         <button class="bg-white border border-parchment-3 rounded-xl flex items-center justify-center w-11 text-ink-muted hover:text-ink hover:border-flame/40 transition-colors" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)" @click="menuOpen = !menuOpen">
@@ -109,17 +137,16 @@
 
         <div v-if="menuOpen" class="fixed inset-0 z-40" @click="menuOpen = false" />
         <div v-if="menuOpen" class="absolute right-0 top-full mt-2 w-52 z-50 bg-white border border-parchment-3 rounded-xl p-1.5 flex flex-col gap-0.5" style="box-shadow:0 4px 20px rgba(58,30,8,0.12)">
-          <button v-if="isLive && !isPaused" class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-amber-700 hover:bg-amber-50 transition-colors text-left" @click="emitAction('pause')"><span class="text-base">⏸</span> Pause firing</button>
-          <button v-if="isPaused" class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-flame hover:bg-flame-bg transition-colors text-left" @click="emitAction('resume')"><span class="text-base">▶</span> Resume firing</button>
-          <button v-if="isLive && !isPaused" class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-ink hover:bg-flame-bg transition-colors text-left" @click="emitAction('recalibrate')"><span class="text-base">↻</span> Recalibrate</button>
-          <!-- G11: reduction toggle -->
-          <button v-if="isLive" class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-indigo-700 hover:bg-indigo-50 transition-colors text-left" @click="emitAction('reduction')">
-            <span class="text-base">{{ reductionOpen ? '⊟' : '⊞' }}</span> {{ reductionOpen ? 'End reduction' : 'Start reduction' }}
-          </button>
-          <!-- Notes — parent owns the modal + PUT -->
+          <!-- Order matches the mobile sheet: notes, recalibrate, pause/resume, end.
+               No cone or reduction entries here — at lg+ both are standalone
+               controls in the row (celadon button, cobalt toggle).
+               Palette: ink/ink-muted = utilities, flame = resume, red = destructive. -->
           <button class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-ink hover:bg-parchment-2 transition-colors text-left" @click="emitAction('notes')">
             <span class="text-base">📝</span> Notes
           </button>
+          <button v-if="isLive && !isPaused" class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-ink-muted hover:bg-parchment-2 transition-colors text-left" @click="emitAction('recalibrate')"><span class="text-base">↻</span> Recalibrate</button>
+          <button v-if="isLive && !isPaused" class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-ink-muted hover:bg-parchment-2 transition-colors text-left" @click="emitAction('pause')"><span class="text-base">⏸</span> Pause firing</button>
+          <button v-if="isPaused" class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-flame hover:bg-flame-bg transition-colors text-left" @click="emitAction('resume')"><span class="text-base">▶</span> Resume firing</button>
           <div class="h-px bg-parchment-3 my-0.5 mx-2"/>
           <button class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-red-500 hover:bg-red-50 transition-colors text-left" @click="emitAction('end')">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5.64 5.64a9 9 0 1012.72 0M12 3v9"/></svg>
@@ -134,9 +161,12 @@
          menu is OUTSIDE the overflow-hidden pill so LOG cannot overlap it. -->
     <div class="lg:hidden flex items-stretch gap-2">
 
-      <!-- Pill: text zone + LOG — BRAND ink+glow ground; LOG stays flame -->
+      <!-- Pill: text zone + LOG — BRAND ink+glow ground; LOG stays flame.
+           md: cap the width — a phone-shaped stats pill stretched across an
+           iPad reads badly (huge empty ink field), so it stops growing at
+           460px and the actions sit beside it. -->
       <div
-        class="flex-1 min-w-0 bg-ink border border-white/10 rounded-2xl flex items-stretch overflow-hidden"
+        class="flex-1 min-w-0 md:max-w-[460px] bg-ink border border-white/10 rounded-2xl flex items-stretch overflow-hidden"
         style="box-shadow:0 2px 12px rgba(34,23,8,0.25); background-image: radial-gradient(ellipse at 18% 40%, rgba(184,85,28,0.35) 0%, transparent 60%)"
       >
         <button class="flex-1 min-w-0 overflow-hidden px-3.5 py-3 text-left flex flex-col justify-center gap-1" @click="$emit('open-temp')">
@@ -158,7 +188,7 @@
           <!-- Rate line -->
           <div class="flex items-center gap-2 mt-0.5">
             <span class="text-[11px] text-parchment-4/80 whitespace-nowrap">Rate <b class="font-bold" :class="rateColorClassDark">{{ rateShort }}</b><span class="text-parchment-4/50">/{{ targetRate }}</span></span>
-            <span v-if="reductionOpen" class="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-300 shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"/>Reduction</span>
+            <span v-if="reductionOpen" class="inline-flex items-center gap-1 text-[11px] font-bold text-cobalt-light shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-cobalt-light animate-pulse"/>Reduction</span>
           </div>
         </button>
 
@@ -167,6 +197,37 @@
           <span class="text-[10px] font-bold uppercase">Log</span>
         </button>
       </div>
+
+      <!-- CONE DROPS: standalone button when the parent says there's room
+           (≥ iPad-portrait width with the sidebar closed). Solid celadon,
+           matching the lg version (option D). Otherwise it stays in the ⋮ menu. -->
+      <button
+        v-if="isLive && showConeButton"
+        class="hidden md:flex shrink-0 w-[88px] bg-celadon active:bg-celadon-dark text-white rounded-2xl flex-col items-center justify-center gap-1 transition-colors"
+        @click="$emit('cone-drop')"
+      >
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M4 6 h16 L12 20 Z" stroke-linejoin="round"/>
+        </svg>
+        <span class="text-[10px] font-bold uppercase">Cone down</span>
+      </button>
+
+      <!-- REDUCTION TOGGLE: standalone beside the cone button when there's
+           room (same showConeButton condition). Closed → cobalt tint; open →
+           solid cobalt with pulse. Otherwise it stays in the ⋮ sheet. -->
+      <button
+        v-if="isLive && showConeButton"
+        class="hidden md:flex shrink-0 w-[88px] rounded-2xl flex-col items-center justify-center gap-1 transition-colors"
+        :class="reductionOpen
+          ? 'bg-cobalt active:bg-cobalt-dark text-white'
+          : 'bg-cobalt-bg border border-cobalt/30 text-cobalt-dark active:bg-cobalt active:text-white'"
+        @click="$emit('reduction')"
+      >
+        <span class="text-base leading-none flex items-center gap-1">
+          <span v-if="reductionOpen" class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"/>{{ reductionOpen ? '⊟' : '⊞' }}
+        </span>
+        <span class="text-[10px] font-bold uppercase">{{ reductionOpen ? 'End red.' : 'Reduce' }}</span>
+      </button>
 
       <!-- Standalone menu (sheet teleported below to escape overflow-hidden) -->
       <button class="shrink-0 w-12 bg-white border border-parchment-3 rounded-2xl flex items-center justify-center text-ink-muted active:bg-parchment-2 transition-colors" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)" @click="menuOpen = !menuOpen">
@@ -179,14 +240,22 @@
       <div v-if="menuOpen" class="lg:hidden fixed inset-0 z-[80] flex flex-col justify-end font-serif" style="background:rgba(26,18,8,0.6)" @click.self="menuOpen = false">
         <div class="bg-parchment rounded-t-2xl p-3 flex flex-col gap-2">
           <div class="flex justify-center pb-1"><div class="w-10 h-1 bg-parchment-3 rounded-full"/></div>
-          <button v-if="isLive && !isPaused" class="w-full py-3 border border-amber-300 bg-amber-50 text-amber-700 text-sm font-bold rounded-xl" @click="emitAction('pause')">⏸ Pause firing</button>
-          <button v-if="isPaused" class="w-full py-3 bg-flame text-parchment text-sm font-bold rounded-xl active:bg-flame-dark" @click="emitAction('resume')">▶ Resume firing</button>
-          <button v-if="isLive && !isPaused" class="w-full py-3 border border-flame/40 bg-flame-bg text-flame text-sm font-bold rounded-xl" @click="emitAction('recalibrate')">↻ Recalibrate</button>
-          <button v-if="isLive" class="w-full py-3 border border-indigo-200 bg-indigo-50 text-indigo-700 text-sm font-bold rounded-xl" @click="emitAction('reduction')">
+          <!-- Order: cone down, reduction, notes, recalibrate, pause/resume, end.
+               Palette (option 3, "two solids"): the two firing EVENTS are loud
+               solids — celadon = cone down (heat-work), cobalt = reduction
+               (atmosphere) — utilities are silent white, resume is flame, end
+               is red. Cone entry hides when the standalone button is broken
+               out beside the pill (showConeButton, md+). -->
+          <button v-if="isLive && !showConeButton" class="w-full py-3 bg-celadon active:bg-celadon-dark text-white text-sm font-bold rounded-xl transition-colors" @click="emitAction('cone-drop')">
+            <svg class="w-4 h-4 inline -mt-0.5 mr-1.5" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6 h16 L12 20 Z" stroke-linejoin="round"/></svg>Cone down
+          </button>
+          <button v-if="isLive && !showConeButton" class="w-full py-3 bg-cobalt active:bg-cobalt-dark text-white text-sm font-bold rounded-xl transition-colors" @click="emitAction('reduction')">
             {{ reductionOpen ? '⊟ End reduction' : '⊞ Start reduction' }}
           </button>
-          <!-- Notes — parent owns the modal + PUT -->
           <button class="w-full py-3 border border-parchment-3 bg-white text-ink text-sm font-bold rounded-xl" @click="emitAction('notes')">📝 Notes</button>
+          <button v-if="isLive && !isPaused" class="w-full py-3 border border-parchment-3 bg-white text-ink-muted text-sm font-bold rounded-xl" @click="emitAction('recalibrate')">↻ Recalibrate</button>
+          <button v-if="isLive && !isPaused" class="w-full py-3 border border-parchment-3 bg-white text-ink-muted text-sm font-bold rounded-xl" @click="emitAction('pause')">⏸ Pause firing</button>
+          <button v-if="isPaused" class="w-full py-3 bg-flame text-parchment text-sm font-bold rounded-xl active:bg-flame-dark" @click="emitAction('resume')">▶ Resume firing</button>
           <button class="w-full py-3 border border-red-300 text-red-500 text-sm font-bold rounded-xl" @click="emitAction('end')">End firing</button>
           <button class="w-full py-2.5 border border-parchment-3 text-ink-muted text-sm font-semibold rounded-xl mt-1" @click="menuOpen = false">Cancel</button>
         </div>
@@ -215,9 +284,13 @@ const props = defineProps({
   isLive:        Boolean,
   isPaused:      Boolean,
   reductionOpen: { type: Boolean, default: false },   // G11
+  // CONE DROPS: parent decides when there's room for the standalone button in
+  // the compact tier (iPad portrait with the sidebar closed, etc). The lg+
+  // desktop row always shows it.
+  showConeButton: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['open-temp', 'log-reading', 'pause', 'resume', 'recalibrate', 'end', 'reduction', 'notes'])
+const emit = defineEmits(['open-temp', 'log-reading', 'pause', 'resume', 'recalibrate', 'end', 'reduction', 'notes', 'cone-drop'])
 
 const { displayTemp, displayDelta, unitLabel } = useTempUnit()
 

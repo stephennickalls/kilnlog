@@ -31,6 +31,8 @@
       </div>
       <p class="text-base sm:text-xl font-bold text-ink truncate mt-0.5">{{ firing.name }}</p>
       <p class="text-xs sm:text-sm text-ink-muted mt-0.5 truncate">{{ summary }}</p>
+      <!-- CONE DROPS: witnessed drops, in order, with elapsed time + temp -->
+      <p v-if="coneLine" class="text-xs sm:text-sm text-flame font-semibold mt-0.5 truncate" :title="coneLine">{{ coneLine }}</p>
     </div>
 
     <!-- ── Actions: full row (xl+ only — needs ~620px of its own) ───────────── -->
@@ -163,5 +165,21 @@ const summary = computed(() => {
   const n = props.firing.readings?.length
   if (n) parts.push(`${n} reading${n === 1 ? '' : 's'}`)
   return parts.join(' · ') || 'No readings logged'
+})
+
+// CONE DROPS: "▽ 04 at 6h 10m · ▽ 6 at 7h 32m (1214°C)"
+const coneLine = computed(() => {
+  const drops = props.firing.cone_drops
+  if (!drops?.length || !props.firing.started_at) return ''
+  return [...drops]
+    .sort((a, b) => a.dropped_at - b.dropped_at)
+    .map(d => {
+      const mins = Math.max(0, Math.round((d.dropped_at - props.firing.started_at) / 60))
+      const t = `${Math.floor(mins / 60)}h ${String(mins % 60).padStart(2, '0')}m`
+      const temp = (d.temp_at_drop !== null && d.temp_at_drop !== undefined)
+        ? ` (${displayTemp(d.temp_at_drop)}${unitLabel.value})` : ''
+      return `▽ ${d.cone} at ${t}${temp}`
+    })
+    .join(' · ')
 })
 </script>

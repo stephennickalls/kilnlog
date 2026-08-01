@@ -2,10 +2,14 @@
 // PUT /api/reductions/:id — end (close) a reduction period.
 // Body: { endTemp: number }  (current reading at the moment of the tap)
 //
-// G11 fast-follow: reductions can run on the COOLING leg (down firing), so the
-// end may be ABOVE or BELOW the start — it just can't equal it (zero-width is
-// meaningless). Matches the loosened DB check (end_temp <> start_temp). We
-// validate here for a clean 400 instead of a 23514 constraint error.
+// REDUCTION-TIME (Aug 2026): periods are now anchored by TIME — created_at
+// opens the band, ended_at (set here) closes it. end_temp is a recorded fact,
+// not geometry, so ANY end temperature is valid: above the start (climbing),
+// below it (kilns routinely stall or dip in reduction — incomplete combustion
+// costs efficiency), or exactly equal. The old "must differ" rule existed only
+// to prevent a zero-width band under temp-anchoring; the matching DB CHECK
+// (end_temp <> start_temp) must be dropped alongside this — see the
+// cone/reduction migration notes.
 const MIN_TEMP = -200
 const MAX_TEMP = 1400
 
@@ -20,30 +24,23 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Invalid end temperature' })
   }
 
-  // Fetch the period; RLS already restricts to periods the caller owns, but
-  // read start_temp so we can validate and give a clear message.
+  // Fetch the period; RLS already restricts to periods the caller owns.
   const { data: period } = await db
     .from('reduction_periods')
-    .select('id, start_temp, end_temp')
+    .select('id, end_temp, ended_at')
     .eq('id', id)
     .single()
 
   if (!period) throw createError({ statusCode: 404, statusMessage: 'Reduction period not found' })
-  if (period.end_temp !== null) {
+  if (period.end_temp !== null || period.ended_at !== null) {
     throw createError({ statusCode: 409, statusMessage: 'This reduction period is already closed.' })
-  }
-  if (endTemp === period.start_temp) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: `End temperature must differ from the start (${Math.round(period.start_temp)}°C).`,
-    })
   }
 
   const { data, error } = await db
     .from('reduction_periods')
-    .update({ end_temp: endTemp })
+    .update({ end_temp: endTemp, ended_at: Math.floor(Date.now() / 1000) })
     .eq('id', id)
-    .select('id, start_temp, end_temp, created_at')
+    .select('id, start_temp, end_temp, created_at, ended_at')
     .single()
 
   if (error) throw await serverError('reductions.end.failed', error, { userId: user.id, reductionId: id })

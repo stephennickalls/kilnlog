@@ -74,6 +74,7 @@
               :is-live="isLive"
               :is-paused="isPaused"
               :reduction-open="!!openReduction"
+              :show-cone-button="coneButtonRoomy"
               @open-temp="showTempModal = true"
               @log-reading="openLogReading"
               @pause="pauseFiring"
@@ -82,6 +83,7 @@
               @end="showEndConfirm = true"
               @reduction="onToggleReduction"
               @notes="openNotes"
+              @cone-drop="openConeSheet"
             />
             <FiringReview
               v-else
@@ -162,6 +164,18 @@
         </div>
       </div>
     </Teleport>
+
+    <!-- CONE DROPS: one-tap witness-cone logging -->
+    <ConeDropSheet
+      :open="showConeSheet"
+      :cones="coneList"
+      :drops="selectedFiring?.cone_drops ?? []"
+      :started-at="selectedFiring?.started_at ?? 0"
+      :busy="coneBusy"
+      @close="showConeSheet = false"
+      @log="logConeDrop"
+      @remove="removeConeDrop"
+    />
 
     <!-- ── End firing confirm modal ──────────────────────────────────────────── -->
     <Teleport to="body">
@@ -347,16 +361,27 @@ const sidebarWidth         = ref(280)
 const MIN_WIDTH            = 180
 const isDragging           = ref(false)
 const nowUnix              = ref(Math.floor(Date.now() / 1000))
+const winW                 = ref(1024)   // CONE DROPS: viewport width, kept fresh by onWindowResize
+
+// CONE DROPS: is there room to break the Cone-down button out of the ⋮ menu in
+// the compact (below-lg) console tier? lg+ always shows it; in between, only
+// when the sidebar isn't eating the width (iPad portrait with sidebar closed).
+const coneButtonRoomy = computed(() => !sidebarOpen.value || winW.value >= 1024)
 
 // Notes modal (firings.notes — CRUD already exists on the API)
 const showNotesModal = ref(false)
 const notesDraft     = ref('')
 const notesSaving    = ref(false)
 
+// CONE DROPS (Aug 2026)
+const showConeSheet = ref(false)
+const coneList      = ref([])     // fetched once from /api/cones
+const coneBusy      = ref(false)
+
 let elapsedTickInterval = null
 
 // NOW-LINE + G1: setUnit pulled from the chart composable to repaint on toggle.
-const { init, setSchedule, setReadings, setReductions, setNowLine, clearNowLine, setUnit: setChartUnit, resetZoom, resize, destroy } = useKilnChart(chartCanvas, {
+const { init, setSchedule, setReadings, setReductions, setConeDrops, setNowLine, clearNowLine, setUnit: setChartUnit, resetZoom, resize, destroy } = useKilnChart(chartCanvas, {
   enableZoom: true,
   showLabels: true,
   onPointClick: (point) => {
@@ -424,6 +449,7 @@ async function loadUnit() {
 }
 
 onMounted(async () => {
+  winW.value = window.innerWidth   // CONE DROPS: seed before first paint decisions
   await init()
 
   try {
@@ -474,6 +500,7 @@ onUnmounted(() => {
 
 let resizeRaf = null
 function onWindowResize() {
+  winW.value = window.innerWidth   // CONE DROPS
   if (resizeRaf) cancelAnimationFrame(resizeRaf)
   resizeRaf = requestAnimationFrame(() => resize())
 }
@@ -529,7 +556,8 @@ async function selectFiring(f, preloaded = null) {
   await nextTick()
   setSchedule(data.schedule ?? [], data.schedule_offset ?? 0)
   setReadings(data.readings ?? [], data.started_at)
-  setReductions(data.reductions ?? [])
+  setReductions(data.reductions ?? [], data.started_at)
+  setConeDrops(data.cone_drops ?? [], data.started_at)
   requestAnimationFrame(() => resize())
 
   if (data.readings?.length) {
@@ -625,6 +653,52 @@ async function saveNotes() {
   }
 }
 
+// ── Cone drops ───────────────────────────────────────────────────────────────
+// One-tap logging via ConeDropSheet. Timestamp + temp snapshot happen
+// server-side; the returned row is merged into selectedFiring and the chart
+// marker set is refreshed.
+async function openConeSheet() {
+  if (!coneList.value.length) {
+    try { coneList.value = await $fetch('/api/cones') }
+    catch { toast.show('Couldn\u2019t load the cone list.'); return }
+  }
+  showConeSheet.value = true
+}
+
+async function logConeDrop(coneName) {
+  const f = selectedFiring.value
+  if (!f) return
+  coneBusy.value = true
+  try {
+    const created = await $fetch(`/api/firings/${f.id}/cones`, {
+      method: 'POST',
+      body: { cone: coneName },
+    })
+    selectedFiring.value = { ...f, cone_drops: [...(f.cone_drops ?? []), created] }
+    setConeDrops(selectedFiring.value.cone_drops, f.started_at)
+    toast.show(`Cone ${coneName} down.`, 'success')
+  } catch (err) {
+    toast.show(err?.data?.statusMessage ?? err?.data?.message ?? 'Could not log cone drop.')
+  } finally {
+    coneBusy.value = false
+  }
+}
+
+async function removeConeDrop(id) {
+  const f = selectedFiring.value
+  if (!f) return
+  coneBusy.value = true
+  try {
+    await $fetch(`/api/cone-drops/${id}`, { method: 'DELETE' })
+    selectedFiring.value = { ...f, cone_drops: (f.cone_drops ?? []).filter(d => d.id !== id) }
+    setConeDrops(selectedFiring.value.cone_drops, f.started_at)
+  } catch (err) {
+    toast.show(err?.data?.statusMessage ?? err?.data?.message ?? 'Could not remove cone drop.')
+  } finally {
+    coneBusy.value = false
+  }
+}
+
 async function confirmEndFiring() {
   showEndConfirm.value = false
   if (!activeFiring.value) return
@@ -709,7 +783,7 @@ async function onToggleReduction() {
       selectedFiring.value = { ...f, reductions: [...(f.reductions ?? []), created] }
       toast.show('Reduction started.', 'success')
     }
-    setReductions(selectedFiring.value.reductions)
+    setReductions(selectedFiring.value.reductions, selectedFiring.value.started_at)
   } catch (err) {
     toast.show(err?.data?.statusMessage ?? err?.data?.message ?? 'Could not update reduction.')
   }
@@ -869,7 +943,8 @@ async function reloadReadings() {
       selectedFiring.value = data
       setSchedule(data.schedule ?? [], data.schedule_offset ?? 0)
       setReadings(data.readings ?? [], data.started_at)
-      setReductions(data.reductions ?? [])
+      setReductions(data.reductions ?? [], data.started_at)
+      setConeDrops(data.cone_drops ?? [], data.started_at)
       refreshFirings()          // sidebar: Live → Finished
       return
     }
@@ -877,8 +952,10 @@ async function reloadReadings() {
     selectedFiring.value.readings = data.readings
     selectedFiring.value.schedule = data.schedule
     selectedFiring.value.reductions = data.reductions ?? selectedFiring.value.reductions
+    selectedFiring.value.cone_drops = data.cone_drops ?? selectedFiring.value.cone_drops
     setReadings(data.readings, selectedFiring.value.started_at)
-    setReductions(selectedFiring.value.reductions ?? [])
+    setReductions(selectedFiring.value.reductions ?? [], selectedFiring.value.started_at)
+    setConeDrops(selectedFiring.value.cone_drops ?? [], selectedFiring.value.started_at)
     if (isLive.value && !isPaused.value && selectedFiring.value.started_at) {
       setNowLine(selectedFiring.value.started_at)
     }

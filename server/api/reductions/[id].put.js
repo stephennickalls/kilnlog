@@ -40,7 +40,7 @@ export default defineEventHandler(async (event) => {
     .from('reduction_periods')
     .update({ end_temp: endTemp, ended_at: Math.floor(Date.now() / 1000) })
     .eq('id', id)
-    .select('id, start_temp, end_temp, created_at, ended_at')
+    .select('id, start_temp, end_temp, created_at, ended_at, origin')
     .single()
 
   if (error) throw await serverError('reductions.end.failed', error, { userId: user.id, reductionId: id })

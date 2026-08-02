@@ -30,6 +30,15 @@
             Account &amp; billing
           </NuxtLink>
 
+          <!-- ADMIN (Aug 2026): only rendered for profiles.role = 'admin'.
+               Links to the admin landing page (announcements, logs, and
+               future user management). The pages/APIs enforce the role
+               server-side; this is just discovery. -->
+          <NuxtLink v-if="isAdmin" to="/admin" class="menu-item" @click="open = false">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+            Admin
+          </NuxtLink>
+
           <!-- Privacy policy — quiet secondary link; opens in a new tab so it
                doesn't navigate the user away from an active firing. -->
           <NuxtLink to="/privacy" target="_blank" class="menu-item" @click="open = false">
@@ -53,16 +62,30 @@
 // PERF (Jul 2026): was supabase.auth.getUser() — a network round trip to
 // Supabase Auth just to show an email we already have. getSession() reads the
 // session from local storage; the email renders on first paint.
+//
+// ADMIN (Aug 2026): role comes from a small profiles query, cached in
+// useState for the SPA session so mounting this menu on several pages costs
+// one fetch total. Non-admins never see the item; the server still enforces.
 const supabase = useSupabaseClient()
 const root  = ref(null)
 const open  = ref(false)
 const email = ref('')
+
+const roleState = useState('user-role', () => null)   // { userId, role }
+const isAdmin = computed(() => roleState.value?.role === 'admin')
 
 const initial = computed(() => (email.value?.[0] ?? '?').toUpperCase())
 
 onMounted(async () => {
   const { data: { session } } = await supabase.auth.getSession()  // local, no network
   email.value = session?.user?.email ?? ''
+
+  const uid = session?.user?.id
+  if (uid && roleState.value?.userId !== uid) {
+    const { data } = await supabase.from('profiles').select('role').eq('id', uid).single()
+    roleState.value = { userId: uid, role: data?.role ?? 'user' }
+  }
+
   document.addEventListener('click', onOutside)
 })
 onUnmounted(() => document.removeEventListener('click', onOutside))

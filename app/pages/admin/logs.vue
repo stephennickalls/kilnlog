@@ -1,13 +1,18 @@
-<!-- app/pages/logs.vue -->
-<!-- Admin-only application logs viewer. Reads /api/logs (gated to ADMIN_EMAIL). -->
+<!-- app/pages/admin/logs.vue -->
+<!-- Admin-only application logs viewer. Reads /api/logs (role-gated).
+     ADMIN MOVE (Aug 2026): relocated from /logs to /admin/logs with a
+     breadcrumb back to the admin landing page. Gains a 24h health strip
+     (?stats=1) and a free-text search over the loaded rows. -->
 <template>
   <div v-if="isAdmin" class="min-h-screen bg-parchment font-serif">
     <!-- Header -->
     <header class="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-parchment-3">
-      <div class="flex items-center gap-2">
-        <NuxtLink to="/app" class="text-base sm:text-lg font-bold flex items-center gap-2 text-ink hover:text-flame transition-colors">🔥 KilnMonitor</NuxtLink>
-        <span class="text-ink-faint">/</span>
-        <span class="text-sm font-semibold text-ink-muted">Logs</span>
+      <div class="flex items-center gap-2 min-w-0">
+        <NuxtLink to="/admin" class="text-base sm:text-lg font-bold flex items-center gap-2 text-ink hover:text-flame transition-colors shrink-0">🔥 KilnMonitor</NuxtLink>
+        <span class="text-ink-faint shrink-0">/</span>
+        <NuxtLink to="/admin" class="text-sm font-semibold text-ink-muted hover:text-ink shrink-0">Admin</NuxtLink>
+        <span class="text-ink-faint shrink-0">/</span>
+        <span class="text-sm font-semibold text-ink-muted truncate">Logs</span>
       </div>
       <div class="flex items-center gap-2">
         <button class="btn-ghost !px-3 !py-1.5 !text-xs" :disabled="loading" @click="reload">
@@ -18,6 +23,42 @@
     </header>
 
     <div class="max-w-5xl mx-auto px-4 sm:px-6 py-6">
+
+      <!-- 24h health strip -->
+      <div v-if="stats" class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-5">
+        <div class="rounded-xl border bg-white px-4 py-3" :class="stats.day.errors ? 'border-red-200' : 'border-parchment-3'">
+          <p class="text-[10px] font-bold uppercase tracking-wide text-ink-faint">Errors · 24h</p>
+          <p class="text-2xl font-bold tabular-nums" :class="stats.day.errors ? 'text-red-600' : 'text-celadon-dark'">{{ stats.day.errors }}</p>
+          <p class="text-[11px] text-ink-faint">{{ stats.week.errors }}{{ stats.sampled ? '+' : '' }} this week</p>
+        </div>
+        <div class="rounded-xl border border-parchment-3 bg-white px-4 py-3">
+          <p class="text-[10px] font-bold uppercase tracking-wide text-ink-faint">Warns · 24h</p>
+          <p class="text-2xl font-bold tabular-nums text-amber-600">{{ stats.day.warns }}</p>
+          <p class="text-[11px] text-ink-faint">{{ stats.week.warns }}{{ stats.sampled ? '+' : '' }} this week</p>
+        </div>
+        <div class="rounded-xl border border-parchment-3 bg-white px-4 py-3">
+          <p class="text-[10px] font-bold uppercase tracking-wide text-ink-faint">Client errors · 24h</p>
+          <p class="text-2xl font-bold tabular-nums text-ink">{{ stats.day.client }}</p>
+          <p class="text-[11px] text-ink-faint">browser-side captures</p>
+        </div>
+        <div class="rounded-xl border border-parchment-3 bg-white px-4 py-3">
+          <p class="text-[10px] font-bold uppercase tracking-wide text-ink-faint">Last error</p>
+          <p class="text-sm font-bold text-ink mt-1.5">{{ stats.last_error_at ? formatTime(stats.last_error_at) : 'none this week 🌱' }}</p>
+        </div>
+      </div>
+
+      <!-- Top error events (24h) -->
+      <div v-if="stats?.top_errors_24h?.length" class="mb-5 rounded-xl border border-red-200 bg-red-50/60 px-4 py-3">
+        <p class="text-[10px] font-bold uppercase tracking-wide text-red-400 mb-1.5">Loudest errors · 24h</p>
+        <div class="flex flex-wrap gap-1.5">
+          <button
+            v-for="t in stats.top_errors_24h"
+            :key="t.event"
+            class="px-2.5 py-1 rounded-full text-xs font-bold bg-white border border-red-200 text-red-700 hover:bg-red-100 transition-colors"
+            @click="search = t.event"
+          >{{ t.event }} × {{ t.count }}</button>
+        </div>
+      </div>
 
       <!-- Filters -->
       <div class="flex flex-wrap items-center gap-2 mb-4">
@@ -37,7 +78,13 @@
             @click="setSource(src)"
           >{{ src }}</button>
         </div>
-        <span class="text-xs text-ink-faint ml-auto">{{ logs.length }} shown</span>
+        <input
+          v-model="search"
+          type="search"
+          placeholder="Search event, message, user id…"
+          class="flex-1 min-w-[180px] border border-parchment-3 rounded-lg px-3 py-1.5 text-xs text-ink bg-white focus:outline-none focus:ring-2 focus:ring-celadon/20 focus:border-celadon font-serif"
+        >
+        <span class="text-xs text-ink-faint">{{ shown.length }} shown</span>
       </div>
 
       <!-- Error state -->
@@ -46,14 +93,14 @@
       </div>
 
       <!-- Empty -->
-      <div v-else-if="!loading && !logs.length" class="rounded-xl border border-parchment-3 bg-white px-4 py-10 text-center text-sm text-ink-muted">
+      <div v-else-if="!loading && !shown.length" class="rounded-xl border border-parchment-3 bg-white px-4 py-10 text-center text-sm text-ink-muted">
         No logs match these filters. Quiet is good. 🌱
       </div>
 
       <!-- List -->
       <ul v-else class="space-y-2">
         <li
-          v-for="log in logs" :key="log.id"
+          v-for="log in shown" :key="log.id"
           class="rounded-xl border bg-white overflow-hidden transition-colors"
           :class="rowBorder(log.level)"
         >
@@ -97,7 +144,8 @@ const supabase = useSupabaseClient()
 const isAdmin = ref(false)
 
 async function gateAdmin() {
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { session } } = await supabase.auth.getSession()
+  const user = session?.user
   if (!user) return showError({ statusCode: 404, statusMessage: 'Page not found' })
 
   const { data, error } = await supabase
@@ -113,10 +161,12 @@ async function gateAdmin() {
 }
 
 const logs        = ref([])
+const stats       = ref(null)
 const loading     = ref(false)
 const loadError   = ref('')
 const levelFilter = ref('all')
 const sourceFilter= ref('all')
+const search      = ref('')
 const limit       = ref(100)
 const expanded    = ref(new Set())
 
@@ -124,18 +174,13 @@ async function fetchLogs() {
   loading.value = true
   loadError.value = ''
   try {
-    const { data: { session } } = await supabase.auth.getSession()
-    const token = session?.access_token
-    if (!token) { loadError.value = 'Not signed in.'; return }
-
     const q = new URLSearchParams()
     q.set('limit', String(limit.value))
     if (levelFilter.value  !== 'all') q.set('level',  levelFilter.value)
     if (sourceFilter.value !== 'all') q.set('source', sourceFilter.value)
 
-    logs.value = await $fetch(`/api/logs?${q.toString()}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    // Patched $fetch attaches the Bearer token — no manual header needed.
+    logs.value = await $fetch(`/api/logs?${q.toString()}`)
   } catch (e) {
     if (e?.statusCode === 403) loadError.value = 'Admin access required.'
     else loadError.value = e?.data?.statusMessage ?? e?.message ?? 'Could not load logs.'
@@ -144,13 +189,32 @@ async function fetchLogs() {
   }
 }
 
-function reload()        { limit.value = 100; fetchLogs() }
+async function fetchStats() {
+  try {
+    stats.value = await $fetch('/api/logs?stats=1')
+  } catch {
+    stats.value = null   // strip just doesn't render; rows still work
+  }
+}
+
+function reload()        { limit.value = 100; fetchLogs(); fetchStats() }
 function loadMore()      { limit.value += 100; fetchLogs() }
 function setLevel(l)     { levelFilter.value = l; reload() }
 function setSource(s)    { sourceFilter.value = s; reload() }
 function toggle(id)      { const n = new Set(expanded.value); n.has(id) ? n.delete(id) : n.add(id); expanded.value = n }
 
 function pretty(ctx)     { try { return JSON.stringify(ctx, null, 2) } catch { return String(ctx) } }
+
+// Free-text search over the loaded rows (event, message, user id, context).
+const shown = computed(() => {
+  const q = search.value.trim().toLowerCase()
+  if (!q) return logs.value
+  return logs.value.filter(l =>
+    (l.event ?? '').toLowerCase().includes(q) ||
+    (l.message ?? '').toLowerCase().includes(q) ||
+    (l.user_id ?? '').toLowerCase().includes(q) ||
+    JSON.stringify(l.context ?? '').toLowerCase().includes(q))
+})
 
 function formatTime(iso) {
   const d = new Date(iso), now = new Date()
@@ -177,6 +241,6 @@ function rowBorder(level) {
 
 onMounted(async () => {
   await gateAdmin()   // throws 404 for non-admins before anything renders
-  await fetchLogs()
+  await Promise.all([fetchLogs(), fetchStats()])
 })
 </script>

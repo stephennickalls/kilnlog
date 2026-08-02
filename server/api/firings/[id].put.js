@@ -124,6 +124,17 @@ export default defineEventHandler(async (event) => {
     throw await serverError('firings.update.failed', error, { userId: user.id, firingId: id, updates })
   }
 
-  logger.info('firings.update.success', { firingId: id, userId: user.id, updates })
+  // Durable lifecycle events (awaited — survives Netlify's freeze). Generic
+  // field edits stay console-only; note that `updates` may contain notes text,
+  // so persisted rows carry field NAMES, never values.
+  if ('endedAt' in body && updates.ended_at !== null) {
+    await logger.tracked('info', 'firing.ended', { userId: user.id, firingId: id, auto: false })
+  } else if ('endedAt' in body && updates.ended_at === null) {
+    await logger.tracked('info', 'firing.restarted', { userId: user.id, firingId: id })
+  } else if ('pausedAt' in body) {
+    await logger.tracked('info', updates.paused_at ? 'firing.paused' : 'firing.resumed', { userId: user.id, firingId: id })
+  } else {
+    logger.info('firings.update.success', { firingId: id, userId: user.id, fields: Object.keys(updates) })
+  }
   return data
 })

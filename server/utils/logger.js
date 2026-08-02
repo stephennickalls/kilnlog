@@ -1,13 +1,26 @@
 // server/utils/logger.js
 // Structured logger for Netlify Functions.
 // - Always writes a JSON line to the console (visible in the Netlify log UI).
-// - Additionally persists warn/error to the public.logs table so they show up
-//   in the in-app /logs page. Persistence is BEST-EFFORT: it never throws and
-//   never blocks the calling request — a logging failure must not break a route.
+// - Persists warn/error to public.logs for the /admin/logs page.
 //
-// Usage: logger.info('event', { key: value })
-//        logger.warn('event', { key: value })
-//        logger.error('event', { key: value, err })
+// NETLIFY REALITY (Aug 2026 fix): fire-and-forget inserts are killed when the
+// function freezes after the response — serverError.js discovered this the
+// hard way. So:
+//   logger.info/warn/error  — console immediately; persistence is attempted
+//                             fire-and-forget (fine on dev / long routes; may
+//                             be dropped on fast Netlify routes).
+//   await logger.tracked()  — console + AWAITED persistence. Use for anything
+//                             you actually need to see in /admin/logs:
+//                             warns on request paths, business events
+//                             (firing.started etc). Never throws.
+//
+// tracked() also persists 'info' rows — that's the point: durable business
+// events. Plain info() stays console-only to bound table growth.
+//
+// Usage:
+//   logger.info('event', { key: value })                       // console only
+//   await logger.tracked('info', 'firing.started', { userId }) // durable
+//   await logger.tracked('warn', 'stripe.checkout.already_subscribed', {...})
 
 import { createClient } from '@supabase/supabase-js'
 
@@ -35,15 +48,9 @@ function consoleWrite(level, event, meta = {}) {
   fn(JSON.stringify(entry))
 }
 
-// Fire-and-forget DB persist. Swallows all errors. Only warn/error by default
-// to keep the table from filling with routine info lines.
-function persist(level, event, meta = {}) {
-  if (level === 'info') return            // skip info to bound table growth
-  const client = db()
-  if (!client) return
-
+function buildRow(level, event, meta = {}) {
   const { err, message, userId, user_id, ...context } = meta
-  const row = {
+  return {
     level,
     source:  'server',
     event:   event ?? null,
@@ -54,13 +61,27 @@ function persist(level, event, meta = {}) {
       ...(err ? { error: err?.message ?? String(err), stack: err?.stack } : {}),
     },
   }
+}
 
-  // Do not await — never block the request on logging. Catch so an unhandled
-  // rejection can't take down the function.
-  client.from('logs').insert(row).then(
-    () => {},
-    () => {}   // swallow — console line above is the fallback record
-  )
+// Fire-and-forget persist (legacy path) — kept for call sites that must not
+// add latency and can tolerate loss on function freeze.
+function persist(level, event, meta = {}) {
+  if (level === 'info') return            // plain info stays console-only
+  const client = db()
+  if (!client) return
+  client.from('logs').insert(buildRow(level, event, meta)).then(() => {}, () => {})
+}
+
+// AWAITED persist — completes before the route returns, so it survives
+// Netlify's freeze. Never throws.
+async function persistAwait(level, event, meta = {}) {
+  const client = db()
+  if (!client) return
+  try {
+    await client.from('logs').insert(buildRow(level, event, meta))
+  } catch {
+    // console line is the fallback record
+  }
 }
 
 function write(level, event, meta = {}) {
@@ -72,4 +93,10 @@ export const logger = {
   info:  (event, meta) => write('info',  event, meta),
   warn:  (event, meta) => write('warn',  event, meta),
   error: (event, meta) => write('error', event, meta),
+
+  // Durable structured event — console + awaited DB row (any level, incl info).
+  tracked: async (level, event, meta = {}) => {
+    consoleWrite(level, event, meta)
+    await persistAwait(level, event, meta)
+  },
 }

@@ -3,10 +3,12 @@
 // Auto-end sweep, extracted from server/api/firings/index.get.js so it can be
 // shared by GET /api/firings and GET /api/bootstrap without duplication.
 //
-// Rules (unchanged):
+// Rules (Aug 2026: extended from 2h/1h to 12h — long gas firings, overnight
+// candling, and testers who log sparsely were being ended mid-firing):
 //   Auto-end an active firing when:
-//     - No readings for 2 hours, OR
-//     - Started but never had a reading, and started > 1 hour ago.
+//     - No readings for 12 hours, OR
+//     - Started but never had a reading, and started > 12 hours ago
+//       (covers overnight candling before the first log).
 //   EXEMPT:
 //     - Paused firings (paused_at set) — deliberately suspended.
 //     - Just-restarted firings whose only readings predate the restart.
@@ -19,8 +21,8 @@
 //
 // Returns the array of firing ids that were auto-ended (possibly empty).
 
-const TWO_HOURS = 2 * 60 * 60
-const ONE_HOUR  = 1 * 60 * 60
+const STALE_GAP    = 12 * 60 * 60   // no readings for this long → auto-end
+const NEVER_LOGGED = 12 * 60 * 60   // started, zero readings, this old → auto-end
 
 export async function autoEndStale(db, userId) {
   const { data: activeFirings, error } = await db
@@ -51,8 +53,8 @@ export async function autoEndStale(db, userId) {
     if (firing.restarted_at && (lastTs === null || lastTs < firing.restarted_at)) continue
 
     if (lastTs === null) {
-      if (now - firing.started_at > ONE_HOUR) toAutoEnd.push(firing.id)
-    } else if (now - lastTs > TWO_HOURS) {
+      if (now - firing.started_at > NEVER_LOGGED) toAutoEnd.push(firing.id)
+    } else if (now - lastTs > STALE_GAP) {
       toAutoEnd.push(firing.id)
     }
   }
@@ -65,6 +67,10 @@ export async function autoEndStale(db, userId) {
       .eq('user_id', userId)
 
     if (endErr) throw await serverError('firings.autoend.update_failed', endErr, { userId, toAutoEnd })
+
+    // Durable + visible: every auto-end is a tester who walked away mid-firing
+    // (or an app failure to log) — exactly the signal /admin/logs exists for.
+    await logger.tracked('warn', 'firing.auto_ended', { userId, firingIds: toAutoEnd, count: toAutoEnd.length })
   }
 
   return toAutoEnd

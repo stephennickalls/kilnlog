@@ -31,7 +31,7 @@ export default defineEventHandler(async (event) => {
   const { data, error } = await db
     .from('reduction_periods')
     .insert({ firing_id: firingId, start_temp: startTemp, end_temp: null })
-    .select('id, start_temp, end_temp, created_at, ended_at')
+    .select('id, start_temp, end_temp, created_at, ended_at, origin')
     .single()
 
   if (error) {

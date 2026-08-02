@@ -44,6 +44,9 @@
 
           <PastDueBanner />
 
+          <!-- ANNOUNCEMENTS: admin-pushed banners (from /api/bootstrap) -->
+          <AnnouncementBanner :announcements="announcements" @dismiss="dismissAnnouncement" />
+
 
         <!-- ── Empty state — nothing selected ── -->
         <FiringEmptyState
@@ -378,6 +381,18 @@ const showConeSheet = ref(false)
 const coneList      = ref([])     // fetched once from /api/cones
 const coneBusy      = ref(false)
 
+// ANNOUNCEMENTS (Aug 2026): live banners from bootstrap; dismiss is optimistic.
+const announcements = ref([])
+
+async function dismissAnnouncement(id) {
+  announcements.value = announcements.value.filter(a => a.id !== id)
+  try {
+    await $fetch(`/api/announcements/${id}/dismiss`, { method: 'POST' })
+  } catch {
+    // Non-fatal: worst case the banner reappears next load.
+  }
+}
+
 let elapsedTickInterval = null
 
 // NOW-LINE + G1: setUnit pulled from the chart composable to repaint on toggle.
@@ -436,6 +451,7 @@ async function loadBootstrap() {
   setUnitState(boot.temp_unit === 'F' ? 'F' : 'C')
   setChartUnit()
   allFirings.value = boot.firings ?? []
+  announcements.value = boot.announcements ?? []   // ANNOUNCEMENTS
   if (boot.activeFiring) await selectFiring(boot.activeFiring, boot.activeFiring)
 }
 

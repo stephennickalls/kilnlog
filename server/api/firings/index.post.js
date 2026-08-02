@@ -125,7 +125,11 @@ export default defineEventHandler(async (event) => {
   }
 
   if (reductions.length) {
-    const rows = reductions.map(r => ({ firing_id: firing.id, start_temp: r.start_temp, end_temp: r.end_temp }))
+    // REDUCTION-TIME (Aug 2026): planned rows are marked origin='planned' so the
+    // chart temp-anchors them; live tapped rows (origin='live', the default)
+    // time-anchor by created_at. Without this, a planned reduction's
+    // created_at ≈ started_at made it render from minute ~0.
+    const rows = reductions.map(r => ({ firing_id: firing.id, start_temp: r.start_temp, end_temp: r.end_temp, origin: 'planned' }))
     const { error: redErr } = await db.from('reduction_periods').insert(rows)
     if (redErr) {
       await db.from('firings').delete().eq('id', firing.id)   // cascade clears partials
@@ -133,6 +137,9 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  logger.info('firings.create.success', { firingId: firing.id, userId: user.id, started: !!startedAt })
+  // Durable lifecycle event — the app's heartbeat on /admin/logs.
+  await logger.tracked('info', startedAt ? 'firing.started' : 'firing.created', {
+    userId: user.id, firingId: firing.id, points: points.length, planned_reductions: reductions.length,
+  })
   return firing
 })

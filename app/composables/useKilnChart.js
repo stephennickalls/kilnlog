@@ -182,7 +182,10 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     for (const p of lastReductions) {
       const open = p.end_temp == null && !p.ended_at
 
-      if (startedAt && p.created_at) {
+      // origin === 'planned' rows were inserted with the firing — their
+      // created_at is the firing's creation moment, not a reduction event, so
+      // they must use the temp mapping below. Live rows time-anchor.
+      if (startedAt && p.created_at && p.origin !== 'planned') {
         // Time-anchored (live/ended firing rows)
         const startX = (p.created_at - startedAt) / 60
         let endX

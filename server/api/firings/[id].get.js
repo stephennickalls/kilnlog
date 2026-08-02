@@ -1,9 +1,16 @@
 // File: server/api/firings/[id].get.js
-// Single query with nested selects — schedule, readings, and reduction periods
-// come back in one round trip.
+// Single query with nested selects — schedule, readings, reduction periods,
+// and cone drops come back in one round trip.
 //
-// G11 CHANGE: added reductions:reduction_periods(*) to the nested select so the
-// chart overlay has the bands without a second request.
+// G11 CHANGE: added reductions to the nested select so the chart overlay has
+// the bands without a second request.
+// REDUCTION-TIME (Aug 2026): reductions now include ended_at (closes the band
+// at the recorded moment) and origin ('planned' rows stay temp-anchored on the
+// chart). Omitting ended_at here was the "ghost band after restart" bug — the
+// client received closed rows without their timestamp and re-rendered them via
+// the legacy fallback, stretched to the last reading.
+// CONE DROPS (Aug 2026): cone_drops nested in, matching /api/bootstrap, so ▽
+// markers survive any refetch (restart, tab refocus, selecting the firing).
 export default defineEventHandler(async (event) => {
   const { db, user } = await useServerUser(event)
   const id = Number(getRouterParam(event, 'id'))
@@ -15,7 +22,8 @@ export default defineEventHandler(async (event) => {
       *,
       schedule:schedule(*),
       readings:readings(*),
-      reductions:reduction_periods(id, start_temp, end_temp, created_at)
+      reductions:reduction_periods(id, start_temp, end_temp, created_at, ended_at, origin),
+      cone_drops:cone_drops(id, cone, dropped_at, temp_at_drop)
     `)
     .eq('id', id)
     .eq('user_id', user.id)
@@ -27,6 +35,7 @@ export default defineEventHandler(async (event) => {
   firing.schedule   = (firing.schedule ?? []).sort((a, b) => a.offset_minutes - b.offset_minutes)
   firing.readings   = (firing.readings ?? []).sort((a, b) => a.timestamp - b.timestamp)
   firing.reductions = (firing.reductions ?? []).sort((a, b) => a.created_at - b.created_at)
+  firing.cone_drops = (firing.cone_drops ?? []).sort((a, b) => a.dropped_at - b.dropped_at)
 
   return firing
 })

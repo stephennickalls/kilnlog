@@ -48,7 +48,7 @@ export default defineEventHandler(async (event) => {
       }
     } catch (err) {
       // Abort before deleting — don't orphan a billing subscription.
-      logger.error('account.delete.stripe_cancel_failed', { userId: user.id, err })
+      await logger.tracked('error', 'account.delete.stripe_cancel_failed', { userId: user.id, err })
       throw createError({
         statusCode: 502,
         statusMessage: 'Could not cancel billing. Your account was not deleted — please try again or contact support.',
@@ -62,7 +62,7 @@ export default defineEventHandler(async (event) => {
   const admin = serviceClient()
   const { error: delErr } = await admin.auth.admin.deleteUser(user.id)
   if (delErr) {
-    logger.error('account.delete.auth_delete_failed', { userId: user.id, err: delErr })
+    await logger.tracked('error', 'account.delete.auth_delete_failed', { userId: user.id, err: delErr })
     // Stripe is already cancelled at this point; surface a clear retry path.
     throw createError({
       statusCode: 500,
@@ -70,6 +70,9 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  logger.info('account.delete.success', { userId: user.id })
+  // warn level: account loss during beta is a signal worth surfacing. The uid
+  // and email ride in CONTEXT, not the user_id column — the auth row is gone,
+  // so an FK-linked user_id would make this insert fail silently.
+  await logger.tracked('warn', 'account.deleted', { deletedUserId: user.id, email: user.email ?? null })
   return { deleted: true }
 })

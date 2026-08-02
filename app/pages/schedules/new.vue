@@ -104,17 +104,29 @@
         <div class="flex items-center gap-2">
           <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Curve</label>
           <span v-if="form.type" class="text-[10px] font-bold px-2 py-0.5 rounded-full" :class="theme.badgeText">{{ form.type }}</span>
+          <div class="flex-1" />
+          <!-- REDUCTIONS (Aug 2026): planner trigger — this page never had one,
+               so new schedules couldn't carry planned reductions (only
+               duplicate/edit could). Mirrors [id].vue; cobalt per the palette. -->
+          <button
+            class="flex items-center gap-1.5 text-xs font-semibold text-cobalt-dark hover:text-cobalt transition-colors"
+            @click="showReductionPlanner = true"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            {{ editReductions.length ? `Edit reduction (${editReductions.length})` : 'Add reduction' }}
+          </button>
         </div>
         <!-- From-firing: raw readings faint underneath -->
         <ScheduleCurveEditor
           v-if="isFromFiring"
           :model-value="editPoints"
           :background-points="rawPoints"
+          :reductions="editReductions"
           :stroke="theme.stroke"
           :fill="theme.fill"
           @update:model-value="onEditorChange"
         />
-        <ScheduleCurveEditor v-else v-model="editPoints" :stroke="theme.stroke" :fill="theme.fill" />
+        <ScheduleCurveEditor v-else v-model="editPoints" :reductions="editReductions" :stroke="theme.stroke" :fill="theme.fill" />
       </div>
 
       <!-- ── SHARED: save ──────────────────────────────────────────────── -->
@@ -127,6 +139,14 @@
       </div>
 
     </main>
+
+    <!-- Reduction planner -->
+    <ReductionPlannerModal
+      :open="showReductionPlanner"
+      :reductions="editReductions"
+      @close="showReductionPlanner = false"
+      @save="onReductionsSaved"
+    />
 
     <Teleport to="body">
       <Transition name="toast">
@@ -180,6 +200,17 @@ const form       = reactive({ name: '', type: 'bisque', cone: '', description: '
 const editPoints = ref(BISQUE_DEFAULT.map(p => ({ ...p })))
 const theme      = computed(() => themeForType(form.type))
 
+// REDUCTIONS (Aug 2026): planned reductions for this schedule, [{ startTemp,
+// endTemp|null }] °C — same shape as [id].vue. Sent on save; POST already
+// accepted them (the duplicate flow proves it), this page just never sent any.
+const editReductions       = ref([])
+const showReductionPlanner = ref(false)
+
+function onReductionsSaved(list) {
+  editReductions.value = list
+  showReductionPlanner.value = false
+}
+
 // Plain create: seed from library
 const librarySchedules  = ref([])
 const selectedLibraryId = ref('')
@@ -219,6 +250,12 @@ onMounted(async () => {
 
     form.name = `${data.name} (from ${formatFiringDate(data.started_at ?? data.created_at)})`
     form.type = guessType(data.name)
+
+    // REDUCTIONS: carry the firing's LIVE reduction periods into the plan —
+    // "save this firing as a schedule" should keep where you actually reduced.
+    editReductions.value = (data.reductions ?? [])
+      .filter(r => r.start_temp != null)
+      .map(r => ({ startTemp: r.start_temp, endTemp: r.end_temp ?? null }))
   } catch (err) {
     flash(`Couldn't load firing: ${err?.data?.message ?? err.message ?? 'error'}`)
   }
@@ -244,6 +281,7 @@ function flash(msg) {
 watch(selectedLibraryId, (val) => {
   if (!val) {
     editPoints.value = BISQUE_DEFAULT.map(p => ({ ...p }))
+    editReductions.value = []   // REDUCTIONS: blank slate, no leak from last pick
     form.name = ''; form.type = 'glaze'; form.cone = ''
     return
   }
@@ -252,6 +290,10 @@ watch(selectedLibraryId, (val) => {
   editPoints.value = (sched.points ?? [])
     .sort((a, b) => a.offset_minutes - b.offset_minutes)
     .map(p => ({ offsetMinutes: p.offset_minutes, targetTemp: p.target_temp }))
+  // REDUCTIONS: the source schedule's planned reductions come along too.
+  editReductions.value = (sched.reductions ?? [])
+    .filter(r => r.start_temp != null)
+    .map(r => ({ startTemp: r.start_temp, endTemp: r.end_temp ?? null }))
   form.name = ''
   form.type = sched.type ?? 'glaze'
   form.cone = sched.cone ?? ''
@@ -294,6 +336,7 @@ async function save() {
         description: form.description?.trim() || null,
         source:      isFromFiring.value ? 'from_firing' : 'custom',
         points:      editPoints.value,
+        reductions:  editReductions.value,   // [{ startTemp, endTemp|null }] °C
       },
     })
     router.replace(`/schedules/${result.id}`)

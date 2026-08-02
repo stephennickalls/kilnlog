@@ -28,10 +28,16 @@
 export default defineEventHandler(async (event) => {
   const { db, user } = await useServerUser(event)
 
-  // ── Step 1: preferences + staleness sweep, in parallel ────────────────────
-  const [prefsRes] = await Promise.all([
+  // ── Step 1: preferences + staleness sweep + announcements, in parallel ────
+  const nowIso = new Date().toISOString()
+  const [prefsRes, , annRes, disRes] = await Promise.all([
     db.from('preferences').select('temp_unit').eq('user_id', user.id).maybeSingle(),
     autoEndStale(db, user.id),   // may end stale firings before we list them
+    // ANNOUNCEMENTS: live-window banners…
+    db.from('announcements').select('id, title, message, link_url, created_at')
+      .eq('active', true).lte('starts_at', nowIso).gte('ends_at', nowIso),
+    // …minus what this user has already dismissed.
+    db.from('announcement_dismissals').select('announcement_id').eq('user_id', user.id),
   ])
 
   if (prefsRes.error) {
@@ -63,7 +69,7 @@ export default defineEventHandler(async (event) => {
         *,
         schedule:schedule(*),
         readings:readings(*),
-        reductions:reduction_periods(id, start_temp, end_temp, created_at, ended_at),
+        reductions:reduction_periods(id, start_temp, end_temp, created_at, ended_at, origin),
         cone_drops:cone_drops(id, cone, dropped_at, temp_at_drop)
       `)
       .eq('id', activeId)
@@ -87,5 +93,11 @@ export default defineEventHandler(async (event) => {
     temp_unit: prefsRes.data?.temp_unit ?? 'C',
     firings:   listRes.data ?? [],
     activeFiring,
+    // ANNOUNCEMENTS: live and not yet dismissed by this user. Query failures
+    // here must not break bootstrap — banners are best-effort.
+    announcements: (() => {
+      const dismissed = new Set((disRes?.data ?? []).map(d => d.announcement_id))
+      return (annRes?.data ?? []).filter(a => !dismissed.has(a.id))
+    })(),
   }
 })

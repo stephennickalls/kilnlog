@@ -208,18 +208,23 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
         continue
       }
 
-      // Temp-anchored fallback (planned/library reductions)
-      const startX = minuteAtTemp(actual, p.start_temp)
+      // Temp-anchored fallback. PLANNED rows map against the PLANNED curve
+      // (dataset 0) — they're intent, visible from the first second, exactly
+      // like the schedule editor's preview. Legacy/other rows keep mapping
+      // against the ACTUAL curve (dataset 1), preserving old behaviour.
+      const isPlanned = p.origin === 'planned'
+      const source = isPlanned ? (chart?.data?.datasets?.[0]?.data ?? []) : actual
+      const startX = minuteAtTemp(source, p.start_temp)
       if (startX === null) continue
       let endX
       if (p.end_temp === null || p.end_temp === undefined) {
-        endX = actual.length ? actual[actual.length - 1].x : startX
+        endX = source.length ? source[source.length - 1].x : startX
       } else {
-        const e = minuteAtTemp(actual, p.end_temp)
-        endX = e === null ? (actual.length ? actual[actual.length - 1].x : startX) : e
+        const e = minuteAtTemp(source, p.end_temp)
+        endX = e === null ? (source.length ? source[source.length - 1].x : startX) : e
       }
       if (endX < startX) [endX] = [startX]
-      bands.push({ startX, endX, open })
+      bands.push({ startX, endX, open, planned: isPlanned })
     }
     reductionBands = bands
   }
@@ -238,20 +243,25 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
         const right = Math.min(Math.max(xPix1, xPix2), chartArea.right)
         const width = Math.max(right - left, 1.5)
 
-        ctx.fillStyle = band.open ? 'rgba(58,90,120,0.10)' : 'rgba(58,90,120,0.14)'
+        // Planned bands are intent — fainter than lived reality.
+        ctx.fillStyle = band.planned
+          ? 'rgba(58,90,120,0.06)'
+          : (band.open ? 'rgba(58,90,120,0.10)' : 'rgba(58,90,120,0.14)')
         ctx.fillRect(left, chartArea.top, width, chartArea.bottom - chartArea.top)
 
-        ctx.strokeStyle = band.open ? 'rgba(58,90,120,0.55)' : 'rgba(58,90,120,0.45)'
+        ctx.strokeStyle = band.planned
+          ? 'rgba(58,90,120,0.35)'
+          : (band.open ? 'rgba(58,90,120,0.55)' : 'rgba(58,90,120,0.45)')
         ctx.lineWidth = 1
         ctx.setLineDash([3, 3])
         ctx.beginPath()
         ctx.moveTo(left, chartArea.top)
         ctx.lineTo(left, chartArea.bottom)
         ctx.stroke()
-        // REDUCTION-TIME: closed bands get a dashed RIGHT edge too, so the end
-        // is as legible as the start. Open bands stay right-edge-less — their
-        // edge is the advancing NOW.
-        if (!band.open) {
+        // REDUCTION-TIME: closed live bands and bounded planned bands get a
+        // dashed RIGHT edge; open live bands stay right-edge-less — their edge
+        // is the advancing NOW.
+        if (band.planned || !band.open) {
           ctx.beginPath()
           ctx.moveTo(right, chartArea.top)
           ctx.lineTo(right, chartArea.bottom)
@@ -261,9 +271,15 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
 
         if (width > 30) {
           ctx.font = 'bold 9px sans-serif'
-          ctx.fillStyle = band.open ? 'rgba(40,64,87,0.9)' : 'rgba(40,64,87,0.75)'
+          ctx.fillStyle = band.planned ? 'rgba(40,64,87,0.55)' : (band.open ? 'rgba(40,64,87,0.9)' : 'rgba(40,64,87,0.75)')
           ctx.textAlign = 'left'
-          ctx.fillText(band.open ? 'Reduction…' : 'Reduction', left + 4, chartArea.top + 12)
+          ctx.fillText(
+            band.planned ? 'Planned reduction' : (band.open ? 'Reduction…' : 'Reduction'),
+            left + 4,
+            // Planned label sits one line lower so a live band drawn over the
+            // same span doesn't collide with it.
+            chartArea.top + (band.planned ? 24 : 12)
+          )
         }
       }
       ctx.restore()

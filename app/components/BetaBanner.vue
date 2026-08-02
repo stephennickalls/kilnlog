@@ -4,6 +4,9 @@
   from app/components/, so just render <BetaBanner /> as the first child of the
   landing page root. Remove that one line (and this file) to revert.
 
+  COPY (Aug 2026): plain "early access" language — no "beta" jargon (see the
+  matching sweep in index.vue / register-interest.vue).
+
   MOBILE NOTES (iPhone-width ~375px):
     - Layout is flex-col by default, flex-row only at sm:. On a phone the pill,
       copy, and CTA stack and each spans full width — nothing gets crushed onto
@@ -22,14 +25,14 @@
       <!-- Status pill -->
       <span class="inline-flex items-center gap-1.5 shrink-0 bg-flame/15 border border-flame-light/40 text-flame-light rounded-full px-2.5 py-1 text-[0.7rem] font-bold uppercase tracking-[0.1em]">
         <span class="w-1.5 h-1.5 rounded-full bg-flame-light animate-pulse"/>
-        Private beta
+        Early access
       </span>
 
       <!-- Copy -->
       <p class="text-[0.9rem] sm:text-[0.925rem] text-parchment/90 leading-snug text-balance sm:flex-1">
-        We're in beta testing —
-        <span class="font-semibold text-parchment">register now for free early access</span>
-        and become a beta tester.
+        We're in our testing phase —
+        <span class="font-semibold text-parchment">sign up for free early access</span>
+        and help us build the app potters actually need.
       </p>
 
       <!-- CTA: full-width block on mobile, compact inline on desktop -->
@@ -37,7 +40,7 @@
         to="/register-interest"
         class="w-full sm:w-auto shrink-0 inline-flex items-center justify-center gap-1.5 bg-flame text-parchment px-5 py-2.5 sm:py-1.5 rounded text-[0.875rem] font-semibold hover:bg-flame-dark transition-colors"
       >
-        Become a beta tester
+        Get free early access
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="shrink-0"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </NuxtLink>
 

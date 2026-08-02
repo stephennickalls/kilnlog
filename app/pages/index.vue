@@ -17,6 +17,10 @@
       instead (original markup preserved in the comment at that spot)
   Reverting the CTAs: swap to="/register-interest" back to to="/signup" and
   restore the original button text noted in each BETA-TEMP comment.
+
+  COPY (Aug 2026): all visitor-facing "beta" jargon replaced with plain
+  "early access" / "testing" language — many potters don't know what a
+  software beta is. The BETA-TEMP markers above still map every revert spot.
 -->
 <template>
   <div class="bg-parchment text-ink font-serif min-h-screen text-lg">
@@ -33,7 +37,7 @@
           <a href="#pricing" class="hover:text-ink transition-colors">Pricing</a>
           <NuxtLink to="/login" class="hover:text-ink transition-colors">Sign in</NuxtLink>
           <!-- BETA-TEMP: was to="/signup" · "Start free trial" -->
-          <NuxtLink to="/register-interest" class="bg-flame text-parchment px-5 py-2 rounded text-[0.875rem] font-semibold hover:bg-flame-dark transition-colors">Join the beta</NuxtLink>
+          <NuxtLink to="/register-interest" class="bg-flame text-parchment px-5 py-2 rounded text-[0.875rem] font-semibold hover:bg-flame-dark transition-colors">Get early access</NuxtLink>
         </div>
         <button class="md:hidden flex flex-col gap-[5px] p-1" aria-label="Menu" @click="mobileMenu = !mobileMenu">
           <span class="block w-6 h-[1.5px] bg-ink rounded"/>
@@ -46,7 +50,7 @@
         <a href="#pricing" class="px-10 py-[0.875rem] text-ink-muted border-b border-parchment-3" @click="mobileMenu = false">Pricing</a>
         <NuxtLink to="/login" class="px-10 py-[0.875rem] text-ink-muted border-b border-parchment-3" @click="mobileMenu = false">Sign in</NuxtLink>
         <!-- BETA-TEMP: was to="/signup" · "Start free trial →" -->
-        <NuxtLink to="/register-interest" class="px-10 py-[0.875rem] text-flame font-semibold" @click="mobileMenu = false">Join the beta →</NuxtLink>
+        <NuxtLink to="/register-interest" class="px-10 py-[0.875rem] text-flame font-semibold" @click="mobileMenu = false">Get early access →</NuxtLink>
       </div>
     </nav>
 
@@ -57,7 +61,7 @@
         <!-- Top copy -->
         <div class="max-w-[680px] mb-14">
           <!-- BETA-TEMP: was "Kiln firing log &amp; chart" -->
-          <p class="text-flame font-semibold tracking-[0.16em] uppercase text-[0.72rem] mb-4">Now in private beta</p>
+          <p class="text-flame font-semibold tracking-[0.16em] uppercase text-[0.72rem] mb-4">Early access now open</p>
           <h1 class="text-[clamp(2.75rem,5vw,4.25rem)] font-bold text-ink leading-[1.07] tracking-tight mb-6">Your firing notebook,<br>finally digital.</h1>
           <p class="text-[1.1rem] text-ink-muted leading-[1.7] mb-7">Sometimes a firing comes out better than you planned — a glaze breaks just right, a reduction sings. Could you do it again? KilnMonitor records the whole curve as it happens, so the firing you want to repeat is one you actually can.</p>
 
@@ -77,13 +81,13 @@
           <div class="flex gap-4 items-center flex-wrap mb-4">
             <!-- BETA-TEMP: was to="/signup" · "Start free trial" -->
             <NuxtLink to="/register-interest" class="inline-flex items-center gap-2 bg-flame text-parchment px-6 py-3 rounded text-[1rem] font-semibold hover:bg-flame-dark transition-all hover:-translate-y-px">
-              Join the beta
+              Get free early access
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </NuxtLink>
             <NuxtLink to="/login" class="inline-flex items-center px-6 py-3 border-[1.5px] border-parchment-3 rounded text-[1rem] text-ink-muted hover:border-flame-light hover:text-ink transition-colors">Sign in</NuxtLink>
           </div>
           <!-- BETA-TEMP: was "30 days free · No credit card required · $49 NZD/year after" -->
-          <p class="text-[0.825rem] text-ink-faint">Free early access for selected testers</p>
+          <p class="text-[0.825rem] text-ink-faint">Help us build the app potters actually need — free for our first testers</p>
         </div>
 
         <!-- Chart + fire cards grid -->
@@ -137,11 +141,12 @@
                 <text x="4" y="77" font-size="10" fill="#a8a29e" font-family="Georgia, serif">1000°C</text>
 
                 <!-- Reduction band (open/live): body reduction from ~900°C to NOW,
-                     mapped along the actual curve. rgba matches reductionBandsPlugin. -->
-                <rect x="200" y="28" width="66" height="148" fill="rgba(99,102,241,0.10)"/>
-                <line x1="200" y1="28" x2="200" y2="176" stroke="rgba(99,102,241,0.55)" stroke-width="1" stroke-dasharray="4 4"/>
-                <line x1="266" y1="28" x2="266" y2="176" stroke="rgba(99,102,241,0.55)" stroke-width="1" stroke-dasharray="4 4"/>
-                <text x="204" y="40" font-size="9" font-weight="bold" fill="rgba(79,70,229,0.9)" font-family="sans-serif">Reduction…</text>
+                     mapped along the actual curve. rgba matches reductionBandsPlugin
+                     (cobalt since the Aug 2026 palette sweep). -->
+                <rect x="200" y="28" width="66" height="148" fill="rgba(58,90,120,0.10)"/>
+                <line x1="200" y1="28" x2="200" y2="176" stroke="rgba(58,90,120,0.55)" stroke-width="1" stroke-dasharray="4 4"/>
+                <line x1="266" y1="28" x2="266" y2="176" stroke="rgba(58,90,120,0.55)" stroke-width="1" stroke-dasharray="4 4"/>
+                <text x="204" y="40" font-size="9" font-weight="bold" fill="rgba(40,64,87,0.9)" font-family="sans-serif">Reduction…</text>
 
                 <!-- Planned — warm grey #a8a29e dashed [6,4]. FULL schedule:
                      climb → peak 1,287° (~5.1h) → hold → cool-down to end. -->
@@ -198,7 +203,7 @@
             </div>
             <div class="bg-flame-bg border border-parchment-4 rounded-[10px] px-[1.625rem] py-6 flex flex-col gap-2">
               <p class="text-[0.7rem] font-bold uppercase tracking-[0.12em] text-flame">Repeat the happy accident</p>
-              <p class="text-[0.9rem] text-ink-muted leading-relaxed">Ran out of gas mid-firing, had to jump in the car to get more gas to carried on — and the glaze came out singing? The whole firing was logged, gas-out and all. Save what <em>actually happened</em> as a schedule and repeat the firing that worked, not the plan that didn't.</p>
+              <p class="text-[0.9rem] text-ink-muted leading-relaxed">Ran out of gas mid-firing, had to jump in the car for more to carry on — and the glaze came out singing? The whole firing was logged, gas-out and all. Save what <em>actually happened</em> as a schedule and repeat the firing that worked, not the plan that didn't.</p>
             </div>
             <div class="bg-parchment-2 border border-parchment-4 rounded-[10px] px-[1.625rem] py-6 flex flex-col gap-2">
               <p class="text-[0.7rem] font-bold uppercase tracking-[0.12em] text-flame">Reduction, planned &amp; real</p>
@@ -291,15 +296,15 @@
             <div class="mb-2">
               <span class="text-[2.5rem] font-bold text-ink leading-none tracking-tight">Pricing announced at launch</span>
             </div>
-            <p class="text-[0.9rem] text-ink-faint mb-8">One simple annual plan — priced for potters, not enterprises. Beta testers receive in 12 months free.</p>
+            <p class="text-[0.9rem] text-ink-faint mb-8">One simple annual plan — priced for potters, not enterprises. Early testers get 12 months free.</p>
 
             <!-- BETA-TEMP: was to="/signup" · "Start 30-day free trial" -->
             <NuxtLink to="/register-interest" class="inline-flex items-center gap-2 bg-flame text-parchment px-8 py-4 rounded text-[1.05rem] font-semibold hover:bg-flame-dark transition-all hover:-translate-y-px">
-              Register for free beta access
+              Sign up for free early access
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </NuxtLink>
             <!-- BETA-TEMP: was "No credit card required to start" -->
-            <p class="text-[0.825rem] text-ink-faint mt-3">Free during beta — no credit card, ever, until launch.</p>
+            <p class="text-[0.825rem] text-ink-faint mt-3">Free while we're testing — no credit card, ever, until launch.</p>
           </div>
 
           <div class="hidden md:block w-px bg-parchment-3 self-stretch"/>
@@ -322,10 +327,10 @@
       <div class="max-w-[1200px] mx-auto text-center flex flex-col items-center gap-4">
         <h2 class="text-[clamp(2rem,3.5vw,2.875rem)] font-bold text-parchment leading-[1.2] tracking-tight">Never lose a good firing again.</h2>
         <!-- BETA-TEMP: was "Start your 30-day free trial. No credit card, no commitment." -->
-        <p class="text-[1.1rem] text-ink-muted mb-2">Join the private beta. Free early access, no credit card.</p>
+        <p class="text-[1.1rem] text-ink-muted mb-2">Help us build the kiln app you need — free early access, no credit card.</p>
         <!-- BETA-TEMP: was to="/signup" · "Get started free" -->
         <NuxtLink to="/register-interest" class="inline-flex items-center gap-2 bg-flame text-parchment px-8 py-4 rounded text-[1.05rem] font-semibold hover:bg-flame-dark transition-all hover:-translate-y-px">
-          Register for beta access
+          Sign up for early access
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </NuxtLink>
       </div>
@@ -340,7 +345,7 @@
           <NuxtLink to="/login" class="hover:text-parchment transition-colors">Sign in</NuxtLink>
           <!-- BETA-TEMP: was <NuxtLink to="/signup">Sign up</NuxtLink> — public
                signup is closed during beta. Restore when going live. -->
-          <NuxtLink to="/register-interest" class="hover:text-parchment transition-colors">Join the beta</NuxtLink>
+          <NuxtLink to="/register-interest" class="hover:text-parchment transition-colors">Early access</NuxtLink>
           <NuxtLink to="/privacy" class="hover:text-parchment transition-colors">Privacy</NuxtLink>
           <NuxtLink to="/terms" class="hover:text-parchment transition-colors">Terms</NuxtLink>
         </div>

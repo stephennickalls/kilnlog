@@ -4,6 +4,13 @@
   testers (see BETA-TEMP edits in middleware/auth.js + subscribe.vue).
   Uses the shared auth layout for the card/brand/back-link chrome.
 
+  COPY (Aug 2026): plain "early access" language throughout — "beta tester"
+  meant nothing to some signups. Success state promises a prompt email and
+  tells people to check spam. It deliberately does NOT claim a confirmation
+  was sent: replies are manual for now (the api's auto-confirmation email may
+  be disabled/unreliable) — if auto-confirmations come back, reinstate the
+  "We sent a confirmation to …" line.
+
   MOBILE NOTE: inputs are `text-base sm:text-sm` — a deliberate deviation
   from login/signup's plain `text-sm`. iOS Safari auto-zooms any focused
   input whose font-size is under 16px; since most beta signups will come
@@ -17,16 +24,22 @@
       <span class="text-5xl">🎉</span>
       <p class="text-base font-bold text-ink">You're on the list!</p>
       <p class="text-sm text-ink-muted leading-relaxed">
-        We sent a confirmation to <strong class="text-ink">{{ email }}</strong>.
-        We'll be in touch when beta spots open up.
+        Thanks for signing up — we'll be in touch at
+        <strong class="text-ink">{{ email }}</strong> as soon as possible.
+      </p>
+      <p class="text-sm text-ink-muted leading-relaxed bg-flame-bg border border-flame/20 rounded-lg px-3.5 py-2.5">
+        📬 Please check your <strong class="text-ink">spam or junk folder</strong> —
+        our emails sometimes land there. Adding
+        <strong class="text-ink">kilnmonitor@gmail.com</strong> to your contacts helps.
       </p>
     </div>
 
     <template v-else>
       <p class="text-sm text-ink-muted text-center mb-5 leading-relaxed">
-        We're picking a small group of potters to beta test KilnMonitor.
-        Chosen testers get <strong class="text-ink">12 months free</strong> —
-        in return we'd love your feedback, bug reports, and feature ideas.
+        KilnMonitor is opening up to a small group of potters first.
+        Sign up and you'll get <strong class="text-ink">12 months free</strong> —
+        in return we'd love to hear what works, what doesn't, and what you'd
+        like the app to do.
       </p>
 
       <form class="flex flex-col gap-4" @submit.prevent="submit">
@@ -86,11 +99,11 @@
           class="w-full flex items-center justify-center gap-2 bg-flame text-parchment py-3 rounded-lg text-base font-bold hover:bg-flame-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-1 font-serif"
         >
           <span v-if="loading" class="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"/>
-          <span v-else>Register my interest →</span>
+          <span v-else>Sign up for early access →</span>
         </button>
 
         <p class="text-center text-xs text-ink-faint">
-          No spam — just an email when beta spots open.
+          No spam from us — just an email about your early access.
         </p>
       </form>
     </template>
@@ -103,7 +116,7 @@
 // app/layouts/auth.vue. This file is just the interest form.
 definePageMeta({
   layout:   'auth',
-  subtitle: 'Become a beta tester',
+  subtitle: 'Sign up for early access',
 })
 
 const email   = ref('')

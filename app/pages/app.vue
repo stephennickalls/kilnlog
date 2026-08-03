@@ -58,9 +58,20 @@
           <AnnouncementBanner :announcements="announcements" @dismiss="dismissAnnouncement" />
 
 
+        <!-- ── Booting — /api/bootstrap in flight ── -->
+        <!-- UX (Aug 2026): shown instead of the empty state so a slow first
+             load never reads as "you have no firings". NOTE: `booting` is
+             cleared BEFORE selectFiring runs (see loadBootstrap) — the chart
+             canvas lives in the v-else branch below and must be mounted
+             before the chart paints into it. -->
+        <div v-if="booting" class="flex-1 flex flex-col items-center justify-center gap-3 text-ink-muted px-6">
+          <span class="w-7 h-7 border-2 border-parchment-3 border-t-celadon rounded-full animate-spin"/>
+          <p class="text-sm font-semibold">Loading your firings…</p>
+        </div>
+
         <!-- ── Empty state — nothing selected ── -->
         <FiringEmptyState
-          v-if="!selectedFiring"
+          v-else-if="!selectedFiring"
           :recent-firing="pastFirings[0] ?? null"
           :active-firing="activeFiring"
           @start="openStartModal"
@@ -404,6 +415,15 @@ const announcements = ref([])
 // own auth.getUser() + profiles query.
 const pastDueGraceEndsAt = ref(null)
 
+// UX (Aug 2026): true until /api/bootstrap resolves. Without this the page
+// renders FiringEmptyState during the wait, which actively lies to the user
+// ("no firings yet") while their firings are still loading — worse than a
+// spinner. Gates the main column only; header/sidebar chrome renders straight
+// away so the app feels present.
+// IMPORTANT: clear this BEFORE calling selectFiring — the chart canvas only
+// exists in the non-booting branch, and selectFiring paints into it.
+const booting = ref(true)
+
 async function dismissAnnouncement(id) {
   announcements.value = announcements.value.filter(a => a.id !== id)
   try {
@@ -485,6 +505,9 @@ async function loadBootstrap() {
   setChartUnit()
   allFirings.value = boot.firings ?? []
   announcements.value = boot.announcements ?? []   // ANNOUNCEMENTS
+  // UX (Aug 2026): drop the skeleton BEFORE selectFiring so the chart canvas
+  // is mounted by the time the chart paints into it.
+  booting.value = false
   if (boot.activeFiring) await selectFiring(boot.activeFiring, boot.activeFiring)
 }
 
@@ -505,7 +528,8 @@ onMounted(async () => {
     await loadBootstrap()
   } catch (err) {
     // ARCH (Aug 2026): access lapsed → redirect, don't fall back (the serial
-    // path would just 402 again on /api/firings and blank the page).
+    // path would just 402 again on /api/firings and blank the page). The
+    // skeleton stays up through the redirect — no flash of empty app.
     if (isAccessLapsed(err)) {
       return navigateTo('/register-interest')  // BETA-TEMP (was /subscribe)
     }
@@ -513,14 +537,19 @@ onMounted(async () => {
     try {
       await loadUnit()
       await refreshFirings()
+      booting.value = false   // as above: canvas must exist before selectFiring
       if (activeFiring.value) await selectFiring(activeFiring.value)
     } catch (err2) {
       if (isAccessLapsed(err2)) {
         return navigateTo('/register-interest')  // BETA-TEMP (was /subscribe)
       }
+      booting.value = false   // real failure: drop the skeleton, show the page
       throw err2
     }
   }
+
+  // Belt and braces — every success path has already cleared this.
+  booting.value = false
 
   // D2: ?startSchedule=id from the schedules page — start the firing
   // immediately. The schedule was already chosen there; don't make the user

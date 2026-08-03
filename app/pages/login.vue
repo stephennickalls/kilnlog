@@ -1,4 +1,4 @@
-<!-- app/pages/login.vue -->
+<!-- File: app/pages/login.vue -->
 <template>
   <div>
  
@@ -20,7 +20,8 @@
           placeholder="you@example.com"
           required
           autocomplete="email"
-          class="w-full border border-parchment-3 rounded-lg px-3.5 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif"
+          :disabled="loading"
+          class="w-full border border-parchment-3 rounded-lg px-3.5 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif disabled:opacity-60"
         >
       </div>
 
@@ -35,7 +36,8 @@
           placeholder="••••••••"
           required
           autocomplete="current-password"
-          class="w-full border border-parchment-3 rounded-lg px-3.5 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif"
+          :disabled="loading"
+          class="w-full border border-parchment-3 rounded-lg px-3.5 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif disabled:opacity-60"
         >
       </div>
 
@@ -48,7 +50,14 @@
         :disabled="loading"
         class="w-full flex items-center justify-center gap-2 bg-flame text-parchment py-3 rounded-lg text-base font-bold hover:bg-flame-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-1 font-serif"
       >
-        <span v-if="loading" class="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"/>
+        <!-- UX (Aug 2026): the spinner now carries a label and stays up
+             through navigation — the first load after sign-in can take
+             several seconds on a cold serverless function, and a silent
+             button made people think the click hadn't registered. -->
+        <template v-if="loading">
+          <span class="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"/>
+          <span>{{ loadingLabel }}</span>
+        </template>
         <span v-else>Sign in →</span>
       </button>
     </form>
@@ -84,25 +93,50 @@ const password = ref('')
 const error    = ref('')
 const loading  = ref(false)
 
-async function signInGoogle() {
+// UX (Aug 2026): after ~2s the wait is long enough that "Signing in…" starts
+// to read as stuck. Switching the label reassures the user something is
+// still happening. Cleared whenever loading ends.
+const loadingLabel = ref('Signing in…')
+let labelTimer = null
+
+function startLoading() {
   loading.value = true
-  error.value   = ''
+  error.value = ''
+  loadingLabel.value = 'Signing in…'
+  labelTimer = setTimeout(() => { loadingLabel.value = 'Loading your kiln…' }, 2000)
+}
+
+function stopLoading() {
+  loading.value = false
+  if (labelTimer) { clearTimeout(labelTimer); labelTimer = null }
+}
+
+onUnmounted(() => { if (labelTimer) clearTimeout(labelTimer) })
+
+async function signInGoogle() {
+  startLoading()
   const { error: err } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options:  { redirectTo: `${window.location.origin}/confirm` },
   })
-  if (err) { error.value = err.message; loading.value = false }
+  // On success the browser leaves for Google — only reset on failure.
+  if (err) { error.value = err.message; stopLoading() }
 }
 
 async function signInEmail() {
-  loading.value = true
-  error.value   = ''
+  startLoading()
   const { error: err } = await supabase.auth.signInWithPassword({
     email:    email.value,
     password: password.value,
   })
-  loading.value = false
-  if (err) { error.value = err.message; return }
+  if (err) {
+    error.value = err.message
+    stopLoading()
+    return
+  }
+  // UX (Aug 2026): deliberately NOT stopping the spinner here. /app then
+  // shows its own skeleton while /api/bootstrap loads, so the user sees
+  // continuous progress instead of a dead button followed by an empty shell.
   await navigateTo('/app')
 }
 </script>

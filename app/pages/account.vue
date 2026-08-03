@@ -9,7 +9,8 @@
 
             <!-- Brand — same mark as the app header, links to the app -->
             <NuxtLink to="/app" class="text-base sm:text-lg font-bold flex items-center gap-2 text-ink tracking-tight hover:text-flame transition-colors shrink-0">
-              🔥 KilnMonitor
+              <BrandFlame class="w-5 h-5 sm:w-6 sm:h-6" />
+              KilnMonitor
             </NuxtLink>
 
             <span class="text-parchment-4 shrink-0">/</span>

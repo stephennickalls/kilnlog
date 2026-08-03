@@ -8,6 +8,10 @@
   schedules world (which is celadon-accented), so the colour telegraphs the
   destination before the user arrives.
 
+  ICONS (Aug 2026): the 🔥 emoji is replaced with the BrandFlame SVG component,
+  sized to fill the badge circle properly (the first pass was too small and left
+  a lot of empty white around it).
+
   G5: if a firing is active (rare here — the active firing is usually the
   selected one — but possible, e.g. after deleting the selected past firing),
   the "Start a firing" CTA is disabled with a note. "Browse schedules" stays
@@ -17,7 +21,7 @@
   <div class="flex flex-col items-center justify-center text-center gap-5 px-6 py-10 sm:py-16 h-full">
 
     <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white border border-parchment-3 flex items-center justify-center" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
-      <span class="text-3xl sm:text-4xl">🔥</span>
+      <BrandFlame class="w-11 h-11 sm:w-14 sm:h-14" />
     </div>
 
     <div class="max-w-md">

@@ -1,7 +1,7 @@
 <!-- app/layouts/auth.vue -->
 <!--
   Shared chrome for every unauthenticated page: login, signup, forgot-password,
-  reset-password.
+  reset-password, register-interest.
 
   Before this existed, all four pages carried `layout: false` (which did nothing
   — there is no layouts/default.vue) and hand-rolled their own background, card,
@@ -17,6 +17,10 @@
     - an EXPLICIT "← Back to home" link. A clickable logo is a convention, not
       a signpost; someone half-way through signing up shouldn't need to know the
       convention to get out.
+
+  BRAND MARK (Aug 2026): the 🔥 emoji is now the BrandFlame SVG component, so
+  every auth page picks up the change from this one file — login and
+  register-interest carry no logo markup of their own.
 
   Usage — pages set the layout and their own subtitle line via page meta:
 
@@ -40,9 +44,9 @@
       <div class="text-center mb-6">
         <NuxtLink
           to="/"
-          class="inline-flex items-center gap-2 text-2xl sm:text-3xl font-bold text-ink tracking-tight hover:text-flame transition-colors"
+          class="inline-flex items-center gap-2.5 text-2xl sm:text-3xl font-bold text-ink tracking-tight hover:text-flame transition-colors"
         >
-          <span aria-hidden="true">🔥</span>
+          <BrandFlame class="w-7 h-7 sm:w-8 sm:h-8" />
           <span>KilnMonitor</span>
         </NuxtLink>
         <p v-if="subtitle" class="text-sm text-ink-muted italic mt-1">{{ subtitle }}</p>

@@ -32,6 +32,9 @@
   recalibrate / reduction / end. It emits only — app.vue owns the modal and the
   PUT (firings.notes already exists server-side; no API work was needed).
 
+  ICONS (Aug 2026): emoji glyphs replaced with inline SVGs (Notes was 📝) —
+  matches the SVG-only icon language used everywhere else in the app.
+
   G1 (°F): currentTemp / targetTemp arrive as raw °C numbers and are converted
   for display via useTempUnit. The on-track / ahead / behind comparison stays in
   °C (both operands °C), and the difference shown to the user is converted with
@@ -138,7 +141,8 @@
                controls in the row (celadon button, cobalt toggle).
                Palette: ink/ink-muted = utilities, flame = resume, red = destructive. -->
           <button class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-ink hover:bg-parchment-2 transition-colors text-left" @click="emitAction('notes')">
-            <span class="text-base">📝</span> Notes
+            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg>
+            Notes
           </button>
           <button v-if="isLive && !isPaused" class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-ink-muted hover:bg-parchment-2 transition-colors text-left" @click="emitAction('recalibrate')"><span class="text-base">↻</span> Recalibrate</button>
           <button v-if="isLive && !isPaused" class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-ink-muted hover:bg-parchment-2 transition-colors text-left" @click="emitAction('pause')"><span class="text-base">⏸</span> Pause firing</button>
@@ -245,7 +249,9 @@
           <button v-if="isLive && !showConeButton" class="w-full py-3 bg-cobalt active:bg-cobalt-dark text-white text-sm font-bold rounded-xl transition-colors" @click="emitAction('reduction')">
             {{ reductionOpen ? '⊟ End reduction' : '⊞ Start reduction' }}
           </button>
-          <button class="w-full py-3 border border-parchment-3 bg-white text-ink text-sm font-bold rounded-xl" @click="emitAction('notes')">📝 Notes</button>
+          <button class="w-full py-3 border border-parchment-3 bg-white text-ink text-sm font-bold rounded-xl" @click="emitAction('notes')">
+            <svg class="w-4 h-4 inline -mt-0.5 mr-1.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg>Notes
+          </button>
           <button v-if="isLive && !isPaused" class="w-full py-3 border border-parchment-3 bg-white text-ink-muted text-sm font-bold rounded-xl" @click="emitAction('recalibrate')">↻ Recalibrate</button>
           <button v-if="isLive && !isPaused" class="w-full py-3 border border-parchment-3 bg-white text-ink-muted text-sm font-bold rounded-xl" @click="emitAction('pause')">⏸ Pause firing</button>
           <button v-if="isPaused" class="w-full py-3 bg-flame text-parchment text-sm font-bold rounded-xl active:bg-flame-dark" @click="emitAction('resume')">▶ Resume firing</button>

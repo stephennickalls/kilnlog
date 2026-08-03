@@ -12,7 +12,7 @@
     <header class="sticky top-0 z-20 bg-parchment/95 backdrop-blur border-b border-parchment-3">
       <div class="max-w-5xl mx-auto flex items-center justify-between px-4 sm:px-6 py-3">
         <div class="flex items-center gap-3 min-w-0">
-          <NuxtLink to="/admin" class="text-base sm:text-lg font-bold flex items-center gap-2 text-ink tracking-tight hover:text-flame transition-colors shrink-0">🔥 KilnMonitor</NuxtLink>
+          <NuxtLink to="/admin" class="text-base sm:text-lg font-bold flex items-center gap-2 text-ink tracking-tight hover:text-flame transition-colors shrink-0"><BrandFlame class="w-5 h-5 sm:w-6 sm:h-6" />KilnMonitor</NuxtLink>
           <span class="text-parchment-4 shrink-0">/</span>
           <NuxtLink to="/admin" class="text-sm font-semibold text-ink-muted hover:text-ink shrink-0">Admin</NuxtLink>
           <span class="text-parchment-4 shrink-0">/</span>

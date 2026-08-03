@@ -2,18 +2,28 @@
 <template>
   <div class="flex flex-col h-screen overflow-hidden font-serif bg-parchment">
 
-    <!-- ── Header ───────────────────────────────────────────────────────────── -->
-      <header class="shrink-0 flex items-center justify-between px-4 sm:px-6 pt-3 pb-1.5 bg-parchment border-b border-parchment-3">      <div class="flex items-center gap-2">
+        <!-- ── Header ───────────────────────────────────────────────────────────── -->
+    <header class="shrink-0 flex items-center justify-between px-4 sm:px-6 pt-3 pb-1.5 bg-parchment border-b border-parchment-3">
+      <div class="flex items-center gap-2">
         <button class="sm:hidden p-1.5 -ml-1 rounded-lg text-ink-muted" @click="showFiringSheet = true">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
         </button>
-        <NuxtLink to="/account" class="text-base sm:text-lg font-bold flex items-center gap-2 text-ink tracking-tight hover:text-flame transition-colors">🔥 KilnMonitor</NuxtLink>
+        <NuxtLink to="/account" class="text-base sm:text-lg font-bold flex items-center gap-2 text-ink tracking-tight hover:text-flame transition-colors">
+          <BrandFlame class="w-5 h-5 sm:w-6 sm:h-6" />
+          KilnMonitor
+        </NuxtLink>
       </div>
       <div class="flex items-center gap-2">
         <!-- Firing title + status intentionally omitted here — they live in the
              sidebar (desktop) and the mobile firing sheet, so showing them in
              the header would just duplicate. Rename is triggered per-row from
              the sidebar (@rename), not from the header. -->
+
+        <!-- FEEDBACK (Aug 2026): "Report a bug or request a feature" — label
+             renders on lg+ only; the button collapses to an icon on mobile.
+             Modal + POST /api/feedback live inside the component. -->
+        <FeedbackButton />
+
         <TempUnitToggle size="md" @change="setChartUnit" />
         <UserMenu />
       </div>

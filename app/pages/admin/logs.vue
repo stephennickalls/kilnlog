@@ -8,7 +8,7 @@
     <!-- Header -->
     <header class="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-parchment-3">
       <div class="flex items-center gap-2 min-w-0">
-        <NuxtLink to="/admin" class="text-base sm:text-lg font-bold flex items-center gap-2 text-ink hover:text-flame transition-colors shrink-0">🔥 KilnMonitor</NuxtLink>
+        <NuxtLink to="/admin" class="text-base sm:text-lg font-bold flex items-center gap-2 text-ink hover:text-flame transition-colors shrink-0"><BrandFlame class="w-5 h-5 sm:w-6 sm:h-6" />KilnMonitor</NuxtLink>
         <span class="text-ink-faint shrink-0">/</span>
         <NuxtLink to="/admin" class="text-sm font-semibold text-ink-muted hover:text-ink shrink-0">Admin</NuxtLink>
         <span class="text-ink-faint shrink-0">/</span>

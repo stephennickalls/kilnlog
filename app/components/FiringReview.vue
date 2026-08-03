@@ -9,6 +9,9 @@
   A trailing • on the label means this firing already has notes saved, so you can
   tell at a glance without opening the modal.
 
+  ICONS (Aug 2026): emoji glyphs (🔥 ✨ 📝) replaced with inline SVGs — flame,
+  bookmark, and file icons — matching the app's SVG-only icon language.
+
   RESPONSIVE FIX (Jul 2026): the action row used to switch to five full-width
   buttons at `sm` (640px). On an iPad in portrait — 768px wide, WITH the 280px
   sidebar showing — that leaves the card about 490px, so the shrink-0 button row
@@ -38,10 +41,12 @@
     <!-- ── Actions: full row (xl+ only — needs ~620px of its own) ───────────── -->
     <div class="hidden xl:flex gap-2 shrink-0">
       <button class="flex items-center justify-center gap-2 px-4 py-2.5 bg-flame hover:bg-flame-dark text-parchment text-sm font-bold rounded-xl transition-colors whitespace-nowrap" @click="$emit('fire-again', firing)">
-        🔥 Fire this again
+        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22c4.4 0 8-3.6 8-8 0-5-4-8-5.5-11C13 6 10 7 10 10c-1.5-1-2-2.5-2-4-2.5 2-4 5-4 8 0 4.4 3.6 8 8 8z"/></svg>
+        Fire this again
       </button>
       <button class="flex items-center justify-center gap-2 px-4 py-2.5 border border-celadon/30 bg-celadon-bg text-celadon-dark hover:bg-celadon hover:text-parchment text-sm font-bold rounded-xl transition-colors whitespace-nowrap" @click="$emit('save-as-schedule', firing)">
-        ✨ Save as schedule
+        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
+        Save as schedule
       </button>
       <!-- Notes — parent owns the modal + PUT -->
       <button
@@ -49,7 +54,8 @@
         :title="firing.notes ? 'View or edit notes' : 'Add notes'"
         @click="$emit('notes', firing)"
       >
-        {{ firing.notes ? '📝 Notes •' : '📝 Notes' }}
+        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg>
+        {{ firing.notes ? 'Notes •' : 'Notes' }}
       </button>
       <button
         class="flex items-center justify-center gap-2 px-4 py-2.5 border border-parchment-3 text-ink-muted hover:bg-parchment-2 text-sm font-semibold rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap"
@@ -78,7 +84,8 @@
         class="hidden sm:flex items-center justify-center gap-2 px-3.5 py-2.5 bg-flame hover:bg-flame-dark text-parchment text-sm font-bold rounded-xl transition-colors whitespace-nowrap"
         @click="$emit('fire-again', firing)"
       >
-        🔥 Fire again
+        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22c4.4 0 8-3.6 8-8 0-5-4-8-5.5-11C13 6 10 7 10 10c-1.5-1-2-2.5-2-4-2.5 2-4 5-4 8 0 4.4 3.6 8 8 8z"/></svg>
+        Fire again
       </button>
 
       <div class="relative">
@@ -102,15 +109,18 @@
           <!-- Duplicated on sm+ (the button beside the menu does the same job),
                but a menu missing its primary action reads as broken. -->
           <button class="flex items-center gap-2.5 px-4 py-2.5 text-sm font-bold text-flame hover:bg-flame-bg text-left transition-colors" @click="pick('fire-again')">
-            🔥 Fire this again
+            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22c4.4 0 8-3.6 8-8 0-5-4-8-5.5-11C13 6 10 7 10 10c-1.5-1-2-2.5-2-4-2.5 2-4 5-4 8 0 4.4 3.6 8 8 8z"/></svg>
+            Fire this again
           </button>
           <button class="flex items-center gap-2.5 px-4 py-2.5 text-sm font-bold text-celadon-dark hover:bg-celadon-bg text-left transition-colors" @click="pick('save-as-schedule')">
-            ✨ Save as schedule
+            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
+            Save as schedule
           </button>
           <div class="my-1 border-t border-parchment-3" />
           <!-- Notes — parent owns the modal + PUT -->
           <button class="flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-ink-muted hover:bg-parchment-2 text-left transition-colors" @click="pick('notes')">
-            {{ firing.notes ? '📝 Notes •' : '📝 Notes' }}
+            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg>
+            {{ firing.notes ? 'Notes •' : 'Notes' }}
           </button>
           <button
             class="flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-ink-muted hover:bg-parchment-2 text-left transition-colors disabled:opacity-40 disabled:cursor-not-allowed"

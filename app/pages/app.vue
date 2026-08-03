@@ -1,4 +1,4 @@
-<!-- app/pages/app.vue -->
+<!-- File: app/pages/app.vue -->
 <template>
   <div class="flex flex-col h-screen overflow-hidden font-serif bg-parchment">
 
@@ -52,7 +52,7 @@
       <main class="flex-1 flex flex-col min-w-0 overflow-hidden">
 
 
-          <PastDueBanner />
+          <PastDueBanner :grace-ends-at="pastDueGraceEndsAt" />
 
           <!-- ANNOUNCEMENTS: admin-pushed banners (from /api/bootstrap) -->
           <AnnouncementBanner :announcements="announcements" @dismiss="dismissAnnouncement" />
@@ -338,6 +338,11 @@ import { useKilnChart } from '~/composables/useKilnChart'
 
 definePageMeta({ middleware: ['auth'] })
 
+// ARCH (Aug 2026): role arrives in the /api/bootstrap payload (server-verified
+// via useServerUser) and is shared with UserMenu through this state — the
+// browser→Supabase profiles queries in middleware + UserMenu are deleted.
+const userRole = useState('user-role', () => null)
+
 const toast  = useToast()
 const router = useRouter()
 const route  = useRoute()          // D2: needed for ?startSchedule param
@@ -394,6 +399,11 @@ const coneBusy      = ref(false)
 // ANNOUNCEMENTS (Aug 2026): live banners from bootstrap; dismiss is optimistic.
 const announcements = ref([])
 
+// G8 (Aug 2026): past_due grace deadline (ISO string) from bootstrap; null
+// unless the user is past_due. Feeds PastDueBanner, which no longer does its
+// own auth.getUser() + profiles query.
+const pastDueGraceEndsAt = ref(null)
+
 async function dismissAnnouncement(id) {
   announcements.value = announcements.value.filter(a => a.id !== id)
   try {
@@ -449,6 +459,14 @@ function tickNow() {
   if (selectedFiring.value?.started_at) setNowLine(selectedFiring.value.started_at)
 }
 
+// ARCH (Aug 2026): 402 = the server's useServerUser says access lapsed. This
+// is now the ONLY access gate — the middleware's client-side profiles check
+// was deleted — so the mount path must recognise it and redirect instead of
+// treating it as a load failure.
+function isAccessLapsed(err) {
+  return (err?.statusCode ?? err?.status ?? err?.response?.status) === 402
+}
+
 // PERF REFACTOR (Jul 2026): the old mount sequence was three serial API calls
 // (/api/preferences → /api/firings → /api/firings/:id), each a separate
 // Netlify Function invocation paying its own auth + profile round trips.
@@ -456,8 +474,13 @@ function tickNow() {
 // firing detail feeds selectFiring's existing `preloaded` path, so no refetch.
 // If bootstrap fails for any reason we fall back to the old serial path so a
 // deploy mismatch can never blank the page.
+// ARCH (Aug 2026): bootstrap now also carries role (→ UserMenu's Admin link)
+// and pastDueGraceEndsAt (→ PastDueBanner) — the client-side profiles
+// queries those components used to make are deleted.
 async function loadBootstrap() {
   const boot = await $fetch('/api/bootstrap')
+  userRole.value = boot.role ?? 'user'
+  pastDueGraceEndsAt.value = boot.pastDueGraceEndsAt ?? null
   setUnitState(boot.temp_unit === 'F' ? 'F' : 'C')
   setChartUnit()
   allFirings.value = boot.firings ?? []
@@ -481,10 +504,22 @@ onMounted(async () => {
   try {
     await loadBootstrap()
   } catch (err) {
+    // ARCH (Aug 2026): access lapsed → redirect, don't fall back (the serial
+    // path would just 402 again on /api/firings and blank the page).
+    if (isAccessLapsed(err)) {
+      return navigateTo('/register-interest')  // BETA-TEMP (was /subscribe)
+    }
     console.error('Bootstrap failed, falling back to serial load:', err)
-    await loadUnit()
-    await refreshFirings()
-    if (activeFiring.value) await selectFiring(activeFiring.value)
+    try {
+      await loadUnit()
+      await refreshFirings()
+      if (activeFiring.value) await selectFiring(activeFiring.value)
+    } catch (err2) {
+      if (isAccessLapsed(err2)) {
+        return navigateTo('/register-interest')  // BETA-TEMP (was /subscribe)
+      }
+      throw err2
+    }
   }
 
   // D2: ?startSchedule=id from the schedules page — start the firing

@@ -7,28 +7,54 @@
 //
 // Returns:
 //   {
-//     temp_unit:    'C' | 'F',
-//     firings:      [...],          // all firings, newest first (list shape)
-//     activeFiring: {...} | null,   // full detail: schedule+readings+reductions+cone_drops
+//     temp_unit:          'C' | 'F',
+//     firings:            [...],          // all firings, newest first (list shape)
+//     activeFiring:       {...} | null,   // full detail: schedule+readings+reductions+cone_drops
+//     role:               'admin' | 'user',
+//     pastDueGraceEndsAt: ISO string | null,
+//     announcements:      [...],
 //   }
 //
-// Round-trip plan inside the function (Supabase queries):
-//   1. Promise.all: preferences + auto-end sweep (which itself is 1 query,
-//      +1 update only when something is actually stale)
-//   2. Promise.all: firings list + active-firing detail (active id is known
-//      from the sweep's own query of active firings)
+// Round-trip plan inside the function (Supabase queries) — TWO rounds:
+//   1. Promise.all: preferences + auto-end sweep + announcements + dismissals
+//   2. Promise.all: firings list + active-firing detail (nested select)
 //
-// CONE DROPS (Aug 2026): active-firing detail now nested-selects cone_drops so
+// PERF (Aug 2026): round 2 used to be two SERIAL rounds — fetch the active
+// firing's id, then re-query that row for its detail. Since the sweep in
+// round 1 has already ended anything stale, the nested select can filter on
+// the same predicate directly, saving a full DB round trip on every load.
+//
+// CONE DROPS (Aug 2026): active-firing detail nested-selects cone_drops so
 // the chart can draw drop markers on first paint, same pattern as reductions.
+//
+// ROLE + G8 GRACE (Aug 2026): useServerUser already fetched the profiles row
+// to enforce the subscription gate, so passing role and the past_due grace
+// deadline through costs zero extra queries. This let us DELETE the
+// browser→Supabase profiles queries in UserMenu, PastDueBanner, and the auth
+// middleware — and PastDueBanner's auth.getUser() network call with them.
+// PAST_DUE_GRACE_DAYS now lives in exactly one file (useServerUser.js).
+//
+// TIMING (Aug 2026, temporary): bootstrap.timing splits cold-start cost into
+// auth (JWKS fetch + JWT verify + profile query) vs the two query rounds, so
+// we can tell whether remaining slowness is the JWKS network call or
+// Netlify↔Supabase region latency. Remove once the numbers are understood.
 //
 // requireSubscription stays true — /app is a paid surface, same as the routes
 // this replaces (preferences was requireSubscription:false, but it's bundled
 // here only for the paid page; /api/preferences still exists for other pages).
+// NOTE: past_due-within-grace PASSES the subscription gate (hasAccess), so
+// this endpoint still runs for those users — the banner data is reachable.
+
+import { PAST_DUE_GRACE_DAYS } from '../utils/useServerUser'
 
 export default defineEventHandler(async (event) => {
-  const { db, user } = await useServerUser(event)
+  const t0 = Date.now()
 
-  // ── Step 1: preferences + staleness sweep + announcements, in parallel ────
+  const { db, user, profile } = await useServerUser(event)
+
+  const tAuth = Date.now()
+
+  // ── Round 1: preferences + staleness sweep + announcements, in parallel ──
   const nowIso = new Date().toISOString()
   const [prefsRes, , annRes, disRes] = await Promise.all([
     db.from('preferences').select('temp_unit').eq('user_id', user.id).maybeSingle(),
@@ -44,27 +70,15 @@ export default defineEventHandler(async (event) => {
     throw await serverError('bootstrap.prefs_failed', prefsRes.error, { userId: user.id })
   }
 
-  // ── Step 2: full list + (if any) active firing detail, in parallel ────────
-  // The active firing must be re-derived AFTER the sweep (a stale one may have
-  // just been ended), so we query the list first and find active from it — but
-  // to keep this to one parallel round instead of two serial ones, we fetch
-  // the active id with a cheap indexed query alongside the list. The partial
-  // unique index one_active_firing_per_user makes this a single-row lookup.
-  const [listRes, activeRowRes] = await Promise.all([
+  const tRound1 = Date.now()
+
+  // ── Round 2: list + active-firing detail, in ONE parallel round ──────────
+  // The sweep (round 1) has already ended anything stale, so filtering on
+  // "started and not ended" here is safe. The partial unique index
+  // one_active_firing_per_user keeps this a single-row lookup.
+  const [listRes, activeRes] = await Promise.all([
     db.from('firings').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-    db.from('firings').select('id').eq('user_id', user.id).is('ended_at', null).not('started_at', 'is', null).maybeSingle(),
-  ])
-
-  if (listRes.error) {
-    throw await serverError('bootstrap.list_failed', listRes.error, { userId: user.id })
-  }
-
-  // ── Step 3: active detail (only when a firing is live) ────────────────────
-  let activeFiring = null
-  const activeId = activeRowRes.data?.id ?? null
-  if (activeId) {
-    const { data, error } = await db
-      .from('firings')
+    db.from('firings')
       .select(`
         *,
         schedule:schedule(*),
@@ -72,27 +86,56 @@ export default defineEventHandler(async (event) => {
         reductions:reduction_periods(id, start_temp, end_temp, created_at, ended_at, origin),
         cone_drops:cone_drops(id, cone, dropped_at, temp_at_drop)
       `)
-      .eq('id', activeId)
       .eq('user_id', user.id)
-      .single()
+      .is('ended_at', null)
+      .not('started_at', 'is', null)
+      .maybeSingle(),
+  ])
 
-    if (error) {
-      throw await serverError('bootstrap.active_detail_failed', error, { userId: user.id, activeId })
-    }
-
-    // Nested rows aren't guaranteed ordered — sort after the single fetch
-    // (same as /api/firings/:id).
-    data.schedule   = (data.schedule ?? []).sort((a, b) => a.offset_minutes - b.offset_minutes)
-    data.readings   = (data.readings ?? []).sort((a, b) => a.timestamp - b.timestamp)
-    data.reductions = (data.reductions ?? []).sort((a, b) => a.created_at - b.created_at)
-    data.cone_drops = (data.cone_drops ?? []).sort((a, b) => a.dropped_at - b.dropped_at)
-    activeFiring = data
+  if (listRes.error) {
+    throw await serverError('bootstrap.list_failed', listRes.error, { userId: user.id })
   }
+  if (activeRes.error) {
+    throw await serverError('bootstrap.active_detail_failed', activeRes.error, { userId: user.id })
+  }
+
+  // Nested rows aren't guaranteed ordered — sort after the fetch (same as
+  // /api/firings/:id).
+  const activeFiring = activeRes.data ?? null
+  if (activeFiring) {
+    activeFiring.schedule   = (activeFiring.schedule ?? []).sort((a, b) => a.offset_minutes - b.offset_minutes)
+    activeFiring.readings   = (activeFiring.readings ?? []).sort((a, b) => a.timestamp - b.timestamp)
+    activeFiring.reductions = (activeFiring.reductions ?? []).sort((a, b) => a.created_at - b.created_at)
+    activeFiring.cone_drops = (activeFiring.cone_drops ?? []).sort((a, b) => a.dropped_at - b.dropped_at)
+  }
+
+  // TIMING (temporary): cold starts pay the JWKS fetch + an empty profile
+  // cache inside useServerUser — authMs isolates that from query latency.
+  logger.info('bootstrap.timing', {
+    userId:  user.id,
+    authMs:  tAuth - t0,
+    round1Ms: tRound1 - tAuth,
+    round2Ms: Date.now() - tRound1,
+    totalMs: Date.now() - t0,
+  })
 
   return {
     temp_unit: prefsRes.data?.temp_unit ?? 'C',
     firings:   listRes.data ?? [],
     activeFiring,
+    // ROLE (Aug 2026): server-verified, from the profile useServerUser
+    // already loaded. Zero extra queries. Feeds UserMenu's Admin link.
+    role: profile.role ?? 'user',
+    // G8 (Aug 2026): past_due grace deadline, computed here so PastDueBanner
+    // is purely presentational. Mirrors hasAccess(): no last_stripe_event_at
+    // anchor → anchor on now (Stripe will reconcile shortly). null unless
+    // the user is actually past_due.
+    pastDueGraceEndsAt: profile.subscription_status === 'past_due'
+      ? new Date(
+          (profile.last_stripe_event_at ? new Date(profile.last_stripe_event_at) : new Date()).getTime()
+          + PAST_DUE_GRACE_DAYS * 86400000
+        ).toISOString()
+      : null,
     // ANNOUNCEMENTS: live and not yet dismissed by this user. Query failures
     // here must not break bootstrap — banners are best-effort.
     announcements: (() => {

@@ -1,14 +1,18 @@
-<!-- app/components/PastDueBanner.vue -->
+<!-- File: app/components/PastDueBanner.vue -->
 <!--
   G8 — persistent payment-failure warning, shown on the app page so a user
   who never opens /account still learns their card failed BEFORE the grace
   window lapses and locks them out mid-firing.
 
-  Self-contained by design (mirrors AutoEndedBanner): does its own profile
-  read and its own grace calculation, so app.vue needs only a one-line
-  <PastDueBanner /> insertion — no new state, props, or wiring in the parent.
+  ARCH/PERF (Aug 2026): no longer self-contained — the old version made its
+  own auth.getUser() (a NETWORK call to Supabase Auth, not local) plus a
+  browser→Supabase profiles query on every /app mount, both stuck in the
+  post-login waterfall. The grace deadline is now computed server-side in
+  /api/bootstrap (from the profile useServerUser already loaded, zero extra
+  queries) and arrives as a prop. This also deleted the third copy of
+  PAST_DUE_GRACE_DAYS — the constant now exists only in useServerUser.js.
 
-  Renders nothing unless the user is past_due AND still inside grace. Because
+  Renders nothing unless graceEndsAt is set and still in the future. Because
   it renders nothing in the common case, it owns its own spacing (mx/mt on the
   visible root) rather than relying on a wrapper in app.vue — that way there's
   zero gap above the stats bar when no banner is shown.
@@ -17,9 +21,6 @@
   for the current view but returns on reload / next visit — the app keeps
   working, but the user re-confronts the warning each time. Intentional: a
   failed payment is important enough to re-surface until they fix it.
-
-  PAST_DUE_GRACE_DAYS must match server/utils/useServerUser.js and
-  app/middleware/auth.js.
 -->
 <template>
   <Transition name="fade">
@@ -58,35 +59,15 @@
 
 <script setup>
 // app/components/PastDueBanner.vue
-const PAST_DUE_GRACE_DAYS = 7
+const props = defineProps({
+  // ISO string from /api/bootstrap's pastDueGraceEndsAt, or null.
+  graceEndsAt: { type: String, default: null },
+})
 
-const supabase  = useSupabaseClient()
-const status    = ref(null)
-const anchor    = ref(null)   // last_stripe_event_at
 const loading   = ref(false)
 const dismissed = ref(false)  // in-memory only → resets on reload / next visit
 
-onMounted(async () => {
-  try {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const { data } = await supabase
-      .from('profiles')
-      .select('subscription_status, last_stripe_event_at')
-      .eq('id', user.id)
-      .single()
-    status.value = data?.subscription_status ?? null
-    anchor.value = data?.last_stripe_event_at ?? null
-  } catch {
-    // Silent — a missing banner is never worth surfacing an error for.
-  }
-})
-
-const graceEnds = computed(() => {
-  if (status.value !== 'past_due') return null
-  const base = anchor.value ? new Date(anchor.value) : new Date()
-  return new Date(base.getTime() + PAST_DUE_GRACE_DAYS * 86400000)
-})
+const graceEnds = computed(() => props.graceEndsAt ? new Date(props.graceEndsAt) : null)
 
 const show = computed(() => !dismissed.value && !!graceEnds.value && graceEnds.value > new Date())
 

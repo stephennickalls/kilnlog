@@ -9,35 +9,61 @@
 //   1. JWT verification is now LOCAL. Previously db.auth.getUser(token) made a
 //      network call to Supabase Auth on every request (~600ms+ cross-region).
 //      The project signs access tokens with an asymmetric ECC P-256 key, so we
-//      verify the signature against the project's public JWKS
-//      (<url>/auth/v1/.well-known/jwks.json) using `jose`. The JWKS is fetched
-//      once and cached in-process across warm invocations (createRemoteJWKSet
-//      handles caching + key rotation refetches automatically).
+//      verify the signature against the project's public JWKS using `jose`.
 //      Fallback: if local verification fails (e.g. a still-live token signed
-//      by the legacy HS256 key, or a JWKS fetch hiccup), we fall back to the
-//      old network call rather than locking anyone out.
+//      by the legacy HS256 key, or a rotated key we don't have), we fall back
+//      to the old network call rather than locking anyone out.
 //
 //   2. The profiles row (subscription gate) is cached in-process for a short
-//      TTL, keyed by user id. Warm Netlify invocations skip the query. TTL is
-//      30s — a Stripe webhook flipping subscription_status takes effect within
-//      30s, which is acceptable; access-REVOKING states were already grace-
-//      windowed by days, not seconds. Cold starts still pay one profile query.
+//      TTL, keyed by user id. Warm invocations skip the query. TTL is 30s — a
+//      Stripe webhook flipping subscription_status takes effect within 30s,
+//      which is acceptable; access-REVOKING states were already grace-windowed
+//      by days, not seconds. Cold starts still pay one profile query.
+//
+// PERF (Aug 2026) — JWKS is now PINNED, not fetched. createRemoteJWKSet still
+// made a network round trip on the first call of every cold process, before
+// we could verify anything: on a cold Netlify lambda that hop sat in front of
+// every other query. The keys are public and rotate rarely, so we pin them in
+// SUPABASE_JWKS and verify with zero network. Get the value with:
+//   curl https://<project>.supabase.co/auth/v1/.well-known/jwks.json
+// and set it in .env and in the Netlify environment.
+// TRADEOFF: if you rotate signing keys you MUST update SUPABASE_JWKS —
+// otherwise verification falls through to the db.auth.getUser() network path
+// (slower, but still correct, so nothing breaks). If the var is unset or
+// unparseable we transparently use the remote set, i.e. the Jul 2026
+// behaviour.
 //
 // Return shape is unchanged: { db, user, profile }.
 // Needs service role instead? Use serviceClient() and justify at the call site.
 
 import { createClient } from '@supabase/supabase-js'
-import { jwtVerify, createRemoteJWKSet } from 'jose'
+import { jwtVerify, createRemoteJWKSet, createLocalJWKSet } from 'jose'
 
-// Grace window for a past_due (failed-payment) subscriber. Keep in sync with
-// the same constant in app/middleware/auth.js so UI and server agree.
+// Grace window for a past_due (failed-payment) subscriber.
+// ARCH (Aug 2026): this is now the ONLY copy — the client-side mirrors in
+// app/middleware/auth.js and app/components/PastDueBanner.vue were deleted;
+// the server alone decides access, and /api/bootstrap ships the computed
+// grace deadline to the UI.
 export const PAST_DUE_GRACE_DAYS = 7
 
-// ── In-process caches (survive across warm Netlify invocations) ─────────────
+// ── In-process caches (survive across warm invocations) ────────────────────
 let _jwks = null
 function getJwks(supabaseUrl) {
   if (!_jwks) {
-    _jwks = createRemoteJWKSet(new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`))
+    const raw = process.env.SUPABASE_JWKS
+    if (raw) {
+      try {
+        // Local key set: signature verification with no network call at all.
+        _jwks = createLocalJWKSet(JSON.parse(raw))
+      } catch {
+        // Malformed env var — don't fail the request, just take the slow path.
+        _jwks = createRemoteJWKSet(new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`))
+      }
+    } else {
+      // Not configured: original behaviour (fetched once, cached in-process,
+      // handles key-rotation refetches automatically).
+      _jwks = createRemoteJWKSet(new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`))
+    }
   }
   return _jwks
 }
@@ -100,9 +126,9 @@ export async function useServerUser(event, { requireSubscription = true } = {}) 
       app_metadata: payload.app_metadata ?? {},
     }
   } catch {
-    // Fallback: legacy-HS256 token still in flight, or a JWKS fetch hiccup.
-    // One network round trip — the pre-refactor behaviour, now the exception
-    // rather than the rule.
+    // Fallback: legacy-HS256 token still in flight, a rotated key missing from
+    // SUPABASE_JWKS, or a JWKS fetch hiccup. One network round trip — the
+    // pre-refactor behaviour, now the exception rather than the rule.
     const { data, error } = await db.auth.getUser(token)
     if (error || !data?.user) {
       throw createError({ statusCode: 401, statusMessage: 'Invalid session' })

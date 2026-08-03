@@ -11,6 +11,14 @@
     - fetch failed  → explicit error state. NEVER a slot-count sentence:
       a failed fetch used to render "all 0 spots are taken".
 
+  COPY: the banner shows only spots REMAINING, never "N of 12" — the total is
+  ours to change and visitors don't need it. The waitlist copy is likewise
+  total-free ("All spots taken"). slots.total is still returned by the API;
+  just don't render it.
+
+  SLOTS PILL: bg-ink + the flame radial-gradient, i.e. the same dark brown as
+  BetaBanner.vue — keep the two in sync if that gradient changes.
+
   NO EMAIL CONFIRMATION (Aug 2026): "Confirm email" is DISABLED in Supabase
   (Authentication → Providers → Email). signUp therefore returns a session
   straight away and sends nothing — which also sidesteps the built-in SMTP's
@@ -76,8 +84,12 @@
       </div>
 
       <template v-else>
-        <div class="text-center bg-flame-bg border border-flame rounded-lg px-4 py-2.5 text-sm font-semibold text-flame mb-4">
-          {{ slots.remaining }} of {{ slots.total }}
+        <!-- Dark brown pill — same treatment as BetaBanner.vue -->
+        <div
+          class="text-center bg-ink text-parchment rounded-lg px-4 py-2.5 text-sm font-bold mb-4 font-serif"
+          style="background-image: radial-gradient(ellipse at 15% 50%, rgba(176,92,26,0.18) 0%, transparent 60%)"
+        >
+          {{ slots.remaining }}
           {{ slots.remaining === 1 ? 'spot' : 'spots' }} left
         </div>
 
@@ -172,9 +184,15 @@
       </div>
 
       <template v-else>
+        <div
+          class="text-center bg-ink text-parchment rounded-lg px-4 py-2.5 text-sm font-bold mb-4 font-serif"
+          style="background-image: radial-gradient(ellipse at 15% 50%, rgba(176,92,26,0.18) 0%, transparent 60%)"
+        >
+          All spots taken
+        </div>
+
         <p class="text-sm text-ink-muted text-center mb-5 leading-relaxed">
-          All {{ slots.total }} early access spots are taken. Join the waitlist
-          and we'll email you the moment one opens —
+          Join the waitlist and we'll email you the moment a spot opens —
           <strong class="text-ink">12 months free</strong> when it does.
         </p>
 

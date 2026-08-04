@@ -21,7 +21,8 @@ export default defineNuxtRouteMiddleware(async (to) => {
 
   const supabase = useSupabaseClient()
   // BETA-TEMP: added '/register-interest'
-  const publicRoutes = ['/login', '/signup', '/forgot-password', '/reset-password', '/subscribe', '/register-interest', '/confirm']
+  // app/middleware/auth.js — replace in publicRoutes:
+  const publicRoutes = ['/login', '/signup', '/forgot-password', '/reset-password', '/subscribe', '/early-access', '/confirm']
   const isPublic = publicRoutes.some(r => to.path.startsWith(r))
 
   const { data: { session } } = await supabase.auth.getSession()   // local, no network

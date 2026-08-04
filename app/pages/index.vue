@@ -37,7 +37,7 @@
           <a href="#pricing" class="hover:text-ink transition-colors">Pricing</a>
           <NuxtLink to="/login" class="hover:text-ink transition-colors">Sign in</NuxtLink>
           <!-- BETA-TEMP: was to="/signup" · "Start free trial" -->
-          <NuxtLink to="/register-interest" class="bg-flame text-parchment px-5 py-2 rounded text-[0.875rem] font-semibold hover:bg-flame-dark transition-colors">Get early access</NuxtLink>
+          <NuxtLink to="/early-access" class="bg-flame text-parchment px-5 py-2 rounded text-[0.875rem] font-semibold hover:bg-flame-dark transition-colors">Get early access</NuxtLink>
         </div>
         <button class="md:hidden flex flex-col gap-[5px] p-1" aria-label="Menu" @click="mobileMenu = !mobileMenu">
           <span class="block w-6 h-[1.5px] bg-ink rounded"/>
@@ -50,7 +50,7 @@
         <a href="#pricing" class="px-10 py-[0.875rem] text-ink-muted border-b border-parchment-3" @click="mobileMenu = false">Pricing</a>
         <NuxtLink to="/login" class="px-10 py-[0.875rem] text-ink-muted border-b border-parchment-3" @click="mobileMenu = false">Sign in</NuxtLink>
         <!-- BETA-TEMP: was to="/signup" · "Start free trial →" -->
-        <NuxtLink to="/register-interest" class="px-10 py-[0.875rem] text-flame font-semibold" @click="mobileMenu = false">Get early access →</NuxtLink>
+        <NuxtLink to="/early-access" class="px-10 py-[0.875rem] text-flame font-semibold" @click="mobileMenu = false">Get early access →</NuxtLink>
       </div>
     </nav>
 
@@ -80,7 +80,7 @@
 
           <div class="flex gap-4 items-center flex-wrap mb-4">
             <!-- BETA-TEMP: was to="/signup" · "Start free trial" -->
-            <NuxtLink to="/register-interest" class="inline-flex items-center gap-2 bg-flame text-parchment px-6 py-3 rounded text-[1rem] font-semibold hover:bg-flame-dark transition-all hover:-translate-y-px">
+            <NuxtLink to="/early-access" class="inline-flex items-center gap-2 bg-flame text-parchment px-6 py-3 rounded text-[1rem] font-semibold hover:bg-flame-dark transition-all hover:-translate-y-px">
               Get free early access
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </NuxtLink>
@@ -299,7 +299,7 @@
             <p class="text-[0.9rem] text-ink-faint mb-8">One simple annual plan — priced for potters, not enterprises. Early testers get 12 months free.</p>
 
             <!-- BETA-TEMP: was to="/signup" · "Start 30-day free trial" -->
-            <NuxtLink to="/register-interest" class="inline-flex items-center gap-2 bg-flame text-parchment px-8 py-4 rounded text-[1.05rem] font-semibold hover:bg-flame-dark transition-all hover:-translate-y-px">
+            <NuxtLink to="/early-access" class="inline-flex items-center gap-2 bg-flame text-parchment px-8 py-4 rounded text-[1.05rem] font-semibold hover:bg-flame-dark transition-all hover:-translate-y-px">
               Sign up for free early access
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </NuxtLink>
@@ -329,7 +329,7 @@
         <!-- BETA-TEMP: was "Start your 30-day free trial. No credit card, no commitment." -->
         <p class="text-[1.1rem] text-ink-muted mb-2">Help us build the kiln app you need — free early access, no credit card.</p>
         <!-- BETA-TEMP: was to="/signup" · "Get started free" -->
-        <NuxtLink to="/register-interest" class="inline-flex items-center gap-2 bg-flame text-parchment px-8 py-4 rounded text-[1.05rem] font-semibold hover:bg-flame-dark transition-all hover:-translate-y-px">
+        <NuxtLink to="/early-access" class="inline-flex items-center gap-2 bg-flame text-parchment px-8 py-4 rounded text-[1.05rem] font-semibold hover:bg-flame-dark transition-all hover:-translate-y-px">
           Sign up for early access
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </NuxtLink>
@@ -345,7 +345,7 @@
           <NuxtLink to="/login" class="hover:text-parchment transition-colors">Sign in</NuxtLink>
           <!-- BETA-TEMP: was <NuxtLink to="/signup">Sign up</NuxtLink> — public
                signup is closed during beta. Restore when going live. -->
-          <NuxtLink to="/register-interest" class="hover:text-parchment transition-colors">Early access</NuxtLink>
+          <NuxtLink to="/early-access" class="hover:text-parchment transition-colors">Early access</NuxtLink>
           <NuxtLink to="/privacy" class="hover:text-parchment transition-colors">Privacy</NuxtLink>
           <NuxtLink to="/terms" class="hover:text-parchment transition-colors">Terms</NuxtLink>
         </div>

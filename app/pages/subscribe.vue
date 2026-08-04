@@ -116,7 +116,8 @@
 // trial-expired UI below is left intact — to restore the page, delete the
 // `redirect` key from definePageMeta (revert to `{ layout: false }`).
 // Grep "BETA-TEMP" to find every temporary beta change.
-definePageMeta({ layout: false, redirect: '/register-interest' })
+// app/pages/subscribe.vue
+definePageMeta({ layout: false, redirect: '/early-access' })
 
 const supabase = useSupabaseClient()
 const error    = ref('')

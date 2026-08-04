@@ -96,6 +96,10 @@ export default defineNuxtConfig({
   // the API namespace with the same headers; they don't affect non-HTML.
   routeRules: {
     '/**': { headers: SECURITY_HEADERS },
+    // BETA-TEMP: /register-interest was the public beta URL before the
+    // rename to /early-access (Aug 2026). Links are already in the wild,
+    // so 301 old visits permanently to the new address.
+    '/register-interest': { redirect: { to: '/early-access', statusCode: 301 } },
   },
 
   runtimeConfig: {

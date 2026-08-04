@@ -100,7 +100,8 @@ export default defineNuxtPlugin(() => {
       // (plugin cache, useState, component state). Skip on public pages.
       if (error) console.warn('Session refresh failed after 401:', error)
       const path = window.location.pathname
-      const publicPaths = ['/login', '/signup', '/forgot-password', '/reset-password', '/register-interest', '/confirm', '/subscribe']
+      // app/plugins/auth-fetch.client.js — replace in publicPaths:
+      const publicPaths = ['/login', '/signup', '/forgot-password', '/reset-password', '/early-access', '/confirm', '/subscribe']
       if (!publicPaths.some(p => path.startsWith(p))) {
         window.location.href = '/login'
       }

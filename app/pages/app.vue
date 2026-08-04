@@ -531,7 +531,7 @@ onMounted(async () => {
     // path would just 402 again on /api/firings and blank the page). The
     // skeleton stays up through the redirect — no flash of empty app.
     if (isAccessLapsed(err)) {
-      return navigateTo('/register-interest')  // BETA-TEMP (was /subscribe)
+      return navigateTo('/early-access')  // BETA-TEMP (was /subscribe)
     }
     console.error('Bootstrap failed, falling back to serial load:', err)
     try {
@@ -541,7 +541,7 @@ onMounted(async () => {
       if (activeFiring.value) await selectFiring(activeFiring.value)
     } catch (err2) {
       if (isAccessLapsed(err2)) {
-        return navigateTo('/register-interest')  // BETA-TEMP (was /subscribe)
+        return navigateTo('/early-access') // BETA-TEMP (was /subscribe)
       }
       booting.value = false   // real failure: drop the skeleton, show the page
       throw err2

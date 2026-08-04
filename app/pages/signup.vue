@@ -112,7 +112,7 @@ definePageMeta({
   // renders (server and client), so the form never flashes. Delete this whole
   // `middleware` key to reopen public registration.
   middleware: [
-    () => navigateTo('/register-interest', { redirectCode: 302 }),
+    () => navigateTo('/early-access'),
   ],
 })
 

@@ -219,18 +219,32 @@
       </span>
     </div>
 
-    <!-- Waypoints table — visible by default, collapsible -->
+    <!-- Waypoints — three views of the same points array.
+         STEPS is the default: rate/target/hold is how schedules are written,
+         shared, and programmed into controllers, and it makes minutes an OUTPUT
+         rather than something the user must calculate before they can type.
+         MINUTES is the raw model, kept for fixing a point the other view can't
+         express. HIDE is the old collapsed state. -->
     <div class="flex flex-col gap-2 mt-1">
       <div class="flex items-center justify-between px-1">
-        <div class="grid grid-cols-[1fr_1fr_28px] gap-2 text-[10px] font-bold uppercase tracking-[0.08em] text-ink-faint flex-1">
+        <span class="text-[10px] font-bold uppercase tracking-[0.08em] text-ink-faint">Waypoints</span>
+        <div class="flex gap-1 shrink-0">
+          <button
+            v-for="v in TABLE_VIEWS" :key="v.key"
+            class="px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors"
+            :class="tableView === v.key ? 'bg-flame text-parchment' : 'bg-white border border-parchment-3 text-ink-muted hover:bg-parchment-2'"
+            @click="tableView = v.key"
+          >{{ v.label }}</button>
+        </div>
+      </div>
+
+      <!-- Steps: rate / target / hold — the default -->
+      <ScheduleSegmentEditor v-if="tableView === 'steps'" v-model="pointsProxy" />
+
+      <template v-else-if="tableView === 'minutes'">
+        <div class="grid grid-cols-[1fr_1fr_28px] gap-2 text-[10px] font-bold uppercase tracking-[0.08em] text-ink-faint px-0.5">
           <span>Time (mins)</span><span>Target {{ unitLabel }}</span><span/>
         </div>
-        <button
-          class="text-[10px] font-semibold text-ink-faint hover:text-flame transition-colors ml-4 shrink-0"
-          @click="showTable = !showTable"
-        >{{ showTable ? 'Hide' : 'Show' }}</button>
-      </div>
-      <template v-if="showTable">
         <div
           v-for="(pt, i) in sortedPoints"
           :key="pt._id + 'row'"
@@ -535,7 +549,23 @@ function removePoint(sortedIdx) {
 }
 
 // ── Table helpers ─────────────────────────────────────────────────────────────
-const showTable = ref(true)
+// 'steps' (rate/target/hold) | 'minutes' (raw waypoints) | 'none'
+const tableView = ref('steps')
+const TABLE_VIEWS = [
+  { key: 'steps',   label: 'Steps' },
+  { key: 'minutes', label: 'Minutes' },
+  { key: 'none',    label: 'Hide' },
+]
+
+// ScheduleSegmentEditor speaks plain [{ offsetMinutes, targetTemp }]; `points`
+// here carries a private _id per row for keying and drag tracking. This bridges
+// the two. The setter deliberately does NOT emit — assigning to points.value
+// trips the existing deep watcher, which emits once. Emitting here as well
+// would double-fire and fight StartFiringModal's inbound watcher.
+const pointsProxy = computed({
+  get: () => sortedPoints.value.map(({ offsetMinutes, targetTemp }) => ({ offsetMinutes, targetTemp })),
+  set: (val) => { points.value = val.map(p => ({ ...p, _id: _nextId++ })) },
+})
 
 // val is already °C (offsetMinutes passes through; targetTemp is converted by
 // the @change handler via toCelsius before reaching here).

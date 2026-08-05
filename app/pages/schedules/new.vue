@@ -2,14 +2,37 @@
 <template>
   <div class="min-h-screen bg-parchment font-serif">
 
+    <!-- Header matches /schedules: brand, breadcrumb, account menu. On phones
+         it collapses to the old chevron + title, because a brand mark plus two
+         crumbs plus a title doesn't fit and the title is what matters there. -->
     <header class="sticky top-0 z-20 bg-parchment/95 backdrop-blur border-b border-parchment-3">
-      <div class="max-w-2xl mx-auto flex items-center gap-2 px-4 sm:px-6 py-3">
-        <NuxtLink to="/schedules" class="p-1.5 -ml-1 rounded-lg text-ink-muted hover:text-flame hover:bg-parchment-2 transition-colors shrink-0">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
-        </NuxtLink>
-        <h1 class="flex-1 text-base font-bold text-ink truncate">
-          {{ isFromFiring ? 'Save firing as schedule' : 'New schedule' }}
-        </h1>
+      <div class="max-w-6xl mx-auto flex items-center justify-between gap-2 px-4 sm:px-6 py-3">
+
+        <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+          <NuxtLink to="/schedules" class="sm:hidden p-1.5 -ml-1 rounded-lg text-ink-muted hover:text-flame hover:bg-parchment-2 transition-colors shrink-0">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+          </NuxtLink>
+          <NuxtLink to="/app" class="hidden sm:flex text-base sm:text-lg font-bold items-center gap-2 text-ink tracking-tight hover:text-flame transition-colors shrink-0">
+            <BrandFlame class="w-5 h-5 sm:w-6 sm:h-6" />KilnMonitor
+          </NuxtLink>
+          <span class="hidden sm:inline text-parchment-4 shrink-0">/</span>
+          <NuxtLink to="/schedules" class="hidden sm:inline text-base sm:text-lg font-bold text-ink tracking-tight hover:text-flame transition-colors shrink-0">Schedules</NuxtLink>
+          <span class="hidden sm:inline text-parchment-4 shrink-0">/</span>
+          <h1 class="text-base sm:text-lg font-bold text-ink tracking-tight truncate">
+            {{ isFromFiring ? 'Save firing as schedule' : 'New schedule' }}
+          </h1>
+        </div>
+
+        <div class="flex items-center gap-2 shrink-0">
+          <NuxtLink
+            to="/schedules"
+            class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold border border-parchment-3 rounded-lg text-ink-muted hover:bg-parchment-2 hover:text-ink transition-colors"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+            All schedules
+          </NuxtLink>
+          <UserMenu />
+        </div>
       </div>
     </header>
 
@@ -76,6 +99,22 @@
             </svg>
           </div>
         </div>
+
+        <!-- PASTE (Aug 2026): the select seeds from your library, this seeds
+             from the internet. Same job — a starting curve — so same place. -->
+        <!-- <button
+          class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl border border-dashed border-parchment-4 hover:border-flame/50 transition-colors text-left -mt-1"
+          @click="showPaste = true"
+        >
+          <svg class="w-4 h-4 text-ink-faint shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/>
+          </svg>
+          <span class="flex-1 min-w-0">
+            <span class="block text-sm font-semibold text-ink">Paste a schedule</span>
+            <span class="block text-[11px] text-ink-muted">From a forum post, a blog, or your kiln manual</span>
+          </span>
+          <svg class="w-4 h-4 text-ink-faint shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+        </button> -->
       </template>
 
       <!-- ── SHARED: name ──────────────────────────────────────────────── -->
@@ -105,6 +144,11 @@
           <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Curve</label>
           <span v-if="form.type" class="text-[10px] font-bold px-2 py-0.5 rounded-full" :class="theme.badgeText">{{ form.type }}</span>
           <div class="flex-1" />
+          <!-- G1: the unit toggle lives here as well as in StartFiringModal.
+               The Steps table asks for a RATE (°C/hr vs °F/hr), so a user who
+               pasted a Fahrenheit schedule needs to be able to flip back and
+               check the numbers against their source without leaving the page. -->
+          <TempUnitToggle />
           <!-- REDUCTIONS (Aug 2026): planner trigger — this page never had one,
                so new schedules couldn't carry planned reductions (only
                duplicate/edit could). Mirrors [id].vue; cobalt per the palette. -->
@@ -140,6 +184,9 @@
 
     </main>
 
+    <!-- Paste import -->
+    <PasteScheduleModal :open="showPaste" @close="showPaste = false" @import="onPasteImport" />
+
     <!-- Reduction planner -->
     <ReductionPlannerModal
       :open="showReductionPlanner"
@@ -161,7 +208,7 @@
 
 <script setup>
 // app/pages/schedules/new.vue
-import { themeForType } from '~/composables/useScheduleTheme'
+import { themeForType, labelForType } from '~/composables/useScheduleTheme'
 import { simplify, SUGGESTED_EPSILON, detailToEpsilon, epsilonToDetail } from '~/composables/useCurveSimplify'
 
 definePageMeta({ middleware: ['auth'], path: '/schedules/new' })
@@ -205,6 +252,13 @@ const theme      = computed(() => themeForType(form.type))
 // accepted them (the duplicate flow proves it), this page just never sent any.
 const editReductions       = ref([])
 const showReductionPlanner = ref(false)
+
+// PASTE (Aug 2026)
+const showPaste            = ref(false)
+// The selectedLibraryId watcher RESETS the curve — including when it changes to
+// '' — so clearing the select after an import would wipe the import. This flag
+// lets us clear it silently.
+const suppressLibraryWatch = ref(false)
 
 function onReductionsSaved(list) {
   editReductions.value = list
@@ -279,6 +333,7 @@ function flash(msg) {
 
 // ── Seed from library ─────────────────────────────────────────────────────────
 watch(selectedLibraryId, (val) => {
+  if (suppressLibraryWatch.value) return   // a paste import just cleared it
   if (!val) {
     editPoints.value = BISQUE_DEFAULT.map(p => ({ ...p }))
     editReductions.value = []   // REDUCTIONS: blank slate, no leak from last pick
@@ -298,6 +353,30 @@ watch(selectedLibraryId, (val) => {
   form.type = sched.type ?? 'glaze'
   form.cone = sched.cone ?? ''
 })
+
+// ── Paste import ──────────────────────────────────────────────────────────────
+// Seeds the SAME editor the library select seeds, so the curve stays fully
+// editable afterwards. Metadata only fills BLANKS — a pasted schedule must not
+// overwrite a name or cone the user already typed.
+function onPasteImport(result) {
+  editPoints.value     = result.points.map(p => ({ ...p }))
+  editReductions.value = []                     // pasted text carries no reductions
+
+  if (result.type && !isFromFiring.value) form.type = result.type
+  if (result.cone && !form.cone)          form.cone = result.cone
+  if (!form.name.trim()) {
+    form.name = `${labelForType(result.type)}${result.cone ? ` — cone ${result.cone}` : ''} (imported)`
+  }
+
+  // The curve no longer came from the library — clear the select without
+  // letting its watcher fire and reset everything we just set.
+  suppressLibraryWatch.value = true
+  selectedLibraryId.value    = ''
+  nextTick(() => { suppressLibraryWatch.value = false })
+
+  showPaste.value = false
+  flash(`Imported ${result.points.length} points — adjust anything below`)
+}
 
 // ── Slider ────────────────────────────────────────────────────────────────────
 watch(slider, (val) => {

@@ -14,6 +14,7 @@
         </NuxtLink>
       </div>
       <div class="flex items-center gap-2">
+        <!-- <SpreadTheWord /> -->
         <!-- Firing title + status intentionally omitted here — they live in the
              sidebar (desktop) and the mobile firing sheet, so showing them in
              the header would just duplicate. Rename is triggered per-row from

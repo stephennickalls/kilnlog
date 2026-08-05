@@ -2,12 +2,35 @@
 <template>
   <div class="min-h-screen bg-parchment font-serif">
 
+    <!-- Header matches /schedules: brand, breadcrumb, account menu. On phones
+         it collapses to a chevron + title, because a brand mark plus two crumbs
+         plus a schedule name doesn't fit and the name is what matters there. -->
     <header class="sticky top-0 z-20 bg-parchment/95 backdrop-blur border-b border-parchment-3">
-      <div class="max-w-2xl mx-auto flex items-center gap-2 px-4 sm:px-6 py-3">
-        <NuxtLink to="/schedules" class="p-1.5 -ml-1 rounded-lg text-ink-muted hover:text-flame hover:bg-parchment-2 transition-colors shrink-0">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
-        </NuxtLink>
-        <h1 class="flex-1 text-base font-bold text-ink truncate">{{ form.name || 'Edit schedule' }}</h1>
+      <div class="max-w-6xl mx-auto flex items-center justify-between gap-2 px-4 sm:px-6 py-3">
+
+        <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+          <NuxtLink to="/schedules" class="sm:hidden p-1.5 -ml-1 rounded-lg text-ink-muted hover:text-flame hover:bg-parchment-2 transition-colors shrink-0">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+          </NuxtLink>
+          <NuxtLink to="/app" class="hidden sm:flex text-base sm:text-lg font-bold items-center gap-2 text-ink tracking-tight hover:text-flame transition-colors shrink-0">
+            <BrandFlame class="w-5 h-5 sm:w-6 sm:h-6" />KilnMonitor
+          </NuxtLink>
+          <span class="hidden sm:inline text-parchment-4 shrink-0">/</span>
+          <NuxtLink to="/schedules" class="hidden sm:inline text-base sm:text-lg font-bold text-ink tracking-tight hover:text-flame transition-colors shrink-0">Schedules</NuxtLink>
+          <span class="hidden sm:inline text-parchment-4 shrink-0">/</span>
+          <h1 class="text-base sm:text-lg font-bold text-ink tracking-tight truncate">{{ form.name || 'Edit schedule' }}</h1>
+        </div>
+
+        <div class="flex items-center gap-2 shrink-0">
+          <NuxtLink
+            to="/schedules"
+            class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold border border-parchment-3 rounded-lg text-ink-muted hover:bg-parchment-2 hover:text-ink transition-colors"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+            All schedules
+          </NuxtLink>
+          <UserMenu />
+        </div>
       </div>
     </header>
 
@@ -55,6 +78,11 @@
           <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Curve</label>
           <span v-if="form.type" class="text-[10px] font-bold px-2 py-0.5 rounded-full" :class="theme.badgeText">{{ form.type }}</span>
           <div class="flex-1" />
+          <!-- G1: the unit toggle lives here as well as in StartFiringModal. The
+               Steps table asks for a RATE (°C/hr vs °F/hr), so someone editing a
+               schedule they pasted in Fahrenheit needs to flip back and check
+               against their source without leaving the page. -->
+          <TempUnitToggle />
           <!-- Reduction planner trigger (above the curve/table) -->
           <button
             class="flex items-center gap-1.5 text-xs font-semibold text-indigo-700 hover:text-indigo-900 transition-colors"

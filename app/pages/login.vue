@@ -73,7 +73,7 @@
     -->
     <p class="text-center mt-5 text-sm text-ink-muted">
       Not a beta tester yet?
-      <NuxtLink to="/register-interest" class="text-flame font-semibold hover:underline">Request access</NuxtLink>
+      <NuxtLink to="/early-access" class="text-flame font-semibold hover:underline">Request access</NuxtLink>
     </p>
   </div>
 </template>

@@ -1,6 +1,6 @@
-<!-- app/pages/register-interest.vue -->
+<!-- app/pages/early-access.vue -->
 <!--
-  Beta recruitment page (see BETA-TEMP edits in middleware/auth.js +
+  Early-access recruitment page (see BETA-TEMP edits in middleware/auth.js +
   subscribe.vue). Chrome lives in app/layouts/auth.vue.
 
   DUAL-MODE, driven by /api/beta-slots (cap = public.app_settings.beta_max_slots,
@@ -11,7 +11,7 @@
     - fetch failed  → explicit error state. NEVER a slot-count sentence:
       a failed fetch used to render "all 0 spots are taken".
 
-  COPY: the banner shows only spots REMAINING, never "N of 12" — the total is
+  COPY: the banner shows only spots REMAINING, never "N of 25" — the total is
   ours to change and visitors don't need it. The waitlist copy is likewise
   total-free ("All spots taken"). slots.total is still returned by the API;
   just don't render it.
@@ -36,13 +36,20 @@
   not for genuine typos.
 
   MOBILE: inputs are `text-base sm:text-sm` — iOS Safari zooms sub-16px inputs.
+
+  LOADING (Aug 2026): the slots fetch is NOT awaited — see the comment on
+  useFetch below. Awaiting it blocked the route transition, so clicking
+  "Get early access" anywhere on the site looked like nothing had happened
+  for 1–4 seconds. The `pending` block at the top of the template is what
+  the user now sees instead.
 -->
 <template>
   <div>
     <!-- Loading -->
-    <p v-if="pending" class="text-center text-sm text-ink-muted py-4">
-      Checking available spots…
-    </p>
+    <div v-if="pending" class="py-6 flex flex-col items-center gap-3">
+      <span class="w-6 h-6 border-2 border-parchment-3 border-t-flame rounded-full animate-spin"/>
+      <p class="text-sm text-ink-muted">Checking available spots…</p>
+    </div>
 
     <!-- Fetch failed — no counts shown -->
     <div v-else-if="slotsError" class="text-center py-4 flex flex-col items-center gap-3">
@@ -58,7 +65,7 @@
     </div>
 
     <!-- ══ MODE A: spots free — create account ══ -->
-    <template v-else-if="slots.remaining > 0">
+    <template v-else-if="slots?.remaining > 0">
       <!-- Signed in already — heading to the app -->
       <div v-if="accountCreated && signedIn" class="text-center py-4 flex flex-col items-center gap-3">
         <span class="text-5xl">{{ tookLastSlot ? '🏆' : '🎉' }}</span>
@@ -265,7 +272,7 @@
 </template>
 
 <script setup>
-// app/pages/register-interest.vue
+// app/pages/early-access.vue
 definePageMeta({
   layout:   'auth',
   subtitle: 'Get early access',
@@ -287,8 +294,20 @@ const signedIn       = ref(false)
 const tookLastSlot   = ref(false)
 
 // SSR'd so the correct mode renders on first paint — no flash, no guessing.
+//
+// LOADING (Aug 2026): deliberately NOT awaited. A top-level `await useFetch`
+// blocks the ROUTE TRANSITION — Nuxt won't render this page until it resolves
+// — so the `pending` branch could never appear, and clicking "Get early
+// access" left the user staring at the previous page for 1–4 seconds with no
+// sign anything had happened. lazy:true renders immediately and lets the
+// loading state do its job. Still SSRs on a hard load; only client-side
+// navigation changes.
+//
+// CONSEQUENCE: `slots` is null while pending, which is why MODE A tests
+// `slots?.remaining`. The pending and slotsError branches must stay ABOVE it
+// in the template — they're what covers the null window.
 const { data: slots, pending, error: slotsError, refresh } =
-  await useFetch('/api/beta-slots')
+  useFetch('/api/beta-slots', { lazy: true })
 
 // Supabase Auth error strings → copy a potter can act on.
 function friendlyAuthError(msg = '') {

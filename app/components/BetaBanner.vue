@@ -37,7 +37,7 @@
 
       <!-- CTA: full-width block on mobile, compact inline on desktop -->
       <NuxtLink
-        to="/register-interest"
+         to="/early-access"
         class="w-full sm:w-auto shrink-0 inline-flex items-center justify-center gap-1.5 bg-flame text-parchment px-5 py-2.5 sm:py-1.5 rounded text-[0.875rem] font-semibold hover:bg-flame-dark transition-colors"
       >
         Get free early access

@@ -8,7 +8,7 @@
 // Returns:
 //   {
 //     temp_unit:          'C' | 'F',
-//     firings:            [...],          // all firings, newest first (list shape)
+//     firings:            [...],          // FIRST PAGE only, newest first
 //     activeFiring:       {...} | null,   // full detail: schedule+readings+reductions+cone_drops
 //     role:               'admin' | 'user',
 //     pastDueGraceEndsAt: ISO string | null,
@@ -17,12 +17,23 @@
 //
 // Round-trip plan inside the function (Supabase queries) — TWO rounds:
 //   1. Promise.all: preferences + auto-end sweep + announcements + dismissals
-//   2. Promise.all: firings list + active-firing detail (nested select)
+//   2. Promise.all: firings page + active-firing detail (nested select)
 //
 // PERF (Aug 2026): round 2 used to be two SERIAL rounds — fetch the active
 // firing's id, then re-query that row for its detail. Since the sweep in
 // round 1 has already ended anything stale, the nested select can filter on
 // the same predicate directly, saving a full DB round trip on every load.
+//
+// LAZY LIST (Aug 2026): `firings` is now the FIRST PAGE (FIRINGS_PAGE_SIZE
+// rows, list columns only) rather than every firing ever created. The sidebar
+// loads older pages on demand via GET /api/firings?offset=. The ACTIVE firing
+// is the deliberate exception — it's still returned in full, because the chart
+// needs its readings on first paint and there's nothing to lazy-load them for.
+//
+// The active firing might not be on page 1: restarting an old firing makes it
+// active again without changing created_at. That's fine — it comes back in
+// `activeFiring` regardless of the page, and app.vue merges it into the list
+// so its "Live" row is always present.
 //
 // CONE DROPS (Aug 2026): active-firing detail nested-selects cone_drops so
 // the chart can draw drop markers on first paint, same pattern as reductions.
@@ -72,17 +83,25 @@ export default defineEventHandler(async (event) => {
 
   const tRound1 = Date.now()
 
-  // ── Round 2: list + active-firing detail, in ONE parallel round ──────────
+  // ── Round 2: first page + active-firing detail, in ONE parallel round ────
   // The sweep (round 1) has already ended anything stale, so filtering on
   // "started and not ended" here is safe. The partial unique index
   // one_active_firing_per_user keeps this a single-row lookup.
+  //
+  // Ordering mirrors /api/firings exactly (created_at DESC, id DESC) — page 1
+  // here and page 2 there must come from the same sort or rows go missing.
   const [listRes, activeRes] = await Promise.all([
-    db.from('firings').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+    db.from('firings')
+      .select(FIRING_LIST_COLUMNS)
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .range(0, FIRINGS_PAGE_SIZE - 1),
     db.from('firings')
       .select(`
         *,
         schedule:schedule(*),
-        readings:readings(*),
+        readings:readings(${READING_COLUMNS}),
         reductions:reduction_periods(id, start_temp, end_temp, created_at, ended_at, origin),
         cone_drops:cone_drops(id, cone, dropped_at, temp_at_drop)
       `)
@@ -117,6 +136,8 @@ export default defineEventHandler(async (event) => {
     round1Ms: tRound1 - tAuth,
     round2Ms: Date.now() - tRound1,
     totalMs: Date.now() - t0,
+    firingsPage: (listRes.data ?? []).length,
+    activeReadings: activeFiring?.readings?.length ?? 0,
   })
 
   return {

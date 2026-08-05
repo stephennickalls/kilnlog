@@ -1,5 +1,12 @@
 <!-- app/components/FiringSidebar.vue -->
-
+<!--
+  LAZY LIST (Aug 2026): the firings list is paginated. This component renders
+  whatever page(s) the parent has loaded and asks for more via @load-more —
+  it owns none of the fetching. `hasMore` is inferred by the parent from
+  "last page came back full", so the button can appear once with nothing
+  behind it; clicking it then reveals nothing and it disappears. That's the
+  accepted cost of not sending a COUNT(*) on every load.
+-->
 <template>
   <!-- Open sidebar -->
   <aside
@@ -86,6 +93,21 @@
           >Delete?</button>
         </div>
       </li>
+
+      <!-- LAZY LIST: older pages on demand -->
+      <li v-if="hasMore">
+        <button
+          class="w-full px-4 py-3 text-xs font-semibold text-ink-muted hover:text-flame hover:bg-parchment-2 transition-colors disabled:opacity-50"
+          :disabled="loadingMore"
+          @click="$emit('load-more')"
+        >
+          <span v-if="loadingMore" class="flex items-center justify-center gap-2">
+            <span class="w-3 h-3 border-2 border-parchment-3 border-t-ink-muted rounded-full animate-spin"/>
+            Loading…
+          </span>
+          <span v-else>Load older firings</span>
+        </button>
+      </li>
     </ul>
 
     <div class="p-3 border-t border-parchment-3 flex flex-col gap-2">
@@ -153,9 +175,12 @@ const props = defineProps({
   selectedId:   { type: Number, default: null },
   activeFiring: { type: Object, default: null },
   pastFirings:  { type: Array, default: () => [] },
+  // LAZY LIST (Aug 2026)
+  hasMore:      { type: Boolean, default: false },
+  loadingMore:  { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['toggle', 'select', 'start', 'rename', 'drag', 'delete'])
+const emit = defineEmits(['toggle', 'select', 'start', 'rename', 'drag', 'delete', 'load-more'])
 
 const confirmDeleteId = ref(null)
 

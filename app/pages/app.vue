@@ -41,12 +41,15 @@
         :selected-id="selectedFiring?.id ?? null"
         :active-firing="activeFiring"
         :past-firings="pastFirings"
+        :has-more="hasMoreFirings"
+        :loading-more="loadingOlderFirings"
         @toggle="sidebarOpen = !sidebarOpen"
         @select="selectFiring"
         @start="openStartModal"
         @rename="renamingFiring = $event"
         @drag="startDrag"
         @delete="deleteFiring"
+        @load-more="loadOlderFirings"
       />
 
       <!-- Main content -->
@@ -258,6 +261,16 @@
                 <button v-else class="px-2.5 py-1.5 rounded-lg text-xs font-bold text-white bg-red-500" @click.stop="sheetDeleteFiring(f)">Delete?</button>
               </div>
             </li>
+
+            <!-- LAZY LIST (Aug 2026): older pages on demand. The sheet stays
+                 open — loading more shouldn't cost the user their place. -->
+            <li v-if="hasMoreFirings">
+              <button
+                class="w-full px-4 py-4 text-sm font-semibold text-ink-muted active:bg-parchment-2 transition-colors disabled:opacity-50"
+                :disabled="loadingOlderFirings"
+                @click="loadOlderFirings"
+              >{{ loadingOlderFirings ? 'Loading…' : 'Load older firings' }}</button>
+            </li>
           </ul>
           <div class="p-3 border-t border-parchment-3 shrink-0">
             <!-- G5: one firing at a time. The active firing is listed above to tap into. -->
@@ -379,6 +392,14 @@ const showEndConfirm       = ref(false)
 const pendingDeleteFiring  = ref(null) // G4: firing awaiting delete confirmation
 const renamingFiring       = ref(null) // firing being renamed (sidebar-triggered); open when non-null
 const allFirings           = ref([])
+// LAZY LIST (Aug 2026): the firings list is paged. MUST match
+// FIRINGS_PAGE_SIZE in server/utils/firingList.js — `hasMoreFirings` is
+// inferred from "the last page came back full", so a mismatch makes the
+// "Load older" button appear or vanish one page early.
+const FIRINGS_PAGE         = 30
+const hasMoreFirings       = ref(false)
+const loadingOlderFirings  = ref(false)
+const firingsOffset        = ref(0)
 const selectedFiring       = ref(null)
 const currentTemp          = ref(null)  // raw °C
 const isSaving             = ref(false)
@@ -488,23 +509,27 @@ function isAccessLapsed(err) {
   return (err?.statusCode ?? err?.status ?? err?.response?.status) === 402
 }
 
-// PERF REFACTOR (Jul 2026): the old mount sequence was three serial API calls
-// (/api/preferences → /api/firings → /api/firings/:id), each a separate
-// Netlify Function invocation paying its own auth + profile round trips.
-// /api/bootstrap returns all three payloads in ONE invocation; the active
-// firing detail feeds selectFiring's existing `preloaded` path, so no refetch.
-// If bootstrap fails for any reason we fall back to the old serial path so a
-// deploy mismatch can never blank the page.
-// ARCH (Aug 2026): bootstrap now also carries role (→ UserMenu's Admin link)
-// and pastDueGraceEndsAt (→ PastDueBanner) — the client-side profiles
-// queries those components used to make are deleted.
 async function loadBootstrap() {
   const boot = await $fetch('/api/bootstrap')
   userRole.value = boot.role ?? 'user'
   pastDueGraceEndsAt.value = boot.pastDueGraceEndsAt ?? null
   setUnitState(boot.temp_unit === 'F' ? 'F' : 'C')
   setChartUnit()
+
+  // LAZY LIST (Aug 2026): boot.firings is now the FIRST PAGE, not everything.
+  // hasMore is inferred from "the page came back full" — no COUNT(*) needed.
+  // firingsOffset tracks rows CONSUMED from the server list; it must be set
+  // before ensureFiringInList, which can prepend a row that was never part of
+  // a page and would otherwise inflate the next offset.
   allFirings.value = boot.firings ?? []
+  firingsOffset.value = (boot.firings ?? []).length
+  hasMoreFirings.value = (boot.firings ?? []).length === FIRINGS_PAGE
+  // The active firing can be older than page 1 (restarting an old firing makes
+  // it active without touching created_at), so merge its row in explicitly —
+  // otherwise the `activeFiring` computed finds nothing and the app believes
+  // no firing is running.
+  ensureFiringInList(boot.activeFiring)
+
   announcements.value = boot.announcements ?? []   // ANNOUNCEMENTS
   // UX (Aug 2026): drop the skeleton BEFORE selectFiring so the chart canvas
   // is mounted by the time the chart paints into it.
@@ -626,8 +651,50 @@ async function onVisibilityChange() {
   }
 }
 
+// Resets to page 1. Any older pages the user had loaded are dropped — they're
+// one click away again, and the alternative (re-fetching every loaded page on
+// each mutation) costs more than it saves.
 async function refreshFirings() {
-  allFirings.value = await $fetch('/api/firings')
+  const page = await $fetch('/api/firings', { query: { limit: FIRINGS_PAGE, offset: 0 } })
+  allFirings.value = page
+  firingsOffset.value = page.length
+  hasMoreFirings.value = page.length === FIRINGS_PAGE
+  // A restarted old firing can be active but off page 1 — keep its row.
+  const sel = selectedFiring.value
+  if (sel?.started_at && !sel?.ended_at) ensureFiringInList(sel)
+}
+
+async function loadOlderFirings() {
+  if (loadingOlderFirings.value || !hasMoreFirings.value) return
+  loadingOlderFirings.value = true
+  try {
+    const page = await $fetch('/api/firings', {
+      query: { limit: FIRINGS_PAGE, offset: firingsOffset.value },
+    })
+    firingsOffset.value += page.length
+    // Offset paging can still repeat a row if one was inserted above
+    // mid-session. Dedupe by id rather than trusting the offset.
+    const seen = new Set(allFirings.value.map(f => f.id))
+    allFirings.value = [...allFirings.value, ...page.filter(f => !seen.has(f.id))]
+    hasMoreFirings.value = page.length === FIRINGS_PAGE
+  } catch (err) {
+    toast.show(`Couldn't load older firings: ${err?.data?.message ?? err.message ?? 'error'}`)
+  } finally {
+    loadingOlderFirings.value = false
+  }
+}
+
+function ensureFiringInList(row) {
+  if (!row?.id) return
+  // Strip the heavy nested arrays and `notes` — a LIST row carries neither, and
+  // holding a full firing's readings in the sidebar list is exactly what this
+  // refactor set out to stop.
+  const listRow = { ...row }
+  for (const k of ['schedule', 'readings', 'reductions', 'cone_drops', 'notes']) delete listRow[k]
+
+  const i = allFirings.value.findIndex(f => f.id === listRow.id)
+  if (i === -1) allFirings.value = [listRow, ...allFirings.value]
+  else allFirings.value[i] = { ...allFirings.value[i], ...listRow }
 }
 
 async function selectFiring(f, preloaded = null) {
@@ -639,7 +706,11 @@ async function selectFiring(f, preloaded = null) {
   clearNowLine()
 
   let data = preloaded
-  if (!data || data.schedule === undefined || data.readings === undefined) {
+  // LAZY LIST: a list row now has NO `notes` column, so a row passed straight
+  // in as `preloaded` (restartFiring does this) looks complete by the old
+  // schedule/readings test while missing notes entirely — the notes modal
+  // would then open empty and saving would blank real notes.
+  if (!data || data.schedule === undefined || data.readings === undefined || data.notes === undefined) {
     data = await $fetch(`/api/firings/${f.id}`)
   }
 

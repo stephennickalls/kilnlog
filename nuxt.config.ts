@@ -6,16 +6,19 @@
 // CSP notes — what each source allows and WHY (a wrong CSP breaks checkout
 // SILENTLY, so each entry is deliberate):
 //   - connect-src: XHR + websocket to Supabase (REST + Auth + Realtime),
-//     plus api.stripe.com for any client-side Stripe calls.
+//     plus api.stripe.com for any client-side Stripe calls, plus the Google
+//     Analytics collection endpoints (see GA block below).
 //   - script-src:  'self' for the bundled app (Chart.js etc. are bundled, not
 //     CDN). js.stripe.com is included so Stripe.js loads if/when embedded
 //     (checkout/portal are server-created redirects today, but keeping Stripe
 //     script allowed is harmless and future-proofs an inline Elements form).
+//     googletagmanager.com serves gtag.js.
 //     'unsafe-inline' is required because Nuxt injects an inline hydration/
 //     payload script with no nonce in the current setup.
 //   - frame-src:   js.stripe.com + hooks.stripe.com for the 3DS/checkout iframe.
 //   - form-action: 'self' + Stripe (checkout/portal POST redirects).
-//   - img-src:     'self' data: blob: + https: (avatars, Supabase storage).
+//   - img-src:     'self' data: blob: + https: (avatars, Supabase storage —
+//     also covers GA's legacy pixel fallback).
 //   - style-src:   'unsafe-inline' — Tailwind + Vue scoped styles inject inline.
 //   - frame-ancestors 'none' is the CSP-level clickjacking guard; X-Frame-Options
 //     DENY is the legacy equivalent for old browsers.
@@ -43,13 +46,31 @@ const SUPABASE_WS = SUPABASE_ORIGIN ? SUPABASE_ORIGIN.replace(/^http/, 'ws') : '
 const SUPABASE_SRC = [SUPABASE_ORIGIN, SUPABASE_WS].filter(Boolean).join(' ')
   || 'https://*.supabase.co wss://*.supabase.co'
 
+// ── GA4 (Aug 2026) ────────────────────────────────────────────────────────
+// Two different hosts, and both are required:
+//   - gtag.js is SERVED from googletagmanager.com          → script-src
+//   - the hits are SENT to google-analytics.com, and to a  → connect-src
+//     region-specific *.analytics.google.com host for some
+//     visitors, which is why the wildcards are here.
+// googletagmanager.com also appears in connect-src because gtag fetches its
+// remote config from there. Miss any of these and GA fails silently — the
+// only symptom is a CSP violation in the browser console.
+const GA_SCRIPT  = 'https://www.googletagmanager.com'
+const GA_CONNECT = [
+  'https://www.google-analytics.com',
+  'https://analytics.google.com',
+  'https://*.google-analytics.com',
+  'https://*.analytics.google.com',
+  'https://www.googletagmanager.com',
+].join(' ')
+
 const CSP = [
   "default-src 'self'",
   "base-uri 'self'",
   "object-src 'none'",
   "frame-ancestors 'none'",
-  `connect-src 'self' ${SUPABASE_SRC} https://api.stripe.com`,
-  "script-src 'self' 'unsafe-inline' https://js.stripe.com",
+  `connect-src 'self' ${SUPABASE_SRC} https://api.stripe.com ${GA_CONNECT}`,
+  `script-src 'self' 'unsafe-inline' https://js.stripe.com ${GA_SCRIPT}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
@@ -109,6 +130,10 @@ export default defineNuxtConfig({
     public: {
       supabaseUrl:            process.env.SUPABASE_URL,
       supabasePublishableKey: process.env.SUPABASE_PUBLISHABLE_KEY,
+      // GA4 measurement ID (G-XXXXXXXXXX). Set in Netlify env only — leaving
+      // it unset locally means app/plugins/analytics.client.js no-ops, so dev
+      // traffic never reaches the property.
+      gaMeasurementId:        process.env.GA_MEASUREMENT_ID || '',
     },
   },
 })

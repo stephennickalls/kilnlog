@@ -1,33 +1,19 @@
-<!-- app/pages/account.vue -->
+<!-- File: app/pages/account.vue -->
+<!--
+  MOBILE (Aug 2026): this page was unreachable-from and unescapable-on a phone.
+  Its only navigation was "Back to app" behind `hidden sm:inline-flex`, and it
+  never rendered a UserMenu — so on an iPhone there was no way out except the
+  browser's back button. It now uses the shared AppNav, which carries the
+  account menu (and therefore the whole app's navigation) at every width.
+
+  The other mobile bug was the Profile card: `justify-between` with a long
+  unbroken email set the row's min-content wider than a 375px screen and pushed
+  the document sideways. Rows now stack under sm and the email breaks.
+-->
 <template>
   <div class="min-h-screen bg-parchment font-serif">
 
-    <!-- Header -->
-      <header class="sticky top-0 z-20 bg-parchment/95 backdrop-blur border-b border-parchment-3">
-        <div class="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-6 py-3">
-          <div class="flex items-center gap-3 min-w-0">
-
-            <!-- Brand — same mark as the app header, links to the app -->
-            <NuxtLink to="/app" class="text-base sm:text-lg font-bold flex items-center gap-2 text-ink tracking-tight hover:text-flame transition-colors shrink-0">
-              <BrandFlame class="w-5 h-5 sm:w-6 sm:h-6" />
-              KilnMonitor
-            </NuxtLink>
-
-            <span class="text-parchment-4 shrink-0">/</span>
-            <h1 class="text-base sm:text-lg font-bold text-ink tracking-tight truncate">Account</h1>
-          </div>
-
-          <div class="flex items-center gap-2 shrink-0">
-            <NuxtLink
-              to="/app"
-              class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold border border-parchment-3 rounded-lg text-ink-muted hover:bg-parchment-2 hover:text-ink transition-colors"
-            >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
-              Back to app
-            </NuxtLink>
-          </div>
-        </div>
-      </header>
+    <AppNav :crumbs="[{ label: 'Account' }]" />
 
     <!-- Loading -->
     <div v-if="loading" class="flex items-center justify-center py-20">
@@ -35,27 +21,29 @@
     </div>
 
     <!-- Error -->
-    <div v-else-if="loadError" class="flex flex-col items-center justify-center py-20 gap-3">
+    <div v-else-if="loadError" class="flex flex-col items-center justify-center py-20 gap-3 px-4 text-center">
       <p class="text-sm text-ink-muted">{{ loadError }}</p>
       <button class="text-sm text-flame font-semibold" @click="load">Try again</button>
     </div>
 
     <template v-else>
-      <div class="max-w-lg mx-auto px-4 py-6 flex flex-col gap-4">
+      <div class="max-w-lg mx-auto px-4 py-6 pb-safe flex flex-col gap-4">
 
         <!-- Profile -->
         <div class="bg-white border border-parchment-3 rounded-2xl overflow-hidden" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
-          <div class="px-5 py-4 border-b border-parchment-3">
+          <div class="px-4 sm:px-5 py-4 border-b border-parchment-3">
             <p class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Profile</p>
           </div>
-          <div class="px-5 py-4 flex flex-col gap-3">
-            <div class="flex items-center justify-between">
-              <span class="text-sm text-ink-muted">Email</span>
-              <span class="text-sm font-semibold text-ink">{{ user?.email }}</span>
+          <div class="px-4 sm:px-5 py-4 flex flex-col gap-3">
+            <!-- Label above value on phones: an email is longer than half a
+                 375px row, and side-by-side forced horizontal overflow. -->
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 sm:gap-3">
+              <span class="text-sm text-ink-muted shrink-0">Email</span>
+              <span class="text-sm font-semibold text-ink break-all sm:text-right min-w-0">{{ user?.email }}</span>
             </div>
-            <div v-if="profile?.full_name" class="flex items-center justify-between">
-              <span class="text-sm text-ink-muted">Name</span>
-              <span class="text-sm font-semibold text-ink">{{ profile.full_name }}</span>
+            <div v-if="profile?.full_name" class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 sm:gap-3">
+              <span class="text-sm text-ink-muted shrink-0">Name</span>
+              <span class="text-sm font-semibold text-ink break-words sm:text-right min-w-0">{{ profile.full_name }}</span>
             </div>
           </div>
         </div>
@@ -68,13 +56,13 @@
           Grep "BETA-TEMP" to find all beta patches.
         -->
         <div class="bg-white border border-parchment-3 rounded-2xl overflow-hidden" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
-          <div class="px-5 py-4 border-b border-parchment-3">
+          <div class="px-4 sm:px-5 py-4 border-b border-parchment-3">
             <p class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Membership</p>
           </div>
-          <div class="px-5 py-4 flex flex-col gap-3">
-            <div class="flex items-center justify-between">
+          <div class="px-4 sm:px-5 py-4 flex flex-col gap-3">
+            <div class="flex items-center justify-between gap-3">
               <span class="text-sm text-ink-muted">Status</span>
-              <span class="px-2.5 py-1 text-xs font-bold rounded-full bg-flame-bg text-flame border border-flame/30">Beta tester</span>
+              <span class="px-2.5 py-1 text-xs font-bold rounded-full bg-flame-bg text-flame border border-flame/30 shrink-0">Beta tester</span>
             </div>
             <p class="text-xs text-ink-muted leading-relaxed">
               You're on free access as a KilnMonitor beta tester — thank you for
@@ -83,7 +71,7 @@
             </p>
             <p class="text-xs text-ink-muted leading-relaxed">
               Found a bug, or have an idea? Email
-              <a href="mailto:kilnmonitor@gmail.com?subject=KilnMonitor%20beta%20feedback" class="text-flame font-semibold hover:underline">kilnmonitor@gmail.com</a>
+              <a href="mailto:kilnmonitor@gmail.com?subject=KilnMonitor%20beta%20feedback" class="text-flame font-semibold hover:underline break-all">kilnmonitor@gmail.com</a>
               — every message gets read.
             </p>
           </div>
@@ -91,16 +79,16 @@
 
         <!-- G7: Your data (export) -->
         <div class="bg-white border border-parchment-3 rounded-2xl overflow-hidden" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
-          <div class="px-5 py-4 border-b border-parchment-3">
+          <div class="px-4 sm:px-5 py-4 border-b border-parchment-3">
             <p class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Your data</p>
           </div>
-          <div class="px-5 py-4 flex flex-col gap-3">
+          <div class="px-4 sm:px-5 py-4 flex flex-col gap-3">
             <p class="text-xs text-ink-muted leading-relaxed">
               Download everything in your account — all firings and readings, your
               schedules, and settings — as a single JSON file.
             </p>
             <button
-              class="w-full py-2.5 border border-parchment-3 text-ink-muted text-sm font-semibold rounded-xl hover:bg-parchment-2 transition-colors disabled:opacity-50"
+              class="w-full min-h-[44px] py-2.5 border border-parchment-3 text-ink-muted text-sm font-semibold rounded-xl hover:bg-parchment-2 transition-colors disabled:opacity-50"
               :disabled="exporting"
               @click="onExport"
             >
@@ -116,8 +104,8 @@
 
         <!-- Sign out -->
         <div class="bg-white border border-parchment-3 rounded-2xl overflow-hidden" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
-          <div class="px-5 py-4">
-            <button class="w-full py-2.5 border border-parchment-3 text-ink-muted text-sm font-semibold rounded-xl hover:bg-parchment-2 transition-colors" @click="signOut">
+          <div class="px-4 sm:px-5 py-4">
+            <button class="w-full min-h-[44px] py-2.5 border border-parchment-3 text-ink-muted text-sm font-semibold rounded-xl hover:bg-parchment-2 transition-colors" @click="signOut">
               Sign out
             </button>
           </div>
@@ -125,16 +113,16 @@
 
         <!-- G7: Danger zone (delete account) -->
         <div class="bg-white border border-red-200 rounded-2xl overflow-hidden" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
-          <div class="px-5 py-4 border-b border-red-100">
+          <div class="px-4 sm:px-5 py-4 border-b border-red-100">
             <p class="text-[10px] font-bold uppercase tracking-[0.1em] text-red-400">Danger zone</p>
           </div>
-          <div class="px-5 py-4 flex flex-col gap-3">
+          <div class="px-4 sm:px-5 py-4 flex flex-col gap-3">
             <p class="text-xs text-ink-muted leading-relaxed">
               Permanently delete your account and all your data. Any active
               subscription is cancelled. This cannot be undone.
             </p>
             <button
-              class="w-full py-2.5 border border-red-200 text-red-500 text-sm font-semibold rounded-xl hover:bg-red-50 transition-colors"
+              class="w-full min-h-[44px] py-2.5 border border-red-200 text-red-500 text-sm font-semibold rounded-xl hover:bg-red-50 transition-colors"
               @click="showDeleteModal = true"
             >
               Delete account

@@ -1,3 +1,85 @@
+/* app/assets/css/tailwind.css */
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ─────────────────────────────────────────────────────────────────────────
+   MOBILE FIXES (Aug 2026)
+
+   1. iOS AUTO-ZOOM — the big one. Safari on iPhone zooms the page in whenever
+      a form control with font-size < 16px receives focus, and it does NOT zoom
+      back out. Every .input in this app was text-sm (14px), so one tap on a
+      firing name, a schedule field, or the search box left the user zoomed and
+      panning sideways for the rest of the session. That is the "page is wider
+      than the screen" report. 16px on touch pointers = no zoom, ever.
+      Desktop keeps the tighter 14px.
+
+   2. OVERFLOW GUARD — belt and braces so a single unbreakable string (a long
+      email, a pasted URL) can never widen the document.
+
+   3. SAFE AREAS — viewport-fit=cover is set in nuxt.config, so the notch and
+      home indicator are ours to avoid.
+   ───────────────────────────────────────────────────────────────────────── */
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    overflow-x: hidden;
+  }
+
+  body {
+    overflow-x: hidden;
+    overscroll-behavior-y: none;      /* no rubber-band on pull-down */
+  }
+
+  /* 1 — no zoom on focus. Applies to phones/tablets only. */
+  @media (pointer: coarse) {
+    input,
+    select,
+    textarea {
+      font-size: 16px !important;
+      line-height: 1.4;
+    }
+  }
+
+  /* Tap targets: iOS HIG minimum is 44px. */
+  @media (pointer: coarse) {
+    button,
+    [role='button'],
+    a.menu-item,
+    a.nav-item {
+      touch-action: manipulation;
+    }
+  }
+
+  /* 2 — nothing may exceed its container. */
+  img, svg, video, canvas { max-width: 100%; }
+}
+
+@layer components {
+  /* SHARED CONTROLS (Aug 2026): these used to be redefined in a page-level
+     <style> block in app.vue and again in admin/announcements.vue, which meant
+     .btn-primary / .input silently did nothing on account, schedules, admin
+     users, admin logs… Defined once here, in the components layer, so a page
+     <style> block can still override (announcements keeps its celadon set). */
+  .btn-primary {
+    @apply inline-flex items-center justify-center px-4 py-2 bg-flame hover:bg-flame-dark text-parchment text-sm font-semibold rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+  .btn-danger {
+    @apply inline-flex items-center justify-center px-4 py-2 border border-red-300 text-red-500 hover:bg-red-50 text-sm font-medium rounded-lg transition-colors;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center px-4 py-2 border border-parchment-3 text-ink-muted hover:bg-parchment-2 text-sm font-medium rounded-lg transition-colors;
+  }
+  .input {
+    @apply w-full border border-parchment-3 rounded-lg px-3 py-2 text-base sm:text-sm text-ink bg-white focus:outline-none focus:ring-2 focus:ring-flame/20 focus:border-flame font-serif;
+  }
+  .label {
+    @apply text-xs font-bold uppercase tracking-widest text-ink-faint;
+  }
+
+  /* 3 — safe-area helpers for sheets, fixed bars, and full-screen menus. */
+  .pb-safe { padding-bottom: max(0.75rem, env(safe-area-inset-bottom)); }
+  .pt-safe { padding-top: max(0.75rem, env(safe-area-inset-top)); }
+}

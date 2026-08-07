@@ -104,6 +104,28 @@ export default defineNuxtConfig({
     },
   },
 
+  // ── MOBILE (Aug 2026) ───────────────────────────────────────────────────
+  // Nuxt's default viewport tag is 'width=device-width, initial-scale=1',
+  // which omits viewport-fit. Without it iOS reports every env(safe-area-inset-*)
+  // as 0, so the full-screen nav sheet and the firing sheet sat under the home
+  // indicator. The .pb-safe / .pt-safe helpers in tailwind.css depend on this.
+  //
+  // maximum-scale / user-scalable are DELIBERATELY absent — pinch-zoom stays
+  // available. The auto-zoom problem (Safari zooming in on focus of any control
+  // under 16px, and never zooming back out) is fixed properly by the
+  // `@media (pointer: coarse)` rule in tailwind.css, not by disabling zoom.
+  app: {
+    head: {
+      viewport: 'width=device-width, initial-scale=1, viewport-fit=cover',
+      meta: [
+        // Stops iOS turning firing durations and cone numbers into phone links.
+        { name: 'format-detection', content: 'telephone=no' },
+        // Safari tints its chrome to match the parchment background.
+        { name: 'theme-color', content: '#faf6ef' },
+      ],
+    },
+  },
+
   // AUTH FIX (Jul 2026) — see header comment.
   imports: {
     imports: [

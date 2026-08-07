@@ -1,40 +1,25 @@
-<!-- app/pages/schedules/new.vue -->
+<!-- File: app/pages/schedules/new.vue -->
 <template>
   <div class="min-h-screen bg-parchment font-serif">
 
-    <!-- Header matches /schedules: brand, breadcrumb, account menu. On phones
-         it collapses to the old chevron + title, because a brand mark plus two
-         crumbs plus a title doesn't fit and the title is what matters there. -->
-    <header class="sticky top-0 z-20 bg-parchment/95 backdrop-blur border-b border-parchment-3">
-      <div class="max-w-6xl mx-auto flex items-center justify-between gap-2 px-4 sm:px-6 py-3">
-
-        <div class="flex items-center gap-2 sm:gap-3 min-w-0">
-          <NuxtLink to="/schedules" class="sm:hidden p-1.5 -ml-1 rounded-lg text-ink-muted hover:text-flame hover:bg-parchment-2 transition-colors shrink-0">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
-          </NuxtLink>
-          <NuxtLink to="/app" class="hidden sm:flex text-base sm:text-lg font-bold items-center gap-2 text-ink tracking-tight hover:text-flame transition-colors shrink-0">
-            <BrandFlame class="w-5 h-5 sm:w-6 sm:h-6" />KilnMonitor
-          </NuxtLink>
-          <span class="hidden sm:inline text-parchment-4 shrink-0">/</span>
-          <NuxtLink to="/schedules" class="hidden sm:inline text-base sm:text-lg font-bold text-ink tracking-tight hover:text-flame transition-colors shrink-0">Schedules</NuxtLink>
-          <span class="hidden sm:inline text-parchment-4 shrink-0">/</span>
-          <h1 class="text-base sm:text-lg font-bold text-ink tracking-tight truncate">
-            {{ isFromFiring ? 'Save firing as schedule' : 'New schedule' }}
-          </h1>
-        </div>
-
-        <div class="flex items-center gap-2 shrink-0">
-          <NuxtLink
-            to="/schedules"
-            class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold border border-parchment-3 rounded-lg text-ink-muted hover:bg-parchment-2 hover:text-ink transition-colors"
-          >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
-            All schedules
-          </NuxtLink>
-          <UserMenu />
-        </div>
-      </div>
-    </header>
+    <AppNav
+      :crumbs="[
+        { label: 'Schedules', to: '/schedules' },
+        { label: isFromFiring ? 'Save firing as schedule' : 'New schedule' },
+      ]"
+      container="max-w-2xl"
+    >
+      <template #lead>
+        <!-- Phones get a back chevron instead of the full crumb trail. -->
+        <NuxtLink
+          to="/schedules"
+          class="lg:hidden p-2 -ml-1 rounded-lg text-ink-muted active:bg-parchment-2 transition-colors shrink-0"
+          aria-label="All schedules"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+        </NuxtLink>
+      </template>
+    </AppNav>
 
     <div v-if="loadingFiring" class="flex justify-center items-center py-24 text-ink-muted">
       <svg class="w-6 h-6 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -43,35 +28,39 @@
       </svg>
     </div>
 
-    <main v-else class="max-w-2xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-5">
+    <main v-else class="max-w-2xl mx-auto px-4 sm:px-6 py-6 pb-safe flex flex-col gap-5 min-w-0">
 
       <!-- ── FROM-FIRING: source badge + slider ────────────────────────── -->
       <template v-if="isFromFiring">
-        <div class="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-celadon-bg border border-celadon/20 text-sm text-celadon-dark">
-          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <div class="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-celadon-bg border border-celadon/20 text-sm text-celadon-dark min-w-0">
+          <svg class="w-4 h-4 shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path d="M3 17l6-6 4 4 8-8"/>
           </svg>
-          <span>Generated from <strong>{{ firingData?.name }}</strong></span>
+          <span class="min-w-0 break-words">Generated from <strong>{{ firingData?.name }}</strong></span>
         </div>
         <div class="flex flex-col gap-2">
-          <div class="flex items-center justify-between">
+          <!-- MOBILE (Aug 2026): flex-wrap — "All 412 readings" plus the label
+               plus Reset is wider than 320px on one line. -->
+          <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
             <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Detail level</label>
-            <div class="flex items-center gap-3">
-              <span class="text-[11px] tabular-nums text-celadon-dark font-semibold">
+            <div class="flex items-center gap-3 min-w-0">
+              <span class="text-[11px] tabular-nums text-celadon-dark font-semibold truncate">
                 {{ slider >= 1 ? `All ${rawPoints.length} readings` : `${simplified.length} segment${simplified.length === 1 ? '' : 's'}` }}
               </span>
-              <button class="text-[11px] text-ink-faint hover:text-flame transition-colors font-semibold" @click="resetToInitial">↺ Reset</button>
+              <button class="text-[11px] text-ink-faint hover:text-flame transition-colors font-semibold shrink-0 py-1" @click="resetToInitial">↺ Reset</button>
             </div>
           </div>
           <div class="flex items-center gap-3">
             <span class="text-[10px] text-ink-faint w-10 shrink-0">Simple</span>
+            <!-- py-2 gives the 1.5px-tall track a thumb-sized hit area. -->
             <input type="range" min="0" max="1" step="0.005" :value="slider"
-              class="flex-1 h-1.5 rounded-full cursor-pointer" style="accent-color: #5f8a78"
+              class="flex-1 min-w-0 h-1.5 py-2 rounded-full cursor-pointer" style="accent-color: #5f8a78"
+              aria-label="Detail level"
               @input="slider = Number($event.target.value)" />
             <span class="text-[10px] text-ink-faint w-10 shrink-0 text-right">Detail</span>
           </div>
-          <p v-if="hasManualEdits" class="text-[11px] text-amber-600 flex items-center gap-1.5">
-            <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <p v-if="hasManualEdits" class="text-[11px] text-amber-600 flex items-start gap-1.5">
+            <svg class="w-3 h-3 shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
             </svg>
             Moving the slider will replace your manual edits
@@ -84,8 +73,14 @@
         <div class="flex flex-col gap-1.5">
           <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Start from</label>
           <div class="relative">
+            <!-- MOBILE (Aug 2026): was text-sm (14px). Any control under 16px
+                 makes iOS Safari zoom the whole page in on focus and never zoom
+                 back out — the single biggest cause of the "everything is huge
+                 and won't fit" report. The shared .input is text-base on
+                 phones, text-sm from sm up; the utilities after it keep this
+                 page's roomier xl/px-4 shape and flame focus. -->
             <select v-model="selectedLibraryId"
-              class="w-full border border-parchment-3 rounded-xl px-4 py-2.5 pr-9 text-sm text-ink bg-white focus:outline-none focus:border-flame font-serif appearance-none">
+              class="input rounded-xl px-4 py-2.5 pr-9 appearance-none focus:border-flame focus:ring-flame/10">
               <option value="">Blank curve</option>
               <optgroup v-if="userSchedules.length" label="Your schedules">
                 <option v-for="s in userSchedules" :key="s.id" :value="s.id">{{ s.name }}</option>
@@ -121,11 +116,13 @@
       <div class="flex flex-col gap-1.5">
         <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Name</label>
         <input v-model="form.name" type="text" placeholder="e.g. Cone 10 reduction"
-          class="w-full border border-parchment-3 rounded-xl px-4 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif" />
+          class="input rounded-xl px-4 py-2.5 focus:border-flame focus:ring-flame/10" />
       </div>
 
       <!-- ── SHARED: type + cone ───────────────────────────────────────── -->
-      <div class="grid grid-cols-2 gap-3">
+      <!-- Two selects side by side leaves ~140px each at 320px, which truncates
+           every cone label. Stacked below 380px. -->
+      <div class="grid grid-cols-1 min-[380px]:grid-cols-2 gap-3">
         <FiringTypeSelect v-model="form.type" />
         <ConeSelect v-model="form.cone" />
       </div>
@@ -135,30 +132,40 @@
         <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Description <span class="text-ink-faint/60 normal-case font-normal tracking-normal">(optional)</span></label>
         <textarea v-model="form.description" rows="2" maxlength="500"
           placeholder="Notes about this schedule — when to use it, glaze pairings, quirks…"
-          class="w-full border border-parchment-3 rounded-xl px-4 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif resize-none" />
+          class="input rounded-xl px-4 py-2.5 resize-none focus:border-flame focus:ring-flame/10" />
       </div>
 
       <!-- ── SHARED: curve ─────────────────────────────────────────────── -->
       <div class="flex flex-col gap-2">
-        <div class="flex items-center gap-2">
-          <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Curve</label>
-          <span v-if="form.type" class="text-[10px] font-bold px-2 py-0.5 rounded-full" :class="theme.badgeText">{{ form.type }}</span>
-          <div class="flex-1" />
-          <!-- G1: the unit toggle lives here as well as in StartFiringModal.
-               The Steps table asks for a RATE (°C/hr vs °F/hr), so a user who
-               pasted a Fahrenheit schedule needs to be able to flip back and
-               check the numbers against their source without leaving the page. -->
-          <TempUnitToggle />
-          <!-- REDUCTIONS (Aug 2026): planner trigger — this page never had one,
-               so new schedules couldn't carry planned reductions (only
-               duplicate/edit could). Mirrors [id].vue; cobalt per the palette. -->
-          <button
-            class="flex items-center gap-1.5 text-xs font-semibold text-cobalt-dark hover:text-cobalt transition-colors"
-            @click="showReductionPlanner = true"
-          >
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-            {{ editReductions.length ? `Edit reduction (${editReductions.length})` : 'Add reduction' }}
-          </button>
+        <!-- MOBILE (Aug 2026): this row carried label + type badge + spacer +
+             unit toggle + a button whose label can read "Edit reduction (3)".
+             The flex-1 spacer forced it all onto one line, so it ran off the
+             screen. Two groups with justify-between wrap cleanly instead. -->
+        <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          <div class="flex items-center gap-2 min-w-0">
+            <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Curve</label>
+            <span v-if="form.type" class="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0" :class="theme.badgeText">{{ form.type }}</span>
+          </div>
+          <div class="flex items-center gap-3 shrink-0">
+            <!-- G1: the unit toggle lives here as well as in StartFiringModal.
+                 The Steps table asks for a RATE (°C/hr vs °F/hr), so a user who
+                 pasted a Fahrenheit schedule needs to be able to flip back and
+                 check the numbers against their source without leaving the page. -->
+            <TempUnitToggle />
+            <!-- REDUCTIONS (Aug 2026): planner trigger — this page never had one,
+                 so new schedules couldn't carry planned reductions (only
+                 duplicate/edit could). Mirrors [id].vue; cobalt per the palette. -->
+            <button
+              class="flex items-center gap-1.5 py-1 text-xs font-semibold text-cobalt-dark hover:text-cobalt transition-colors"
+              @click="showReductionPlanner = true"
+            >
+              <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+              <!-- Short label on phones: "Edit reduction (3)" is the widest
+                   string in this row. -->
+              <span class="min-[380px]:hidden">{{ editReductions.length ? `Reduction (${editReductions.length})` : 'Reduction' }}</span>
+              <span class="hidden min-[380px]:inline">{{ editReductions.length ? `Edit reduction (${editReductions.length})` : 'Add reduction' }}</span>
+            </button>
+          </div>
         </div>
         <!-- From-firing: raw readings faint underneath -->
         <ScheduleCurveEditor
@@ -176,7 +183,7 @@
       <!-- ── SHARED: save ──────────────────────────────────────────────── -->
       <div class="pt-2 border-t border-parchment-3">
         <button
-          class="w-full py-2.5 bg-flame hover:bg-flame-dark text-parchment text-sm font-bold rounded-xl transition-colors disabled:opacity-40"
+          class="w-full min-h-[44px] py-2.5 bg-flame hover:bg-flame-dark text-parchment text-sm font-bold rounded-xl transition-colors disabled:opacity-40"
           :disabled="saving || !form.name.trim()"
           @click="save"
         >{{ saving ? 'Saving…' : 'Save schedule' }}</button>
@@ -197,7 +204,12 @@
 
     <Teleport to="body">
       <Transition name="toast">
-        <div v-if="status" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] px-4 py-3 rounded-xl shadow-lg text-sm font-semibold font-serif bg-celadon-dark text-white max-w-sm w-[calc(100%-2rem)] text-center">
+        <!-- Clears the iPhone home indicator; bottom-6 alone sat on top of it. -->
+        <div
+          v-if="status"
+          class="fixed left-1/2 -translate-x-1/2 z-[100] px-4 py-3 rounded-xl shadow-lg text-sm font-semibold font-serif bg-celadon-dark text-white max-w-sm w-[calc(100%-2rem)] text-center"
+          style="bottom: max(1.5rem, calc(env(safe-area-inset-bottom) + 0.75rem))"
+        >
           {{ status }}
         </div>
       </Transition>

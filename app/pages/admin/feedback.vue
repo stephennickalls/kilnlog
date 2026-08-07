@@ -4,21 +4,13 @@
      mark done / dismiss inline. -->
 <template>
   <div v-if="isAdmin" class="min-h-screen bg-parchment font-serif">
-    <header class="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-parchment-3">
-      <div class="flex items-center gap-2 min-w-0">
-        <NuxtLink to="/admin" class="text-base sm:text-lg font-bold flex items-center gap-2 text-ink hover:text-flame transition-colors shrink-0">🔥 KilnMonitor</NuxtLink>
-        <span class="text-ink-faint shrink-0">/</span>
-        <NuxtLink to="/admin" class="text-sm font-semibold text-ink-muted hover:text-ink shrink-0">Admin</NuxtLink>
-        <span class="text-ink-faint shrink-0">/</span>
-        <span class="text-sm font-semibold text-ink-muted truncate">Feedback</span>
-      </div>
-      <div class="flex items-center gap-2">
-        <button class="btn-ghost !px-3 !py-1.5 !text-xs" :disabled="loading" @click="fetchFeedback">
-          {{ loading ? 'Loading…' : '↻ Refresh' }}
+   <AppNav :crumbs="[{ label: 'Admin', to: '/admin' }, { label: 'Feedback' }]" container="max-w-5xl">
+      <template #actions>
+        <button class="btn-ghost !px-3 !py-1.5 !text-xs shrink-0" :disabled="loading" @click="reload">
+          {{ loading ? '…' : '↻' }}
         </button>
-        <UserMenu />
-      </div>
-    </header>
+      </template>
+    </AppNav>
 
     <div class="max-w-5xl mx-auto px-4 sm:px-6 py-6">
 

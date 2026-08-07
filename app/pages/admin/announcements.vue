@@ -10,16 +10,13 @@
 <template>
   <div class="min-h-screen bg-parchment font-serif">
 
-    <header class="sticky top-0 z-20 bg-parchment/95 backdrop-blur border-b border-parchment-3">
-      <div class="max-w-4xl mx-auto flex items-center justify-between px-4 sm:px-6 py-3">
-        <div class="flex items-center gap-3 min-w-0">
-          <NuxtLink to="/app" class="text-base sm:text-lg font-bold flex items-center gap-2 text-ink tracking-tight hover:text-flame transition-colors shrink-0"><BrandFlame class="w-5 h-5 sm:w-6 sm:h-6" />KilnMonitor</NuxtLink>
-          <span class="text-parchment-4 shrink-0">/</span>
-          <h1 class="text-base sm:text-lg font-bold text-ink tracking-tight truncate">Announcements</h1>
-        </div>
-        <button class="btn-primary !py-2" @click="openCreate">+ New announcement</button>
-      </div>
-    </header>
+    <AppNav :crumbs="[{ label: 'Admin', to: '/admin' }, { label: 'Announcements' }]" container="max-w-5xl">
+      <template #actions>
+        <button class="btn-ghost !px-3 !py-1.5 !text-xs shrink-0" :disabled="loading" @click="reload">
+          {{ loading ? '…' : '↻' }}
+        </button>
+      </template>
+    </AppNav>
 
     <div class="max-w-4xl mx-auto px-4 sm:px-6 py-6">
 

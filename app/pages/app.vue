@@ -1,37 +1,40 @@
 <!-- File: app/pages/app.vue -->
 <template>
-  <div class="flex flex-col h-screen overflow-hidden font-serif bg-parchment">
+  <!-- MOBILE (Aug 2026): h-screen is 100vh, which on iOS EXCLUDES Safari's
+       URL bar — the bottom of the console and the chart's Reset-zoom button
+       sat underneath it. 100dvh tracks the actually-visible height. Applied
+       inline rather than as a class so it reliably beats h-screen; browsers
+       without dvh drop the declaration and fall back to 100vh. -->
+  <div class="flex flex-col h-screen overflow-hidden font-serif bg-parchment" style="height:100dvh">
 
-        <!-- ── Header ───────────────────────────────────────────────────────────── -->
-    <header class="shrink-0 flex items-center justify-between px-4 sm:px-6 pt-3 pb-1.5 bg-parchment border-b border-parchment-3">
-      <div class="flex items-center gap-2">
-        <button class="sm:hidden p-1.5 -ml-1 rounded-lg text-ink-muted" @click="showFiringSheet = true">
+    <!-- ── Header ───────────────────────────────────────────────────────────
+         MOBILE (Aug 2026): was a hand-rolled row of brand + FeedbackButton +
+         TempUnitToggle + UserMenu with nothing allowed to shrink. Their
+         combined min-content exceeded 375px, which is what pushed the page
+         wider than the screen. AppNav owns the layout now — it drops the
+         wordmark on narrow screens and renders the section tabs on md+. The
+         hamburger stays here because on THIS page it opens the firing list,
+         not navigation; the sidebar takes over at sm, so it hides there. -->
+    <AppNav :sticky="false" container="max-w-none">
+      <template #lead>
+        <button
+          class="sm:hidden p-2 -ml-1 rounded-lg text-ink-muted active:bg-parchment-2 transition-colors shrink-0"
+          aria-label="Show firings"
+          @click="showFiringSheet = true"
+        >
           <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
         </button>
-        <NuxtLink to="/account" class="text-base sm:text-lg font-bold flex items-center gap-2 text-ink tracking-tight hover:text-flame transition-colors">
-          <BrandFlame class="w-5 h-5 sm:w-6 sm:h-6" />
-          KilnMonitor
-        </NuxtLink>
-      </div>
-      <div class="flex items-center gap-2">
-        <!-- <SpreadTheWord /> -->
-        <!-- Firing title + status intentionally omitted here — they live in the
-             sidebar (desktop) and the mobile firing sheet, so showing them in
-             the header would just duplicate. Rename is triggered per-row from
-             the sidebar (@rename), not from the header. -->
+      </template>
 
-        <!-- FEEDBACK (Aug 2026): "Report a bug or request a feature" — label
-             renders on lg+ only; the button collapses to an icon on mobile.
-             Modal + POST /api/feedback live inside the component. -->
+      <template #actions>
+        <!-- FEEDBACK: label renders lg+ only; collapses to an icon on mobile. -->
         <FeedbackButton />
-
         <TempUnitToggle size="md" @change="setChartUnit" />
-        <UserMenu />
-      </div>
-    </header>
+      </template>
+    </AppNav>
 
     <!-- ── Body ─────────────────────────────────────────────────────────────── -->
-    <div class="flex flex-1 overflow-hidden">
+    <div class="flex flex-1 overflow-hidden min-w-0">
 
       <!-- Sidebar — desktop only -->
       <FiringSidebar
@@ -87,7 +90,7 @@
         <template v-else>
 
           <!-- Console (live) or Review (ended) -->
-          <div class="shrink-0 px-3 pb-3 pt-2 sm:px-5 sm:pb-0 sm:pt-2.5">
+          <div class="shrink-0 px-3 pb-3 pt-2 sm:px-5 sm:pb-0 sm:pt-2.5 min-w-0">
             <FiringConsole
               v-if="!selectedFiring.ended_at"
               ref="consoleRef"
@@ -128,13 +131,13 @@
           </div>
 
           <!-- G6: auto-ended banner -->
-          <div v-if="selectedFiring.auto_ended && selectedFiring.ended_at" class="px-3 sm:px-5 pt-2">
+          <div v-if="selectedFiring.auto_ended && selectedFiring.ended_at" class="px-3 sm:px-5 pt-2 min-w-0">
             <AutoEndedBanner :firing="selectedFiring" @restart="restartFiring(selectedFiring)" />
           </div>
 
           <!-- Chart -->
-          <div class="flex-1 relative min-h-0 p-3 pt-2 sm:p-5 sm:pt-4 flex flex-col">
-            <div class="flex-1 min-h-0 rounded-xl border border-parchment-3 relative" style="box-shadow:0 2px 12px rgba(58,30,8,0.06); background: linear-gradient(to right, rgba(95,138,120,0.07) 1px, transparent 1px) 0 0 / 12.5% 100%, linear-gradient(to bottom, rgba(95,138,120,0.07) 1px, transparent 1px) 0 0 / 100% 25%, #fcfdfc;">
+          <div class="flex-1 relative min-h-0 min-w-0 p-3 pt-2 sm:p-5 sm:pt-4 flex flex-col">
+            <div class="flex-1 min-h-0 min-w-0 rounded-xl border border-parchment-3 relative" style="box-shadow:0 2px 12px rgba(58,30,8,0.06); background: linear-gradient(to right, rgba(95,138,120,0.07) 1px, transparent 1px) 0 0 / 12.5% 100%, linear-gradient(to bottom, rgba(95,138,120,0.07) 1px, transparent 1px) 0 0 / 100% 25%, #fcfdfc;">
               <canvas ref="chartCanvas" class="absolute inset-0 w-full h-full"/>
               <button class="absolute bottom-2 right-2 sm:bottom-4 sm:right-4 px-2.5 py-1.5 text-xs font-medium border border-parchment-3 rounded-lg bg-white text-ink-muted hover:bg-parchment transition-colors" @click="resetZoom">Reset zoom</button>
               <div v-if="isLive && !selectedFiring?.readings?.length" class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-ink-muted pointer-events-none px-6 text-center">
@@ -149,9 +152,12 @@
     </div>
 
     <!-- ── Recalibrate modal ─────────────────────────────────────────────────── -->
+    <!-- SAFE AREA (Aug 2026): every bottom sheet below pads past the iPhone's
+         home indicator. Without it the last button sits under the gesture bar
+         and is genuinely hard to hit. -->
     <Teleport to="body">
       <div v-if="showRecalibrateInfo" class="fixed inset-0 z-[70] flex items-end sm:items-center justify-center" style="background:rgba(26,18,8,0.55)" @click.self="showRecalibrateInfo = false">
-        <div class="bg-parchment sm:bg-white w-full sm:w-80 sm:rounded-2xl rounded-t-2xl p-5 sm:border sm:border-parchment-3" style="box-shadow:0 -8px 40px rgba(26,18,8,0.15)">
+        <div class="bg-parchment sm:bg-white w-full sm:w-80 sm:rounded-2xl rounded-t-2xl p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-5 sm:border sm:border-parchment-3" style="box-shadow:0 -8px 40px rgba(26,18,8,0.15)">
           <p class="text-sm font-bold text-ink mb-1.5">When to recalibrate</p>
           <p class="text-sm text-ink-muted leading-relaxed">Use this when your kiln has fallen behind the planned curve — a weak burner, a stall, or after a gas-out. It slides the rest of your schedule to start from your <strong>current temperature</strong>, keeping every ramp rate intact. Your firing just finishes later.</p>
           <div class="flex gap-2 mt-4">
@@ -168,7 +174,7 @@
          both accept it); this is the UI that was missing. -->
     <Teleport to="body">
       <div v-if="showNotesModal" class="fixed inset-0 z-[70] flex items-end sm:items-center justify-center" style="background:rgba(26,18,8,0.6)" @click.self="showNotesModal = false">
-        <div class="bg-parchment w-full sm:w-[440px] sm:rounded-2xl rounded-t-2xl p-5 sm:p-6 flex flex-col gap-3 border border-parchment-3" style="box-shadow:0 -8px 40px rgba(26,18,8,0.15)">
+        <div class="bg-parchment w-full sm:w-[440px] sm:rounded-2xl rounded-t-2xl p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:p-6 flex flex-col gap-3 border border-parchment-3" style="box-shadow:0 -8px 40px rgba(26,18,8,0.15)">
           <div class="flex flex-col gap-0.5">
             <h2 class="text-base font-bold text-ink">Notes</h2>
             <p class="text-xs text-ink-muted truncate">{{ selectedFiring?.name }}</p>
@@ -181,8 +187,8 @@
             placeholder="Load, atmosphere, glaze tests, anything worth remembering…"
           />
           <div class="flex items-center justify-between gap-2">
-            <span class="text-[11px] text-ink-faint tabular-nums">{{ notesDraft.length }}/5000</span>
-            <div class="flex gap-2">
+            <span class="text-[11px] text-ink-faint tabular-nums shrink-0">{{ notesDraft.length }}/5000</span>
+            <div class="flex gap-2 shrink-0">
               <button class="btn-ghost !py-2" :disabled="notesSaving" @click="showNotesModal = false">Cancel</button>
               <button class="btn-primary !py-2" :disabled="notesSaving" @click="saveNotes">
                 {{ notesSaving ? 'Saving…' : 'Save notes' }}
@@ -208,7 +214,7 @@
     <!-- ── End firing confirm modal ──────────────────────────────────────────── -->
     <Teleport to="body">
       <div v-if="showEndConfirm" class="fixed inset-0 z-[70] flex items-end sm:items-center justify-center" style="background:rgba(26,18,8,0.6)" @click.self="showEndConfirm = false">
-        <div class="bg-parchment w-full sm:w-[400px] sm:rounded-2xl rounded-t-2xl p-6 flex flex-col gap-4 border border-parchment-3" style="box-shadow:0 -8px 40px rgba(26,18,8,0.15)">
+        <div class="bg-parchment w-full sm:w-[400px] sm:rounded-2xl rounded-t-2xl p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:pb-6 flex flex-col gap-4 border border-parchment-3" style="box-shadow:0 -8px 40px rgba(26,18,8,0.15)">
           <div class="flex flex-col gap-1.5">
             <h2 class="text-base font-bold text-ink">End this firing?</h2>
             <p class="text-sm text-ink-muted leading-relaxed">
@@ -226,11 +232,15 @@
     <!-- ── Mobile firing sheet ───────────────────────────────────────────────── -->
     <Teleport to="body">
       <div v-if="showFiringSheet" class="fixed inset-0 z-50 flex flex-col justify-end sm:hidden" style="background:rgba(26,18,8,0.6)" @click.self="showFiringSheet = false">
-        <div class="bg-parchment rounded-t-2xl flex flex-col" style="max-height:80vh">
+        <!-- 80vh is wrong on iOS for the same reason h-screen is: it measures
+             against a viewport that includes Safari's chrome, so the sheet's
+             footer button ended up below the fold. min() takes whichever the
+             browser understands and the smaller of the two when it knows both. -->
+        <div class="bg-parchment rounded-t-2xl flex flex-col w-full" style="max-height:80vh; max-height:min(80vh, 80dvh)">
           <div class="flex justify-center pt-3 pb-1 shrink-0"><div class="w-10 h-1 bg-parchment-3 rounded-full"/></div>
           <div class="flex items-center justify-between px-4 py-2 border-b border-parchment-3 shrink-0">
             <h2 class="text-sm font-bold text-ink">Firings</h2>
-            <button class="p-1 text-ink-muted" @click="showFiringSheet = false">
+            <button class="p-2 -mr-1 text-ink-muted" aria-label="Close" @click="showFiringSheet = false">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
             </button>
           </div>
@@ -255,7 +265,7 @@
                 </div>
               </button>
               <div class="absolute right-3 top-1/2 -translate-y-1/2">
-                <button v-if="sheetConfirmDeleteId !== f.id" class="p-2 text-parchment-4 hover:text-red-400" @click.stop="sheetConfirmDeleteId = f.id">
+                <button v-if="sheetConfirmDeleteId !== f.id" class="p-2 text-parchment-4 hover:text-red-400" aria-label="Delete firing" @click.stop="sheetConfirmDeleteId = f.id">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
                 </button>
                 <button v-else class="px-2.5 py-1.5 rounded-lg text-xs font-bold text-white bg-red-500" @click.stop="sheetDeleteFiring(f)">Delete?</button>
@@ -272,7 +282,7 @@
               >{{ loadingOlderFirings ? 'Loading…' : 'Load older firings' }}</button>
             </li>
           </ul>
-          <div class="p-3 border-t border-parchment-3 shrink-0">
+          <div class="p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-parchment-3 shrink-0">
             <!-- G5: one firing at a time. The active firing is listed above to tap into. -->
             <button
               class="w-full py-3 bg-celadon hover:bg-celadon-dark text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
@@ -343,11 +353,12 @@
       <Transition name="toast">
         <div
           v-if="toast.visible.value"
-          class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-semibold font-serif max-w-sm w-[calc(100%-2rem)]"
+          class="fixed left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg text-sm font-semibold font-serif max-w-sm w-[calc(100%-2rem)]"
+          style="bottom: max(1.5rem, calc(env(safe-area-inset-bottom) + 0.75rem))"
           :class="toast.type.value === 'error' ? 'bg-red-600 text-white' : 'bg-celadon-dark text-white'"
         >
-          <span class="flex-1">{{ toast.message.value }}</span>
-          <button class="shrink-0 opacity-75 hover:opacity-100" @click="toast.hide()">
+          <span class="flex-1 min-w-0">{{ toast.message.value }}</span>
+          <button class="shrink-0 opacity-75 hover:opacity-100" aria-label="Dismiss" @click="toast.hide()">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
           </button>
         </div>
@@ -1137,11 +1148,17 @@ async function sheetDeleteFiring(f) {
 </script>
 
 <style>
-.btn-primary { @apply px-4 py-1.5 bg-celadon hover:bg-celadon-dark text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed; }
-.btn-danger  { @apply px-4 py-1.5 border border-red-300 text-red-500 hover:bg-red-50 text-sm font-medium rounded-lg transition-colors; }
-.btn-ghost   { @apply px-4 py-1.5 border border-parchment-3 text-ink-muted hover:bg-parchment-2 text-sm font-medium rounded-lg transition-colors; }
-.input       { @apply w-full border border-parchment-3 rounded-lg px-3 py-1.5 text-sm text-ink bg-white focus:outline-none focus:ring-2 focus:ring-celadon/20 focus:border-celadon font-serif; }
-.label       { @apply text-xs font-bold uppercase tracking-widest text-ink-faint; }
+/* SHARED CONTROLS MOVED (Aug 2026): .btn-primary, .btn-danger, .btn-ghost,
+   .input and .label used to be defined here. Because this is a page-level
+   <style> block, they only existed while /app was mounted — which is why the
+   same class names did nothing on /account, /schedules and the admin pages.
+   They now live in app/assets/css/tailwind.css under @layer components.
+
+   NOTE: the definitions there must use the CELADON variants to match what this
+   page rendered before the move (.btn-primary → bg-celadon, .input focus ring
+   → celadon), not flame.
+
+   Only the toast transition is page-specific, so only it stays. */
 .toast-enter-active, .toast-leave-active { transition: all 0.2s ease; }
 .toast-enter-from, .toast-leave-to       { opacity: 0; transform: translate(-50%, 1rem); }
 </style>

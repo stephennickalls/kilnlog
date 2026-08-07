@@ -1,7 +1,7 @@
-<!-- app/layouts/auth.vue -->
+<!-- File: app/layouts/auth.vue -->
 <!--
   Shared chrome for every unauthenticated page: login, signup, forgot-password,
-  reset-password, register-interest.
+  reset-password, early-access.
 
   Before this existed, all four pages carried `layout: false` (which did nothing
   — there is no layouts/default.vue) and hand-rolled their own background, card,
@@ -20,7 +20,14 @@
 
   BRAND MARK (Aug 2026): the 🔥 emoji is now the BrandFlame SVG component, so
   every auth page picks up the change from this one file — login and
-  register-interest carry no logo markup of their own.
+  early-access carry no logo markup of their own.
+
+  MOBILE (Aug 2026): the padding was px-6 on the page PLUS p-8 on the card —
+  112px of chrome at 320px, leaving 208px for form fields that also carry their
+  own px-3.5. Both now step up with the viewport instead of starting at their
+  desktop value. min-height uses dvh so the card centres against the visible
+  area rather than a viewport that includes Safari's URL bar, and the bottom
+  padding clears the home indicator.
 
   Usage — pages set the layout and their own subtitle line via page meta:
 
@@ -35,18 +42,24 @@
 -->
 <template>
   <div
-    class="min-h-screen bg-parchment font-serif flex flex-col items-center justify-center px-6 py-10"
-    style="background-image: radial-gradient(circle at 20% 80%, rgba(176,92,26,0.06) 0%, transparent 60%), radial-gradient(circle at 80% 20%, rgba(176,92,26,0.04) 0%, transparent 60%)"
+    class="min-h-screen bg-parchment font-serif flex flex-col items-center justify-center px-4 sm:px-6 pt-8 sm:pt-10"
+    style="
+      min-height: 100dvh;
+      padding-bottom: max(2rem, calc(env(safe-area-inset-bottom) + 1rem));
+      background-image:
+        radial-gradient(circle at 20% 80%, rgba(176,92,26,0.06) 0%, transparent 60%),
+        radial-gradient(circle at 80% 20%, rgba(176,92,26,0.04) 0%, transparent 60%);
+    "
   >
-    <div class="w-full max-w-md bg-white border border-parchment-3 rounded-2xl p-8 sm:p-10" style="box-shadow: 0 4px 24px rgba(58,30,8,0.08)">
+    <div class="w-full max-w-md bg-white border border-parchment-3 rounded-2xl p-6 sm:p-8 md:p-10" style="box-shadow: 0 4px 24px rgba(58,30,8,0.08)">
 
       <!-- Brand — clickable, matches the in-app header mark -->
       <div class="text-center mb-6">
         <NuxtLink
           to="/"
-          class="inline-flex items-center gap-2.5 text-2xl sm:text-3xl font-bold text-ink tracking-tight hover:text-flame transition-colors"
+          class="inline-flex items-center gap-2 sm:gap-2.5 text-2xl sm:text-3xl font-bold text-ink tracking-tight hover:text-flame transition-colors"
         >
-          <BrandFlame class="w-7 h-7 sm:w-8 sm:h-8" />
+          <BrandFlame class="w-7 h-7 sm:w-8 sm:h-8 shrink-0" />
           <span>KilnMonitor</span>
         </NuxtLink>
         <p v-if="subtitle" class="text-sm text-ink-muted italic mt-1">{{ subtitle }}</p>
@@ -63,7 +76,7 @@
       to="/"
       class="mt-6 inline-flex items-center gap-1.5 text-sm text-ink-muted hover:text-flame transition-colors"
     >
-      <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+      <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
       Back to home
     </NuxtLink>
 
@@ -71,6 +84,7 @@
 </template>
 
 <script setup>
+// app/layouts/auth.vue
 // Each page declares its own subtitle in definePageMeta; read it from route meta.
 const route = useRoute()
 const subtitle = computed(() => route.meta.subtitle ?? '')

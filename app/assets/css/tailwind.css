@@ -10,7 +10,7 @@
    1. iOS AUTO-ZOOM — the big one. Safari on iPhone zooms the page in whenever
       a form control with font-size < 16px receives focus, and it does NOT zoom
       back out. Every .input in this app was text-sm (14px), so one tap on a
-      firing name, a schedule field, or the search box left the user zoomed and
+      firing name, a schedule field, or the login form left the user zoomed and
       panning sideways for the rest of the session. That is the "page is wider
       than the screen" report. 16px on touch pointers = no zoom, ever.
       Desktop keeps the tighter 14px.
@@ -25,12 +25,21 @@
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
-    overflow-x: hidden;
   }
 
+  /* 2 — the guard, and a warning about how NOT to write it.
+     `overflow-x: hidden` here was WRONG and broke scrolling outright: setting
+     overflow on html or body makes that element a scroll CONTAINER and changes
+     which box the viewport scrolls, which on iOS Safari stops the page moving
+     at all and also breaks every `position: sticky` header in the app (the
+     marketing nav, AppNav, the schedules header).
+     `clip` is the fix — it clips overflow WITHOUT creating a scroll container,
+     so vertical scrolling and sticky both keep working. Safari 16+, Chrome 90+,
+     Firefox 81+; older browsers simply don't get the guard, which is fine
+     because it's only a safety net — the real fixes are min-w-0 and break-all
+     at the offending elements. */
   body {
-    overflow-x: hidden;
-    overscroll-behavior-y: none;      /* no rubber-band on pull-down */
+    overflow-x: clip;
   }
 
   /* 1 — no zoom on focus. Applies to phones/tablets only. */
@@ -53,7 +62,7 @@
     }
   }
 
-  /* 2 — nothing may exceed its container. */
+  /* Nothing may exceed its container. */
   img, svg, video, canvas { max-width: 100%; }
 }
 
@@ -62,9 +71,12 @@
      <style> block in app.vue and again in admin/announcements.vue, which meant
      .btn-primary / .input silently did nothing on account, schedules, admin
      users, admin logs… Defined once here, in the components layer, so a page
-     <style> block can still override (announcements keeps its celadon set). */
+     <style> block can still override (announcements keeps its own set).
+
+     COLOURS: celadon, matching what app.vue's local block rendered before the
+     move. Change here, not per page. */
   .btn-primary {
-    @apply inline-flex items-center justify-center px-4 py-2 bg-flame hover:bg-flame-dark text-parchment text-sm font-semibold rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center px-4 py-2 bg-celadon hover:bg-celadon-dark text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed;
   }
   .btn-danger {
     @apply inline-flex items-center justify-center px-4 py-2 border border-red-300 text-red-500 hover:bg-red-50 text-sm font-medium rounded-lg transition-colors;
@@ -73,7 +85,7 @@
     @apply inline-flex items-center justify-center px-4 py-2 border border-parchment-3 text-ink-muted hover:bg-parchment-2 text-sm font-medium rounded-lg transition-colors;
   }
   .input {
-    @apply w-full border border-parchment-3 rounded-lg px-3 py-2 text-base sm:text-sm text-ink bg-white focus:outline-none focus:ring-2 focus:ring-flame/20 focus:border-flame font-serif;
+    @apply w-full border border-parchment-3 rounded-lg px-3 py-2 text-base sm:text-sm text-ink bg-white focus:outline-none focus:ring-2 focus:ring-celadon/20 focus:border-celadon font-serif;
   }
   .label {
     @apply text-xs font-bold uppercase tracking-widest text-ink-faint;

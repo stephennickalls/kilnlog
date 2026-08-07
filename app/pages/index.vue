@@ -1,10 +1,18 @@
-<!-- app/pages/index.vue -->
+<!-- File: app/pages/index.vue -->
 <!--
   Marketing landing page. Celadon appears in three meaningful places:
   1. Hero chart planned/schedule line — the schedule IS the celadon world
   2. Active pill + rate chip — on-track/good state = celadon (matches the app)
   3. Schedule library feature card icon — the one feature in the celadon world
   Everything else stays warm (flame/parchment/ink). No decoration.
+
+  MOBILE (Aug 2026): every section was px-10 — 80px of a 320px screen spent on
+  padding before a single word. The pricing card added p-12 on top of that, so
+  its content had 144px to live in. Padding now steps up with the viewport
+  (px-5 → sm:px-8 → lg:px-10) and the same for the card and section padding.
+  The clamp() minimums on the headings were also set for a desktop-first eye
+  (2.75rem = 44px at 320px); each has been lowered so the hero fits without
+  the browser choosing the break points for us.
 
   BETA-TEMP: during beta recruitment the page announces the beta (top BetaBanner)
   and every "Start free trial / signup" CTA points to /register-interest instead
@@ -23,75 +31,77 @@
   software beta is. The BETA-TEMP markers above still map every revert spot.
 -->
 <template>
-  <div class="bg-parchment text-ink font-serif min-h-screen text-lg">
+  <div class="bg-parchment text-ink font-serif min-h-screen text-base sm:text-lg">
 
     <!-- BETA-TEMP: beta announcement bar (delete this line to revert) -->
     <BetaBanner />
 
     <!-- Nav -->
     <nav class="sticky top-0 z-50 bg-parchment/95 backdrop-blur border-b border-parchment-3">
-      <div class="max-w-[1200px] mx-auto px-10 h-[68px] flex items-center justify-between">
-        <a href="/" class="text-[1.3rem] font-bold text-ink tracking-tight">KilnMonitor</a>
-        <div class="hidden md:flex items-center gap-9 text-[0.95rem] text-ink-muted">
+      <div class="max-w-[1200px] mx-auto px-5 sm:px-8 lg:px-10 h-[60px] sm:h-[68px] flex items-center justify-between gap-3">
+        <a href="/" class="text-[1.15rem] sm:text-[1.3rem] font-bold text-ink tracking-tight shrink-0">KilnMonitor</a>
+        <div class="hidden md:flex items-center gap-6 lg:gap-9 text-[0.95rem] text-ink-muted">
           <a href="#features" class="hover:text-ink transition-colors">Features</a>
           <a href="#pricing" class="hover:text-ink transition-colors">Pricing</a>
           <NuxtLink to="/login" class="hover:text-ink transition-colors">Sign in</NuxtLink>
           <!-- BETA-TEMP: was to="/signup" · "Start free trial" -->
-          <NuxtLink to="/early-access" class="bg-flame text-parchment px-5 py-2 rounded text-[0.875rem] font-semibold hover:bg-flame-dark transition-colors">Get early access</NuxtLink>
+          <NuxtLink to="/early-access" class="bg-flame text-parchment px-5 py-2 rounded text-[0.875rem] font-semibold hover:bg-flame-dark transition-colors whitespace-nowrap">Get early access</NuxtLink>
         </div>
-        <button class="md:hidden flex flex-col gap-[5px] p-1" aria-label="Menu" @click="mobileMenu = !mobileMenu">
+        <button class="md:hidden flex flex-col gap-[5px] p-2 -mr-2 shrink-0" aria-label="Menu" @click="mobileMenu = !mobileMenu">
           <span class="block w-6 h-[1.5px] bg-ink rounded"/>
           <span class="block w-6 h-[1.5px] bg-ink rounded"/>
           <span class="block w-6 h-[1.5px] bg-ink rounded"/>
         </button>
       </div>
       <div v-if="mobileMenu" class="md:hidden flex flex-col bg-parchment border-t border-parchment-3">
-        <a href="#features" class="px-10 py-[0.875rem] text-ink-muted border-b border-parchment-3" @click="mobileMenu = false">Features</a>
-        <a href="#pricing" class="px-10 py-[0.875rem] text-ink-muted border-b border-parchment-3" @click="mobileMenu = false">Pricing</a>
-        <NuxtLink to="/login" class="px-10 py-[0.875rem] text-ink-muted border-b border-parchment-3" @click="mobileMenu = false">Sign in</NuxtLink>
+        <a href="#features" class="px-5 sm:px-8 py-3.5 text-ink-muted border-b border-parchment-3" @click="mobileMenu = false">Features</a>
+        <a href="#pricing" class="px-5 sm:px-8 py-3.5 text-ink-muted border-b border-parchment-3" @click="mobileMenu = false">Pricing</a>
+        <NuxtLink to="/login" class="px-5 sm:px-8 py-3.5 text-ink-muted border-b border-parchment-3" @click="mobileMenu = false">Sign in</NuxtLink>
         <!-- BETA-TEMP: was to="/signup" · "Start free trial →" -->
-        <NuxtLink to="/early-access" class="px-10 py-[0.875rem] text-flame font-semibold" @click="mobileMenu = false">Get early access →</NuxtLink>
+        <NuxtLink to="/early-access" class="px-5 sm:px-8 py-3.5 text-flame font-semibold" @click="mobileMenu = false">Get early access →</NuxtLink>
       </div>
     </nav>
 
     <!-- Hero -->
-    <section class="px-10 pt-20 pb-16 bg-parchment" style="background-image: radial-gradient(ellipse at 80% 20%, rgba(176,92,26,0.06) 0%, transparent 55%)">
+    <section class="px-5 sm:px-8 lg:px-10 pt-12 sm:pt-16 lg:pt-20 pb-12 sm:pb-16 bg-parchment" style="background-image: radial-gradient(ellipse at 80% 20%, rgba(176,92,26,0.06) 0%, transparent 55%)">
       <div class="max-w-[1200px] mx-auto">
 
         <!-- Top copy -->
-        <div class="max-w-[680px] mb-14">
+        <div class="max-w-[680px] mb-10 sm:mb-14">
           <!-- BETA-TEMP: was "Kiln firing log &amp; chart" -->
           <p class="text-flame font-semibold tracking-[0.16em] uppercase text-[0.72rem] mb-4">Early access now open</p>
-          <h1 class="text-[clamp(2.75rem,5vw,4.25rem)] font-bold text-ink leading-[1.07] tracking-tight mb-6">Your firing notebook,<br>finally digital.</h1>
-          <p class="text-[1.1rem] text-ink-muted leading-[1.7] mb-7">Sometimes a firing comes out better than you planned — a glaze breaks just right, a reduction sings. Could you do it again? KilnMonitor records the whole curve as it happens, so the firing you want to repeat is one you actually can.</p>
+          <!-- clamp min was 2.75rem — at 320px that put "Your firing" at the
+               very edge of the line box. 2.25rem leaves the intended break. -->
+          <h1 class="text-[clamp(2.25rem,5vw,4.25rem)] font-bold text-ink leading-[1.07] tracking-tight mb-6">Your firing notebook,<br>finally digital.</h1>
+          <p class="text-[1rem] sm:text-[1.1rem] text-ink-muted leading-[1.7] mb-7">Sometimes a firing comes out better than you planned — a glaze breaks just right, a reduction sings. Could you do it again? KilnMonitor records the whole curve as it happens, so the firing you want to repeat is one you actually can.</p>
 
           <!-- Simplicity strip -->
-          <div class="flex items-center gap-4 bg-parchment-2 border-[1.5px] border-parchment-4 rounded-lg px-5 py-[0.875rem] mb-8 max-w-[800px]">
+          <div class="flex items-start sm:items-center gap-3 sm:gap-4 bg-parchment-2 border-[1.5px] border-parchment-4 rounded-lg px-4 sm:px-5 py-3.5 mb-8 max-w-[800px]">
             <div class="w-9 h-9 bg-white border border-parchment-3 rounded-md flex items-center justify-center shrink-0">
               <svg width="16" height="16" viewBox="0 0 14 14" fill="none">
                 <path d="M8 1L3 8h5l-2 5 6-7H7L8 1z" stroke="#b05c1a" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
             </div>
-            <div>
+            <div class="min-w-0">
               <p class="text-[0.9rem] font-bold text-ink mb-0.5">No hardware. No setup. No fuss.</p>
               <p class="text-[0.8rem] text-ink-muted leading-snug">Draw a curve, log temperatures as you fire — right from the phone in your apron pocket.</p>
             </div>
           </div>
 
-          <div class="flex gap-4 items-center flex-wrap mb-4">
+          <div class="flex gap-3 sm:gap-4 items-center flex-wrap mb-4">
             <!-- BETA-TEMP: was to="/signup" · "Start free trial" -->
-            <NuxtLink to="/early-access" class="inline-flex items-center gap-2 bg-flame text-parchment px-6 py-3 rounded text-[1rem] font-semibold hover:bg-flame-dark transition-all hover:-translate-y-px">
+            <NuxtLink to="/early-access" class="inline-flex items-center gap-2 bg-flame text-parchment px-5 sm:px-6 py-3 rounded text-[0.95rem] sm:text-[1rem] font-semibold hover:bg-flame-dark transition-all hover:-translate-y-px">
               Get free early access
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="shrink-0"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </NuxtLink>
-            <NuxtLink to="/login" class="inline-flex items-center px-6 py-3 border-[1.5px] border-parchment-3 rounded text-[1rem] text-ink-muted hover:border-flame-light hover:text-ink transition-colors">Sign in</NuxtLink>
+            <NuxtLink to="/login" class="inline-flex items-center px-5 sm:px-6 py-3 border-[1.5px] border-parchment-3 rounded text-[0.95rem] sm:text-[1rem] text-ink-muted hover:border-flame-light hover:text-ink transition-colors">Sign in</NuxtLink>
           </div>
           <!-- BETA-TEMP: was "30 days free · No credit card required · $49 NZD/year after" -->
           <p class="text-[0.825rem] text-ink-faint">Help us build the app potters actually need — free for our first testers</p>
         </div>
 
         <!-- Chart + fire cards grid -->
-        <div class="grid grid-cols-1 md:grid-cols-[1.5fr_1fr] gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-[1.5fr_1fr] gap-4 sm:gap-6">
 
           <!-- Chart card. Recreates the REAL app chart (useKilnChart.js + the
                plot styling in app.vue): faint celadon graph-paper ground,
@@ -107,18 +117,22 @@
                ~60°C/hr ≈ +1°C/min — the gentle slope drawn at NOW.
                One coordinate space (viewBox 480×200). Scale: x = 42 + h·52.5;
                y = 176 − t·0.10156 (0°C=176, ~1477°C=26) so the peak stands tall.
-               NOW at 4.3h (x268), 1,179°C (y56); planned target there 1,225°. -->
-          <div class="bg-white border border-parchment-3 rounded-[14px] p-7 shadow-[0_8px_40px_rgba(58,30,8,0.09),0_2px_8px_rgba(58,30,8,0.05)]">
-            <div class="flex justify-between items-center mb-[0.875rem]">
-              <span class="text-[0.875rem] font-semibold text-ink-2">Cone 10 Reduction</span>
-              <span class="flex items-center gap-[5px] bg-celadon-bg border border-celadon/30 rounded-full px-[10px] py-[3px] text-[0.75rem] font-bold text-celadon-dark">
+               NOW at 4.3h (x268), 1,179°C (y56); planned target there 1,225°.
+
+               MOBILE: padding drops to p-4 so the SVG gets ~35% more width. The
+               viewBox scales, but its 9–10px labels shrink with it, so every
+               pixel of card width is a pixel of legibility. -->
+          <div class="bg-white border border-parchment-3 rounded-[14px] p-4 sm:p-6 lg:p-7 shadow-[0_8px_40px_rgba(58,30,8,0.09),0_2px_8px_rgba(58,30,8,0.05)]">
+            <div class="flex justify-between items-center gap-2 mb-[0.875rem]">
+              <span class="text-[0.875rem] font-semibold text-ink-2 truncate min-w-0">Cone 10 Reduction</span>
+              <span class="flex items-center gap-[5px] bg-celadon-bg border border-celadon/30 rounded-full px-[10px] py-[3px] text-[0.75rem] font-bold text-celadon-dark shrink-0">
                 <span class="w-[6px] h-[6px] bg-celadon rounded-full animate-pulse"/>
                 Active
               </span>
             </div>
-            <div class="flex items-baseline gap-[6px] mb-4">
-              <span class="text-[2.75rem] font-bold text-flame leading-none tracking-[-0.04em]">1,179</span>
-              <span class="text-[1.2rem] font-semibold text-flame-light">°C</span>
+            <div class="flex items-baseline gap-[6px] mb-4 flex-wrap">
+              <span class="text-[2.25rem] sm:text-[2.75rem] font-bold text-flame leading-none tracking-[-0.04em]">1,179</span>
+              <span class="text-[1.05rem] sm:text-[1.2rem] font-semibold text-flame-light">°C</span>
               <!-- Rate on-track = celadon. °C/MIN, and the app ROUNDS rate to a
                    whole number (Math.round in useFiringStats), so it's +1, not
                    +1.4. ~1°C/min (≈60°C/hr) is a realistic slow final approach
@@ -175,18 +189,18 @@
                 <text x="462" y="194" font-size="10" fill="#a8a29e" font-family="Georgia, serif" text-anchor="end">8h</text>
               </svg>
             </div>
-            <div class="grid grid-cols-3 border-t border-parchment-2 pt-4">
-              <div class="flex flex-col gap-[3px]">
-                <span class="text-[1.05rem] font-bold text-ink tracking-tight">1,287°C</span>
-                <span class="text-[0.7rem] uppercase tracking-[0.08em] text-ink-faint">Peak target</span>
+            <div class="grid grid-cols-3 gap-2 border-t border-parchment-2 pt-4">
+              <div class="flex flex-col gap-[3px] min-w-0">
+                <span class="text-[0.95rem] sm:text-[1.05rem] font-bold text-ink tracking-tight">1,287°C</span>
+                <span class="text-[0.65rem] sm:text-[0.7rem] uppercase tracking-[0.08em] text-ink-faint leading-tight">Peak target</span>
               </div>
-              <div class="flex flex-col gap-[3px]">
-                <span class="text-[1.05rem] font-bold text-ink tracking-tight">4h 18m</span>
-                <span class="text-[0.7rem] uppercase tracking-[0.08em] text-ink-faint">Elapsed</span>
+              <div class="flex flex-col gap-[3px] min-w-0">
+                <span class="text-[0.95rem] sm:text-[1.05rem] font-bold text-ink tracking-tight">4h 18m</span>
+                <span class="text-[0.65rem] sm:text-[0.7rem] uppercase tracking-[0.08em] text-ink-faint leading-tight">Elapsed</span>
               </div>
-              <div class="flex flex-col gap-[3px]">
-                <span class="text-[1.05rem] font-bold text-ink tracking-tight">+1<span class="text-ink-faint font-semibold">/+2</span></span>
-                <span class="text-[0.7rem] uppercase tracking-[0.08em] text-ink-faint">Rate °C/min · act/tgt</span>
+              <div class="flex flex-col gap-[3px] min-w-0">
+                <span class="text-[0.95rem] sm:text-[1.05rem] font-bold text-ink tracking-tight">+1<span class="text-ink-faint font-semibold">/+2</span></span>
+                <span class="text-[0.65rem] sm:text-[0.7rem] uppercase tracking-[0.08em] text-ink-faint leading-tight">Rate °C/min · act/tgt</span>
               </div>
             </div>
           </div>
@@ -197,15 +211,15 @@
                planned + live reduction bands (G11). The middle card is the
                flame-bg hero. -->
           <div class="flex flex-col gap-3">
-            <div class="bg-parchment-2 border border-parchment-4 rounded-[10px] px-[1.625rem] py-6 flex flex-col gap-2">
+            <div class="bg-parchment-2 border border-parchment-4 rounded-[10px] px-5 sm:px-[1.625rem] py-5 sm:py-6 flex flex-col gap-2">
               <p class="text-[0.7rem] font-bold uppercase tracking-[0.12em] text-flame">Always know where you are</p>
               <p class="text-[0.9rem] text-ink-muted leading-relaxed">The NOW line pins this exact minute to your plan and shows the target you should be at. Running behind? Recalibrate slides the rest of the schedule to meet your kiln where it is.</p>
             </div>
-            <div class="bg-flame-bg border border-parchment-4 rounded-[10px] px-[1.625rem] py-6 flex flex-col gap-2">
+            <div class="bg-flame-bg border border-parchment-4 rounded-[10px] px-5 sm:px-[1.625rem] py-5 sm:py-6 flex flex-col gap-2">
               <p class="text-[0.7rem] font-bold uppercase tracking-[0.12em] text-flame">Repeat the happy accident</p>
               <p class="text-[0.9rem] text-ink-muted leading-relaxed">Ran out of gas mid-firing, had to jump in the car for more to carry on — and the glaze came out singing? The whole firing was logged, gas-out and all. Save what <em>actually happened</em> as a schedule and repeat the firing that worked, not the plan that didn't.</p>
             </div>
-            <div class="bg-parchment-2 border border-parchment-4 rounded-[10px] px-[1.625rem] py-6 flex flex-col gap-2">
+            <div class="bg-parchment-2 border border-parchment-4 rounded-[10px] px-5 sm:px-[1.625rem] py-5 sm:py-6 flex flex-col gap-2">
               <p class="text-[0.7rem] font-bold uppercase tracking-[0.12em] text-flame">Reduction, planned &amp; real</p>
               <p class="text-[0.9rem] text-ink-muted leading-relaxed">Mark where you intend to reduce on your schedule, then log the real thing live at the kiln. The chart shows both — so you learn how your intentions and your atmosphere actually line up.</p>
             </div>
@@ -216,32 +230,32 @@
     </section>
 
     <!-- Bridge — dark section -->
-    <section class="bg-ink px-10 py-20" style="background-image: radial-gradient(ellipse at 20% 50%, rgba(176,92,26,0.14) 0%, transparent 60%)">
+    <section class="bg-ink px-5 sm:px-8 lg:px-10 py-14 sm:py-20" style="background-image: radial-gradient(ellipse at 20% 50%, rgba(176,92,26,0.14) 0%, transparent 60%)">
       <div class="max-w-[1200px] mx-auto">
         <p class="text-flame-light font-semibold tracking-[0.16em] uppercase text-[0.72rem] mb-4">Built for the studio</p>
-        <h2 class="text-[clamp(2.25rem,4vw,3.25rem)] font-bold text-parchment leading-[1.12] tracking-tight mb-5">Plan it.<br>Log it.<br>Learn from it.</h2>
-        <p class="text-[1.05rem] text-ink-muted leading-[1.7] max-w-[560px]">Sketch your firing curve, tap in temperatures as you go, and watch your kiln track against the plan. Every firing saved forever — so you can repeat your wins and stop repeating your mistakes.</p>
+        <h2 class="text-[clamp(1.875rem,4vw,3.25rem)] font-bold text-parchment leading-[1.12] tracking-tight mb-5">Plan it.<br>Log it.<br>Learn from it.</h2>
+        <p class="text-[1rem] sm:text-[1.05rem] text-ink-muted leading-[1.7] max-w-[560px]">Sketch your firing curve, tap in temperatures as you go, and watch your kiln track against the plan. Every firing saved forever — so you can repeat your wins and stop repeating your mistakes.</p>
       </div>
     </section>
 
     <!-- Features -->
-    <section id="features" class="bg-parchment-2 border-y border-parchment-3 px-10 py-24">
+    <section id="features" class="bg-parchment-2 border-y border-parchment-3 px-5 sm:px-8 lg:px-10 py-16 sm:py-20 lg:py-24">
       <div class="max-w-[1200px] mx-auto">
         <p class="text-flame font-semibold tracking-[0.16em] uppercase text-[0.72rem] mb-4">What you get</p>
-        <h2 class="text-[clamp(2rem,3.5vw,2.875rem)] font-bold text-ink leading-[1.15] tracking-tight mb-14">Everything you need.<br>Nothing you don't.</h2>
+        <h2 class="text-[clamp(1.75rem,3.5vw,2.875rem)] font-bold text-ink leading-[1.15] tracking-tight mb-8 sm:mb-14">Everything you need.<br>Nothing you don't.</h2>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-px bg-parchment-3 border border-parchment-3 rounded-[10px] overflow-hidden">
 
-          <div class="md:col-span-2 bg-flame-bg p-8 flex flex-col gap-[0.875rem]">
-            <div class="w-11 h-11 bg-flame/10 rounded-lg flex items-center justify-center">
+          <div class="md:col-span-2 bg-flame-bg p-6 sm:p-8 flex flex-col gap-[0.875rem]">
+            <div class="w-11 h-11 bg-flame/10 rounded-lg flex items-center justify-center shrink-0">
               <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M3 17l4-4 3 3 4-5 5 6" stroke="#b05c1a" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 5h16" stroke="#b05c1a" stroke-width="1.25" stroke-linecap="round"/></svg>
             </div>
             <h3 class="text-[1.05rem] font-bold text-ink tracking-tight">Planned vs actual, live</h3>
             <p class="text-[0.925rem] text-ink-muted leading-[1.65]">Draw your target curve, then watch your real readings track against it as the firing climbs. See at a glance whether you're ahead, behind, or right on the line — and adjust while it still matters.</p>
           </div>
 
-          <div class="bg-parchment p-8 flex flex-col gap-[0.875rem]">
-            <div class="w-11 h-11 bg-flame/10 rounded-lg flex items-center justify-center">
+          <div class="bg-parchment p-6 sm:p-8 flex flex-col gap-[0.875rem]">
+            <div class="w-11 h-11 bg-flame/10 rounded-lg flex items-center justify-center shrink-0">
               <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M4 6h14M4 10h14M4 14h8" stroke="#b05c1a" stroke-width="1.25" stroke-linecap="round"/><circle cx="17" cy="16" r="3" stroke="#b05c1a" stroke-width="1.25"/><path d="M17 14.5v1.5l1 1" stroke="#b05c1a" stroke-width="1" stroke-linecap="round"/></svg>
             </div>
             <h3 class="text-[1.05rem] font-bold text-ink tracking-tight">Log in a tap</h3>
@@ -249,25 +263,25 @@
           </div>
 
           <!-- Schedule library — celadon icon (this is the celadon/schedule world) -->
-          <div class="bg-parchment p-8 flex flex-col gap-[0.875rem]">
-            <div class="w-11 h-11 bg-celadon-bg rounded-lg flex items-center justify-center">
+          <div class="bg-parchment p-6 sm:p-8 flex flex-col gap-[0.875rem]">
+            <div class="w-11 h-11 bg-celadon-bg rounded-lg flex items-center justify-center shrink-0">
               <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="3" y="3" width="16" height="16" rx="2" stroke="#5f8a78" stroke-width="1.25"/><path d="M7 8h8M7 12h5" stroke="#5f8a78" stroke-width="1.25" stroke-linecap="round"/><path d="M14 15l2-2 2 2" stroke="#5f8a78" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </div>
             <h3 class="text-[1.05rem] font-bold text-ink tracking-tight">Schedule library</h3>
             <p class="text-[0.925rem] text-ink-muted leading-[1.65]">Start from a built-in bisque or glaze curve, or save your own and reuse it. No re-drawing the same firing twice.</p>
           </div>
 
-          <div class="bg-parchment p-8 flex flex-col gap-[0.875rem]">
-            <div class="w-11 h-11 bg-flame/10 rounded-lg flex items-center justify-center">
+          <div class="bg-parchment p-6 sm:p-8 flex flex-col gap-[0.875rem]">
+            <div class="w-11 h-11 bg-flame/10 rounded-lg flex items-center justify-center shrink-0">
               <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M11 2C6.03 2 2 6.03 2 11s4.03 9 9 9 9-4.03 9-9-4.03-9-9-9z" stroke="#b05c1a" stroke-width="1.25"/><path d="M11 6v5l3 3" stroke="#b05c1a" stroke-width="1.25" stroke-linecap="round"/></svg>
             </div>
             <h3 class="text-[1.05rem] font-bold text-ink tracking-tight">Full firing history</h3>
             <p class="text-[0.925rem] text-ink-muted leading-[1.65]">Every firing saved with its curve, notes, and stats. Compare past firings to understand what changed — and why one came out better.</p>
           </div>
 
-          <div class="bg-ink p-8 flex flex-col justify-center gap-[0.625rem]">
+          <div class="bg-ink p-6 sm:p-8 flex flex-col justify-center gap-[0.625rem]">
             <p class="text-[0.7rem] font-bold uppercase tracking-[0.12em] text-flame-light">Firing insight</p>
-            <div class="text-[2.75rem] font-bold text-parchment leading-none tracking-[-0.04em]">1,280<span class="text-[1.375rem] text-flame-light">°C</span></div>
+            <div class="text-[2.25rem] sm:text-[2.75rem] font-bold text-parchment leading-none tracking-[-0.04em]">1,280<span class="text-[1.125rem] sm:text-[1.375rem] text-flame-light">°C</span></div>
             <p class="text-[0.825rem] text-ink-muted leading-[1.5]">Peak temperature — Cone 10 reduction<br>Duration 8h 40m · 142 readings logged</p>
           </div>
 
@@ -276,13 +290,14 @@
     </section>
 
     <!-- Pricing -->
-    <section id="pricing" class="bg-parchment px-10 py-24">
+    <section id="pricing" class="bg-parchment px-5 sm:px-8 lg:px-10 py-16 sm:py-20 lg:py-24">
       <div class="max-w-[1200px] mx-auto">
         <p class="text-flame font-semibold tracking-[0.16em] uppercase text-[0.72rem] mb-4">Simple pricing</p>
-        <h2 class="text-[clamp(2rem,3.5vw,2.875rem)] font-bold text-ink leading-[1.15] tracking-tight mb-14">One plan.<br>Everything included.</h2>
+        <h2 class="text-[clamp(1.75rem,3.5vw,2.875rem)] font-bold text-ink leading-[1.15] tracking-tight mb-8 sm:mb-14">One plan.<br>Everything included.</h2>
 
-        <div class="bg-white border border-parchment-3 rounded-[14px] p-12 shadow-[0_4px_24px_rgba(58,30,8,0.07)] grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-14 items-start">
-          <div>
+        <!-- p-12 on top of the section's px-10 left 144px of content at 320px. -->
+        <div class="bg-white border border-parchment-3 rounded-[14px] p-6 sm:p-8 lg:p-12 shadow-[0_4px_24px_rgba(58,30,8,0.07)] grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] gap-8 lg:gap-14 items-start">
+          <div class="min-w-0">
             <span class="inline-block bg-flame-bg border border-flame-light text-flame text-[0.75rem] font-bold uppercase tracking-[0.1em] px-3 py-1 rounded mb-5">Annual plan</span>
 
             <!-- BETA-TEMP: price hidden during beta. Was —
@@ -294,14 +309,14 @@
               <p class="text-[0.9rem] text-ink-faint mb-8">That's just $4.08 per month.</p>
             -->
             <div class="mb-2">
-              <span class="text-[2.5rem] font-bold text-ink leading-none tracking-tight">Pricing announced at launch</span>
+              <span class="text-[1.75rem] sm:text-[2.5rem] font-bold text-ink leading-tight tracking-tight">Pricing announced at launch</span>
             </div>
             <p class="text-[0.9rem] text-ink-faint mb-8">One simple annual plan — priced for potters, not enterprises. Early testers get 12 months free.</p>
 
             <!-- BETA-TEMP: was to="/signup" · "Start 30-day free trial" -->
-            <NuxtLink to="/early-access" class="inline-flex items-center gap-2 bg-flame text-parchment px-8 py-4 rounded text-[1.05rem] font-semibold hover:bg-flame-dark transition-all hover:-translate-y-px">
+            <NuxtLink to="/early-access" class="inline-flex items-center justify-center gap-2 bg-flame text-parchment px-5 sm:px-8 py-3.5 sm:py-4 rounded text-[0.95rem] sm:text-[1.05rem] font-semibold hover:bg-flame-dark transition-all hover:-translate-y-px">
               Sign up for free early access
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="shrink-0"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </NuxtLink>
             <!-- BETA-TEMP: was "No credit card required to start" -->
             <p class="text-[0.825rem] text-ink-faint mt-3">Free while we're testing — no credit card, ever, until launch.</p>
@@ -309,10 +324,10 @@
 
           <div class="hidden md:block w-px bg-parchment-3 self-stretch"/>
 
-          <div>
+          <div class="min-w-0">
             <p class="text-[0.75rem] font-bold uppercase tracking-[0.1em] text-ink-faint mb-4">Everything included:</p>
             <ul class="flex flex-col gap-3 list-none p-0">
-              <li v-for="item in pricingItems" :key="item" class="flex items-center gap-3 text-[0.975rem] text-ink-2">
+              <li v-for="item in pricingItems" :key="item" class="flex items-center gap-3 text-[0.9rem] sm:text-[0.975rem] text-ink-2">
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="shrink-0"><path d="M2 7l3.5 3.5L12 3.5" stroke="#b05c1a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 {{ item }}
               </li>
@@ -323,25 +338,25 @@
     </section>
 
     <!-- Final CTA -->
-    <section class="bg-ink px-10 py-24" style="background-image: radial-gradient(ellipse at 30% 50%, rgba(176,92,26,0.15) 0%, transparent 60%)">
+    <section class="bg-ink px-5 sm:px-8 lg:px-10 py-16 sm:py-20 lg:py-24" style="background-image: radial-gradient(ellipse at 30% 50%, rgba(176,92,26,0.15) 0%, transparent 60%)">
       <div class="max-w-[1200px] mx-auto text-center flex flex-col items-center gap-4">
-        <h2 class="text-[clamp(2rem,3.5vw,2.875rem)] font-bold text-parchment leading-[1.2] tracking-tight">Never lose a good firing again.</h2>
+        <h2 class="text-[clamp(1.75rem,3.5vw,2.875rem)] font-bold text-parchment leading-[1.2] tracking-tight">Never lose a good firing again.</h2>
         <!-- BETA-TEMP: was "Start your 30-day free trial. No credit card, no commitment." -->
-        <p class="text-[1.1rem] text-ink-muted mb-2">Help us build the kiln app you need — free early access, no credit card.</p>
+        <p class="text-[1rem] sm:text-[1.1rem] text-ink-muted mb-2">Help us build the kiln app you need — free early access, no credit card.</p>
         <!-- BETA-TEMP: was to="/signup" · "Get started free" -->
-        <NuxtLink to="/early-access" class="inline-flex items-center gap-2 bg-flame text-parchment px-8 py-4 rounded text-[1.05rem] font-semibold hover:bg-flame-dark transition-all hover:-translate-y-px">
+        <NuxtLink to="/early-access" class="inline-flex items-center justify-center gap-2 bg-flame text-parchment px-5 sm:px-8 py-3.5 sm:py-4 rounded text-[0.95rem] sm:text-[1.05rem] font-semibold hover:bg-flame-dark transition-all hover:-translate-y-px">
           Sign up for early access
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" class="shrink-0"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </NuxtLink>
       </div>
     </section>
 
     <!-- Footer -->
-    <footer class="bg-ink border-t border-white/[0.08] px-10 py-7">
-      <div class="max-w-[1200px] mx-auto flex items-center justify-between gap-4 flex-wrap">
+    <footer class="bg-ink border-t border-white/[0.08] px-5 sm:px-8 lg:px-10 py-7 pb-[max(1.75rem,env(safe-area-inset-bottom))]">
+      <div class="max-w-[1200px] mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 flex-wrap">
         <span class="text-[0.95rem] font-bold text-parchment">KilnMonitor</span>
-        <span class="text-[0.825rem] text-ink-muted">&copy; {{ new Date().getFullYear() }} KilnMonitor. Made by a potter, for potters.</span>
-        <div class="flex gap-7 text-[0.825rem] text-ink-muted">
+        <span class="text-[0.8rem] sm:text-[0.825rem] text-ink-muted">&copy; {{ new Date().getFullYear() }} KilnMonitor. Made by a potter, for potters.</span>
+        <div class="flex gap-5 sm:gap-7 text-[0.825rem] text-ink-muted flex-wrap">
           <NuxtLink to="/login" class="hover:text-parchment transition-colors">Sign in</NuxtLink>
           <!-- BETA-TEMP: was <NuxtLink to="/signup">Sign up</NuxtLink> — public
                signup is closed during beta. Restore when going live. -->
@@ -356,6 +371,7 @@
 </template>
 
 <script setup>
+// app/pages/index.vue
 definePageMeta({ layout: false, middleware: [] })
 const mobileMenu = ref(false)
 const pricingItems = [

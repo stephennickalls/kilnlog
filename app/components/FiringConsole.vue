@@ -22,7 +22,14 @@
   "Readings" is desktop-only (not needed live on a phone).
 
   Mobile menu: a Teleported bottom sheet (can't be clipped); desktop keeps its
-  anchored dropdown with a backdrop for outside-click.
+  anchored dropdown with a backdrop for outside-click. It pads past the home
+  indicator and caps its height in dvh, so the last action is always reachable.
+
+  NARROW PHONES (Aug 2026): at 320px the text zone gets ~136px. The status
+  line's delta chip therefore switches to delta.short ("45°") below 380px and
+  the full label ("45° behind") above it — previously both children were
+  shrink-0 inside an overflow-hidden parent, so the longer label was clipped
+  mid-word instead of degrading.
 
   G11: the overflow menu gains a reduction toggle — "Start reduction" when none is
   open, "End reduction" when one is in progress. Emits a single 'reduction' action;
@@ -177,11 +184,21 @@
             <span class="text-sm font-medium" :class="currentTemp !== null ? currentColorClass : 'text-parchment-4/50'">{{ unitLabel }}</span>
           </div>
 
-          <!-- Status line: target + delta (arrow dropped — reclaims width on narrow phones) -->
+          <!-- Status line: target + delta (arrow dropped — reclaims width on narrow phones)
+
+               MOBILE (Aug 2026): both children were shrink-0 inside a
+               min-w-0 + overflow-hidden parent, so at 320px (≈136px of text
+               zone) a longer label like "45° behind" was silently SLICED IN
+               HALF rather than wrapping — the firing state, cut off mid-word.
+               delta.short ("45°") already existed on the computed but was
+               never rendered; it now carries the sub-380px case, and the
+               target label may truncate as the last resort. -->
           <div v-if="targetTemp !== null" class="flex items-center gap-1.5 min-w-0">
-            <span class="text-xs text-parchment-4/80 whitespace-nowrap shrink-0">target <b class="font-bold text-parchment-3 tabular-nums">{{ targetTemp }}{{ unitLabel }}</b></span>
+            <span class="text-xs text-parchment-4/80 whitespace-nowrap truncate min-w-0">target <b class="font-bold text-parchment-3 tabular-nums">{{ targetTemp }}{{ unitLabel }}</b></span>
             <span v-if="delta" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[11px] font-bold shrink-0 whitespace-nowrap" :class="delta.class">
-              {{ delta.icon }} {{ delta.label }}
+              {{ delta.icon }}
+              <span class="min-[380px]:hidden">{{ delta.short }}</span>
+              <span class="hidden min-[380px]:inline">{{ delta.label }}</span>
             </span>
           </div>
 
@@ -235,7 +252,15 @@
     <!-- Mobile overflow menu — bottom sheet (Teleported so overflow-hidden can't clip it) -->
     <Teleport to="body">
       <div v-if="menuOpen" class="lg:hidden fixed inset-0 z-[80] flex flex-col justify-end font-serif" style="background:rgba(26,18,8,0.6)" @click.self="menuOpen = false">
-        <div class="bg-parchment rounded-t-2xl p-3 flex flex-col gap-2">
+        <!-- SAFE AREA + dvh (Aug 2026): p-3 alone put "Cancel" underneath the
+             iPhone home indicator. The height cap uses dvh because 100vh on
+             iOS measures a viewport that includes Safari's chrome; with seven
+             actions on a short phone the sheet could otherwise run off-screen
+             with no way to scroll. -->
+        <div
+          class="bg-parchment rounded-t-2xl p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex flex-col gap-2 overflow-y-auto"
+          style="max-height:85vh; max-height:min(85vh, 85dvh)"
+        >
           <div class="flex justify-center pb-1"><div class="w-10 h-1 bg-parchment-3 rounded-full"/></div>
           <!-- Order: cone down, reduction, notes, recalibrate, pause/resume, end.
                Palette (option 3, "two solids"): the two firing EVENTS are loud

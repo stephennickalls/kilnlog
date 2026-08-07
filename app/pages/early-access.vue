@@ -1,4 +1,4 @@
-<!-- app/pages/early-access.vue -->
+<!-- File: app/pages/early-access.vue -->
 <!--
   Early-access recruitment page (see BETA-TEMP edits in middleware/auth.js +
   subscribe.vue). Chrome lives in app/layouts/auth.vue.
@@ -35,7 +35,12 @@
   is invalid" is returned for placeholder addresses (test@gmail.com, a@b.com),
   not for genuine typos.
 
-  MOBILE: inputs are `text-base sm:text-sm` — iOS Safari zooms sub-16px inputs.
+  MOBILE: inputs were already `text-base sm:text-sm` — iOS Safari zooms
+  sub-16px inputs and never zooms back out. They now use the shared .input,
+  which encodes exactly that rule in one place, so this page can't drift back.
+  The confirmation states echo the address the user typed; those are wrapped in
+  `break-all` because an unbroken email is wider than a 320px card and pushed
+  the whole page sideways.
 
   LOADING (Aug 2026): the slots fetch is NOT awaited — see the comment on
   useFetch below. Awaiting it blocked the route transition, so clicking
@@ -57,7 +62,7 @@
       <p class="text-base font-bold text-ink">We couldn't load early access right now</p>
       <p class="text-sm text-ink-muted">Please try again in a moment.</p>
       <button
-        class="text-flame font-semibold text-sm hover:underline"
+        class="text-flame font-semibold text-sm hover:underline py-1"
         @click="refresh()"
       >
         Retry
@@ -82,11 +87,11 @@
           {{ tookLastSlot ? 'You got the last spot!' : 'Your spot is claimed!' }}
         </p>
         <p class="text-sm text-ink-muted leading-relaxed">
-          Confirm your email at <strong class="text-ink">{{ email }}</strong>, then sign in.
+          Confirm your email at <strong class="text-ink break-all">{{ email }}</strong>, then sign in.
         </p>
         <p class="text-sm text-ink-muted leading-relaxed bg-flame-bg border border-flame/20 rounded-lg px-3.5 py-2.5">
           📬 Check your <strong class="text-ink">spam folder</strong> — adding
-          <strong class="text-ink">kilnmonitor@gmail.com</strong> to your contacts helps.
+          <strong class="text-ink break-all">kilnmonitor@gmail.com</strong> to your contacts helps.
         </p>
       </div>
 
@@ -114,7 +119,7 @@
               placeholder="you@example.com"
               required
               autocomplete="email"
-              class="w-full border border-parchment-3 rounded-lg px-3.5 py-2.5 text-base sm:text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif"
+              class="input rounded-lg px-3.5 py-2.5 focus:border-flame focus:ring-flame/10"
             >
           </div>
 
@@ -127,7 +132,7 @@
               required
               minlength="8"
               autocomplete="new-password"
-              class="w-full border border-parchment-3 rounded-lg px-3.5 py-2.5 text-base sm:text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif"
+              class="input rounded-lg px-3.5 py-2.5 focus:border-flame focus:ring-flame/10"
             >
           </div>
 
@@ -138,7 +143,7 @@
               type="text"
               placeholder="Jane Smith"
               autocomplete="name"
-              class="w-full border border-parchment-3 rounded-lg px-3.5 py-2.5 text-base sm:text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif"
+              class="input rounded-lg px-3.5 py-2.5 focus:border-flame focus:ring-flame/10"
             >
           </div>
 
@@ -149,7 +154,7 @@
               rows="3"
               maxlength="2000"
               placeholder="e.g. wood, gas, hybrid, cone 6, cone 10..."
-              class="w-full border border-parchment-3 rounded-lg px-3.5 py-2.5 text-base sm:text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif resize-none"
+              class="input rounded-lg px-3.5 py-2.5 resize-none focus:border-flame focus:ring-flame/10"
             />
           </div>
 
@@ -160,7 +165,7 @@
           <button
             type="submit"
             :disabled="loading"
-            class="w-full flex items-center justify-center gap-2 bg-flame text-parchment py-3 rounded-lg text-base font-bold hover:bg-flame-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-1 font-serif"
+            class="w-full min-h-[44px] flex items-center justify-center gap-2 bg-flame text-parchment py-3 rounded-lg text-base font-bold hover:bg-flame-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-1 font-serif"
           >
             <span v-if="loading" class="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"/>
             <span v-else>Claim your spot →</span>
@@ -182,11 +187,11 @@
         <span class="text-5xl">🎉</span>
         <p class="text-base font-bold text-ink">You're on the list!</p>
         <p class="text-sm text-ink-muted leading-relaxed">
-          We'll email <strong class="text-ink">{{ email }}</strong> as soon as a spot opens.
+          We'll email <strong class="text-ink break-all">{{ email }}</strong> as soon as a spot opens.
         </p>
         <p class="text-sm text-ink-muted leading-relaxed bg-flame-bg border border-flame/20 rounded-lg px-3.5 py-2.5">
           📬 Check your <strong class="text-ink">spam folder</strong> — adding
-          <strong class="text-ink">kilnmonitor@gmail.com</strong> to your contacts helps.
+          <strong class="text-ink break-all">kilnmonitor@gmail.com</strong> to your contacts helps.
         </p>
       </div>
 
@@ -212,7 +217,7 @@
               placeholder="you@example.com"
               required
               autocomplete="email"
-              class="w-full border border-parchment-3 rounded-lg px-3.5 py-2.5 text-base sm:text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif"
+              class="input rounded-lg px-3.5 py-2.5 focus:border-flame focus:ring-flame/10"
             >
           </div>
 
@@ -223,7 +228,7 @@
               type="text"
               placeholder="Jane Smith"
               autocomplete="name"
-              class="w-full border border-parchment-3 rounded-lg px-3.5 py-2.5 text-base sm:text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif"
+              class="input rounded-lg px-3.5 py-2.5 focus:border-flame focus:ring-flame/10"
             >
           </div>
 
@@ -234,7 +239,7 @@
               rows="3"
               maxlength="2000"
               placeholder="e.g. wood, gas, hybrid, cone 6, cone 10..."
-              class="w-full border border-parchment-3 rounded-lg px-3.5 py-2.5 text-base sm:text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif resize-none"
+              class="input rounded-lg px-3.5 py-2.5 resize-none focus:border-flame focus:ring-flame/10"
             />
           </div>
 
@@ -256,7 +261,7 @@
           <button
             type="submit"
             :disabled="loading"
-            class="w-full flex items-center justify-center gap-2 bg-flame text-parchment py-3 rounded-lg text-base font-bold hover:bg-flame-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-1 font-serif"
+            class="w-full min-h-[44px] flex items-center justify-center gap-2 bg-flame text-parchment py-3 rounded-lg text-base font-bold hover:bg-flame-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-1 font-serif"
           >
             <span v-if="loading" class="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"/>
             <span v-else>Join the waitlist →</span>

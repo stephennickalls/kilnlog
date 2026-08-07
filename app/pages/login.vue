@@ -1,17 +1,23 @@
 <!-- File: app/pages/login.vue -->
+<!--
+  MOBILE (Aug 2026) — this page was the origin of the whole "the app is zoomed
+  in and wider than my screen" report. Both inputs were text-sm (14px), and iOS
+  Safari zooms the page in whenever a control under 16px takes focus, then never
+  zooms back out. Signing in therefore left every subsequent page zoomed. They
+  now use the shared .input (text-base on phones, text-sm from sm up), which is
+  what early-access.vue had already been doing correctly.
+
+  ALSO REMOVED: an orphaned "─── or ───" divider that sat above the form with
+  nothing above IT. The Google sign-in button it separated was deleted at some
+  point and the divider was left behind. signInGoogle() below is kept for when
+  that button returns.
+-->
 <template>
   <div>
- 
-
-    <div class="flex items-center gap-4 mb-5 text-sm text-ink-muted">
-      <div class="flex-1 h-px bg-parchment-3"/>
-      <span>or</span>
-      <div class="flex-1 h-px bg-parchment-3"/>
-    </div>
 
     <form class="flex flex-col gap-4" @submit.prevent="signInEmail">
       <div class="flex flex-col gap-1.5">
-        <label class="text-xs font-semibold uppercase tracking-widest text-ink-faint flex justify-between items-center">
+        <label class="text-xs font-semibold uppercase tracking-widest text-ink-faint">
           Email
         </label>
         <input
@@ -21,14 +27,16 @@
           required
           autocomplete="email"
           :disabled="loading"
-          class="w-full border border-parchment-3 rounded-lg px-3.5 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif disabled:opacity-60"
+          class="input rounded-lg px-3.5 py-2.5 focus:border-flame focus:ring-flame/10 disabled:opacity-60"
         >
       </div>
 
       <div class="flex flex-col gap-1.5">
-        <label class="text-xs font-semibold uppercase tracking-widest text-ink-faint flex justify-between items-center">
-          Password
-          <NuxtLink to="/forgot-password" class="text-flame text-xs font-medium normal-case tracking-normal hover:underline">Forgot password?</NuxtLink>
+        <!-- gap-2 + shrink-0 so "Forgot password?" can't be squeezed into two
+             lines against the label at 320px. -->
+        <label class="text-xs font-semibold uppercase tracking-widest text-ink-faint flex justify-between items-center gap-2">
+          <span class="min-w-0">Password</span>
+          <NuxtLink to="/forgot-password" class="text-flame text-xs font-medium normal-case tracking-normal hover:underline shrink-0">Forgot password?</NuxtLink>
         </label>
         <input
           v-model="password"
@@ -37,7 +45,7 @@
           required
           autocomplete="current-password"
           :disabled="loading"
-          class="w-full border border-parchment-3 rounded-lg px-3.5 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif disabled:opacity-60"
+          class="input rounded-lg px-3.5 py-2.5 focus:border-flame focus:ring-flame/10 disabled:opacity-60"
         >
       </div>
 
@@ -48,7 +56,7 @@
       <button
         type="submit"
         :disabled="loading"
-        class="w-full flex items-center justify-center gap-2 bg-flame text-parchment py-3 rounded-lg text-base font-bold hover:bg-flame-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-1 font-serif"
+        class="w-full min-h-[44px] flex items-center justify-center gap-2 bg-flame text-parchment py-3 rounded-lg text-base font-bold hover:bg-flame-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-1 font-serif"
       >
         <!-- UX (Aug 2026): the spinner now carries a label and stays up
              through navigation — the first load after sign-in can take
@@ -113,6 +121,10 @@ function stopLoading() {
 
 onUnmounted(() => { if (labelTimer) clearTimeout(labelTimer) })
 
+// UNUSED (Aug 2026): the Google button was removed from the template; this is
+// kept so restoring it is a template-only change. Wire it to a button and put
+// back the "or" divider above the form at the same time.
+// eslint-disable-next-line no-unused-vars
 async function signInGoogle() {
   startLoading()
   const { error: err } = await supabase.auth.signInWithOAuth({

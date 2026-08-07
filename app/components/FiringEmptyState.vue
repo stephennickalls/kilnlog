@@ -18,7 +18,7 @@
   enabled; navigating away is always fine.
 -->
 <template>
-  <div class="flex flex-col items-center justify-center text-center gap-5 px-6 py-10 sm:py-16 h-full">
+  <div class="flex flex-col items-center justify-center text-center gap-5 px-4 sm:px-6 py-10 sm:py-16 h-full min-w-0">
 
     <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white border border-parchment-3 flex items-center justify-center" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)">
       <BrandFlame class="w-11 h-11 sm:w-14 sm:h-14" />
@@ -37,7 +37,7 @@
 
     <div class="flex flex-col sm:flex-row gap-2.5 w-full sm:w-auto max-w-xs sm:max-w-none">
       <button
-        class="flex items-center justify-center gap-2 px-6 py-3 bg-flame hover:bg-flame-dark text-parchment text-sm font-bold rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        class="flex items-center justify-center gap-2 px-5 sm:px-6 py-3 min-h-[44px] bg-flame hover:bg-flame-dark text-parchment text-sm font-bold rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         :disabled="!!activeFiring"
         :title="activeFiring ? 'A firing is already active — only one at a time' : ''"
         @click="$emit('start')"
@@ -46,7 +46,7 @@
         Start a firing
       </button>
       <!-- Celadon hint: this button leads to the schedules world -->
-      <button class="flex items-center justify-center gap-2 px-6 py-3 border border-celadon/40 bg-celadon-bg/60 text-celadon-dark hover:bg-celadon-bg text-sm font-semibold rounded-xl transition-colors" @click="$emit('browse-schedules')">
+      <button class="flex items-center justify-center gap-2 px-5 sm:px-6 py-3 min-h-[44px] border border-celadon/40 bg-celadon-bg/60 text-celadon-dark hover:bg-celadon-bg text-sm font-semibold rounded-xl transition-colors" @click="$emit('browse-schedules')">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
         Browse schedules
       </button>
@@ -57,15 +57,23 @@
       <strong class="font-semibold">{{ activeFiring.name }}</strong> is still firing — only one firing at a time. End it from the sidebar first.
     </p>
 
+    <!-- Most-recent shortcut.
+         MOBILE (Aug 2026): this row had a fixed max-w-[160px] on the name plus
+         a "Most recent —" label, an icon and a chevron, with nothing allowed to
+         shrink — about 300px of content in the 240px available at 320px, so it
+         pushed past the card edge (visible in the reported screenshots as the
+         chevron sitting on the screen border). The label now hides on the
+         narrowest screens, the row is width-capped, and the name truncates
+         against whatever space is actually left rather than a fixed number. -->
     <button
       v-if="recentFiring"
-      class="mt-1 flex items-center gap-2 bg-white border border-parchment-3 rounded-xl px-4 py-2.5 hover:border-flame/40 transition-colors"
+      class="mt-1 flex items-center gap-2 min-w-0 max-w-full bg-white border border-parchment-3 rounded-xl px-3 sm:px-4 py-2.5 min-h-[44px] hover:border-flame/40 transition-colors"
       style="box-shadow:0 2px 12px rgba(58,30,8,0.06)"
       @click="$emit('select-recent', recentFiring)"
     >
       <svg class="w-4 h-4 text-ink-faint shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-      <span class="text-xs sm:text-sm text-ink-muted">Most recent —</span>
-      <span class="text-xs sm:text-sm font-semibold text-ink truncate max-w-[160px]">{{ recentFiring.name }}</span>
+      <span class="hidden min-[380px]:inline text-xs sm:text-sm text-ink-muted shrink-0">Most recent —</span>
+      <span class="text-xs sm:text-sm font-semibold text-ink truncate min-w-0">{{ recentFiring.name }}</span>
       <svg class="w-4 h-4 text-ink-faint shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
     </button>
   </div>

@@ -3,7 +3,7 @@
      Opens a modal (bottom sheet on mobile) with a bug/feature toggle and a
      message box. POSTs to /api/feedback. Icons are inline SVGs — no emojis. -->
 <template>
-  <div class="flex items-center gap-2.5">
+  <div class="flex items-center gap-2.5 shrink-0">
     <span class="hidden lg:inline text-sm font-semibold text-ink-muted">Report a bug or request a feature</span>
     <button
       class="flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-lg border border-celadon/50 text-celadon-dark bg-celadon-bg hover:bg-celadon/20 transition-colors"
@@ -15,21 +15,30 @@
 
     <Teleport to="body">
       <div v-if="open" class="fixed inset-0 z-[70] flex items-end sm:items-center justify-center" style="background:rgba(26,18,8,0.6)" @click.self="close">
-        <div class="bg-parchment w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-5 flex flex-col gap-4">
+        <!-- MOBILE (Aug 2026): pads past the home indicator and caps its height
+             in dvh — with the keyboard up on a short phone the Send button was
+             below the fold and there was nothing to scroll. -->
+        <div
+          class="bg-parchment w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-5 flex flex-col gap-4 overflow-y-auto"
+          style="max-height:90vh; max-height:min(90vh, 88dvh)"
+        >
 
-          <div class="flex items-center justify-between">
-            <h2 class="text-base font-bold text-ink">{{ sent ? 'Thank you!' : 'Report a bug or request a feature' }}</h2>
-            <button class="p-1 text-ink-muted" @click="close">
+          <div class="flex items-start justify-between gap-2">
+            <h2 class="text-base font-bold text-ink min-w-0">{{ sent ? 'Thank you!' : 'Report a bug or request a feature' }}</h2>
+            <button class="p-2 -mr-1 -mt-1 text-ink-muted shrink-0" aria-label="Close" @click="close">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
             </button>
           </div>
 
           <template v-if="!sent">
-            <!-- Type toggle -->
+            <!-- Type toggle. "Request a feature" plus its icon needs ~134px and
+                 each half of this row gets ~136px at 320px — right on the edge,
+                 so the labels shorten below 380px rather than wrapping to two
+                 lines and shunting the buttons out of alignment. -->
             <div class="flex gap-2">
               <button
                 v-for="t in types" :key="t.value"
-                class="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-bold rounded-xl border transition-colors"
+                class="flex-1 min-w-0 flex items-center justify-center gap-2 py-2.5 min-h-[44px] text-sm font-bold rounded-xl border transition-colors"
                 :class="type === t.value
                   ? 'bg-flame text-parchment border-flame'
                   : 'bg-white text-ink-muted border-parchment-3 hover:bg-parchment-2'"
@@ -39,7 +48,8 @@
                 <svg v-if="t.value === 'bug'" class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>
                 <!-- Feature: lightbulb -->
                 <svg v-else class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18h6M10 22h4M12 2a7 7 0 00-4 12.7c.6.5 1 1.2 1 2V17h6v-.3c0-.8.4-1.5 1-2A7 7 0 0012 2z"/></svg>
-                {{ t.label }}
+                <span class="min-[380px]:hidden">{{ t.shortLabel }}</span>
+                <span class="hidden min-[380px]:inline truncate">{{ t.label }}</span>
               </button>
             </div>
 
@@ -94,8 +104,9 @@ const sent    = ref(false)
 const error   = ref('')
 
 const types = [
-  { value: 'bug',     label: 'Report a bug' },
-  { value: 'feature', label: 'Request a feature' },
+  // shortLabel renders below 380px — see the type-toggle comment in the template.
+  { value: 'bug',     label: 'Report a bug',      shortLabel: 'Bug' },
+  { value: 'feature', label: 'Request a feature', shortLabel: 'Feature' },
 ]
 
 async function submit() {

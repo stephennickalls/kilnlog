@@ -26,12 +26,12 @@
   <Transition name="fade">
     <div
       v-if="show"
-      class="flex items-start gap-3 px-4 py-3 mx-3 mt-3 sm:mx-5 sm:mt-5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800"
+      class="flex flex-wrap items-start gap-x-3 gap-y-2 px-4 py-3 mx-3 mt-3 sm:mx-5 sm:mt-5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800"
     >
       <svg class="w-5 h-5 shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
         <path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
       </svg>
-      <div class="flex-1 min-w-0">
+      <div class="flex-1 min-w-[180px]">
         <p class="text-sm font-bold">Payment failed</p>
         <p class="text-xs leading-relaxed mt-0.5">
           We couldn't charge your card. You'll keep full access until
@@ -39,16 +39,22 @@
           payment method to avoid losing access mid-firing.
         </p>
       </div>
+      <!-- MOBILE (Aug 2026): icon + message + this button + the dismiss X all
+           sat in one non-wrapping row, which left the message about 90px of
+           width at 320px — a warning about losing access mid-firing, rendered
+           as a four-word-per-line sliver. The row wraps now and this button
+           takes the full width on its own line when it has to. -->
       <button
-        class="shrink-0 px-3 py-1.5 text-xs font-bold rounded-lg bg-amber-600 text-white hover:bg-amber-700 transition-colors disabled:opacity-50"
+        class="order-last sm:order-none w-full sm:w-auto shrink-0 px-3 py-2 min-h-[36px] text-xs font-bold rounded-lg bg-amber-600 text-white hover:bg-amber-700 transition-colors disabled:opacity-50"
         :disabled="loading"
         @click="openPortal"
       >
         {{ loading ? 'Opening…' : 'Update card' }}
       </button>
       <button
-        class="shrink-0 p-1 -mr-1 text-amber-600 hover:text-amber-800 transition-colors"
+        class="shrink-0 p-2 -mr-1 -mt-1 text-amber-600 hover:text-amber-800 transition-colors"
         title="Dismiss"
+        aria-label="Dismiss"
         @click="dismissed = true"
       >
         <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>

@@ -1,11 +1,18 @@
-<!-- app/components/FiringTypeSelect.vue -->
+<!-- File: app/components/FiringTypeSelect.vue -->
+<!--
+  MOBILE (Aug 2026): the select was text-sm (14px). Any control under 16px makes
+  iOS Safari zoom the page in on focus and never zoom back out. The shared
+  .input is text-base on phones and text-sm from sm up; the utilities after it
+  keep this control's roomier xl/px-4 shape and flame focus ring.
+  ConeSelect.vue carries the identical markup — apply the same swap there.
+-->
 <template>
   <div class="flex flex-col gap-1.5">
     <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Type</label>
     <div class="relative">
       <select
         :value="modelValue"
-        class="w-full border border-parchment-3 rounded-xl px-4 py-2.5 pr-9 text-sm text-ink bg-white focus:outline-none focus:border-flame font-serif appearance-none"
+        class="input rounded-xl px-4 py-2.5 pr-9 appearance-none focus:border-flame focus:ring-flame/10"
         @change="$emit('update:modelValue', $event.target.value)"
       >
         <option v-for="t in FIRING_TYPES" :key="t.value" :value="t.value">{{ t.label }}</option>

@@ -25,20 +25,23 @@
       style="background:rgba(26,18,8,0.6)"
       @click.self="$emit('close')"
     >
-      <div class="bg-parchment w-full sm:w-[460px] sm:rounded-2xl rounded-t-2xl sm:max-h-[88vh] max-h-[92vh] overflow-y-auto flex flex-col border border-parchment-3" style="box-shadow:0 -8px 40px rgba(26,18,8,0.15)">
+      <!-- MOBILE (Aug 2026): the vh cap measures a viewport that includes
+           Safari's chrome on iOS, so the footer buttons could sit below the
+           fold with nothing to scroll to them. dvh tracks the visible area. -->
+      <div class="bg-parchment w-full sm:w-[460px] sm:rounded-2xl rounded-t-2xl overflow-y-auto flex flex-col border border-parchment-3" style="max-height:92vh; max-height:min(92vh, 88dvh); box-shadow:0 -8px 40px rgba(26,18,8,0.15)">
 
         <!-- Header -->
-        <div class="flex items-center justify-between px-6 pt-6 pb-4 border-b border-parchment-3 shrink-0">
-          <div>
+        <div class="flex items-start justify-between gap-2 px-4 sm:px-6 pt-5 sm:pt-6 pb-4 border-b border-parchment-3 shrink-0">
+          <div class="min-w-0">
             <h2 class="text-base font-bold text-ink">Plan reduction</h2>
             <p class="text-xs text-ink-muted mt-0.5">Mark when you intend to reduce. This is a plan — your real firing decides the rest.</p>
           </div>
-          <button class="p-1.5 rounded-lg hover:bg-parchment-2 text-ink-muted hover:text-ink transition-colors shrink-0" @click="$emit('close')">
+          <button class="p-2 -mr-1 rounded-lg hover:bg-parchment-2 text-ink-muted hover:text-ink transition-colors shrink-0" aria-label="Close" @click="$emit('close')">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
           </button>
         </div>
 
-        <div class="flex flex-col gap-3 px-6 py-5">
+        <div class="flex flex-col gap-3 px-4 sm:px-6 py-5">
 
           <!-- Existing reductions -->
           <div v-if="rows.length" class="flex flex-col gap-2">
@@ -58,7 +61,7 @@
                   <input
                     :value="r.startDisplay"
                     type="number" min="0" :max="maxInputTemp" placeholder="950"
-                    class="w-full border border-parchment-3 rounded-lg px-2.5 py-1.5 text-sm text-ink bg-white focus:outline-none focus:border-flame font-serif"
+                    class="input rounded-lg px-2.5 py-1.5 focus:border-flame focus:ring-flame/10"
                     @input="onStartInput(i, $event.target.value)"
                     @blur="snapDisplay(i, 'start')"
                   >
@@ -68,7 +71,7 @@
                   <input
                     :value="r.endDisplay"
                     type="number" min="0" :max="maxInputTemp" placeholder="—"
-                    class="w-full border border-parchment-3 rounded-lg px-2.5 py-1.5 text-sm text-ink bg-white focus:outline-none focus:border-flame font-serif"
+                    class="input rounded-lg px-2.5 py-1.5 focus:border-flame focus:ring-flame/10"
                     @input="onEndInput(i, $event.target.value)"
                     @blur="snapDisplay(i, 'end')"
                   >
@@ -99,10 +102,10 @@
         </div>
 
         <!-- Footer -->
-        <div class="flex justify-end gap-2 px-6 pb-6 pt-4 border-t border-parchment-3 shrink-0">
-          <button class="px-4 py-2 border border-parchment-3 text-ink-muted hover:bg-parchment-2 text-sm font-semibold rounded-lg transition-colors" @click="$emit('close')">Cancel</button>
+        <div class="flex justify-end gap-2 px-4 sm:px-6 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] border-t border-parchment-3 shrink-0">
+          <button class="px-4 py-2.5 min-h-[44px] border border-parchment-3 text-ink-muted hover:bg-parchment-2 text-sm font-semibold rounded-lg transition-colors" @click="$emit('close')">Cancel</button>
           <button
-            class="px-4 py-2 bg-flame text-parchment text-sm font-bold rounded-lg hover:bg-flame-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            class="px-4 py-2.5 min-h-[44px] bg-flame text-parchment text-sm font-bold rounded-lg hover:bg-flame-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             :disabled="!canSave"
             @click="save"
           >Save reductions</button>

@@ -14,18 +14,18 @@
 -->
 <template>
   <div
-    class="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 rounded-xl border border-amber-300 bg-amber-50"
+    class="flex flex-wrap items-start sm:items-center gap-x-3 gap-y-2 px-4 py-3 rounded-xl border border-amber-300 bg-amber-50"
     role="status"
   >
-    <svg class="w-4 h-4 text-amber-600 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+    <svg class="w-4 h-4 text-amber-600 shrink-0 mt-0.5 sm:mt-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
       <path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>
     </svg>
-    <p class="text-sm text-amber-800 flex-1 min-w-[200px]">
+    <p class="text-sm text-amber-800 flex-1 min-w-[160px]">
       <strong>Ended automatically</strong> — no readings were logged for a while{{ endedLabel }}.
       If the kiln is still going, restart and log a fresh reading.
     </p>
     <button
-      class="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 transition-colors shrink-0"
+      class="w-full sm:w-auto px-3 py-2 min-h-[36px] rounded-lg text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 transition-colors shrink-0"
       @click="$emit('restart')"
     >Restart firing</button>
   </div>

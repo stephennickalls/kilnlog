@@ -1,4 +1,14 @@
 <!-- File: app/pages/schedules/new.vue -->
+<!--
+  PASTE (removed Aug 2026): this page used to offer "Paste a schedule" beside
+  the library select. Dropped at the owner's request. Gone with it: the
+  PasteScheduleModal mount, onPasteImport, the showPaste ref, and the
+  suppressLibraryWatch flag — that flag existed ONLY to stop the
+  selectedLibraryId watcher wiping a fresh import when the select was cleared,
+  so with paste gone it has no job. app/components/PasteScheduleModal.vue and
+  composables/useSchedulePaste.js can be deleted once StartFiringModal.vue is
+  updated too (it is, in this batch).
+-->
 <template>
   <div class="min-h-screen bg-parchment font-serif">
 
@@ -95,21 +105,6 @@
           </div>
         </div>
 
-        <!-- PASTE (Aug 2026): the select seeds from your library, this seeds
-             from the internet. Same job — a starting curve — so same place. -->
-        <!-- <button
-          class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl border border-dashed border-parchment-4 hover:border-flame/50 transition-colors text-left -mt-1"
-          @click="showPaste = true"
-        >
-          <svg class="w-4 h-4 text-ink-faint shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/>
-          </svg>
-          <span class="flex-1 min-w-0">
-            <span class="block text-sm font-semibold text-ink">Paste a schedule</span>
-            <span class="block text-[11px] text-ink-muted">From a forum post, a blog, or your kiln manual</span>
-          </span>
-          <svg class="w-4 h-4 text-ink-faint shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
-        </button> -->
       </template>
 
       <!-- ── SHARED: name ──────────────────────────────────────────────── -->
@@ -191,9 +186,6 @@
 
     </main>
 
-    <!-- Paste import -->
-    <PasteScheduleModal :open="showPaste" @close="showPaste = false" @import="onPasteImport" />
-
     <!-- Reduction planner -->
     <ReductionPlannerModal
       :open="showReductionPlanner"
@@ -220,7 +212,7 @@
 
 <script setup>
 // app/pages/schedules/new.vue
-import { themeForType, labelForType } from '~/composables/useScheduleTheme'
+import { themeForType } from '~/composables/useScheduleTheme'
 import { simplify, SUGGESTED_EPSILON, detailToEpsilon, epsilonToDetail } from '~/composables/useCurveSimplify'
 
 definePageMeta({ middleware: ['auth'], path: '/schedules/new' })
@@ -264,13 +256,6 @@ const theme      = computed(() => themeForType(form.type))
 // accepted them (the duplicate flow proves it), this page just never sent any.
 const editReductions       = ref([])
 const showReductionPlanner = ref(false)
-
-// PASTE (Aug 2026)
-const showPaste            = ref(false)
-// The selectedLibraryId watcher RESETS the curve — including when it changes to
-// '' — so clearing the select after an import would wipe the import. This flag
-// lets us clear it silently.
-const suppressLibraryWatch = ref(false)
 
 function onReductionsSaved(list) {
   editReductions.value = list
@@ -345,7 +330,6 @@ function flash(msg) {
 
 // ── Seed from library ─────────────────────────────────────────────────────────
 watch(selectedLibraryId, (val) => {
-  if (suppressLibraryWatch.value) return   // a paste import just cleared it
   if (!val) {
     editPoints.value = BISQUE_DEFAULT.map(p => ({ ...p }))
     editReductions.value = []   // REDUCTIONS: blank slate, no leak from last pick
@@ -365,30 +349,6 @@ watch(selectedLibraryId, (val) => {
   form.type = sched.type ?? 'glaze'
   form.cone = sched.cone ?? ''
 })
-
-// ── Paste import ──────────────────────────────────────────────────────────────
-// Seeds the SAME editor the library select seeds, so the curve stays fully
-// editable afterwards. Metadata only fills BLANKS — a pasted schedule must not
-// overwrite a name or cone the user already typed.
-function onPasteImport(result) {
-  editPoints.value     = result.points.map(p => ({ ...p }))
-  editReductions.value = []                     // pasted text carries no reductions
-
-  if (result.type && !isFromFiring.value) form.type = result.type
-  if (result.cone && !form.cone)          form.cone = result.cone
-  if (!form.name.trim()) {
-    form.name = `${labelForType(result.type)}${result.cone ? ` — cone ${result.cone}` : ''} (imported)`
-  }
-
-  // The curve no longer came from the library — clear the select without
-  // letting its watcher fire and reset everything we just set.
-  suppressLibraryWatch.value = true
-  selectedLibraryId.value    = ''
-  nextTick(() => { suppressLibraryWatch.value = false })
-
-  showPaste.value = false
-  flash(`Imported ${result.points.length} points — adjust anything below`)
-}
 
 // ── Slider ────────────────────────────────────────────────────────────────────
 watch(slider, (val) => {

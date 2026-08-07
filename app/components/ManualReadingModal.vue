@@ -6,6 +6,12 @@
   °C value is converted to the display unit to pre-fill the field. The max cap
   is shown in the active unit (1400°C === 2552°F) but the server still validates
   in °C.
+
+  TYPE SIZE (Aug 2026): the temperature field is text-3xl (30px) ON PURPOSE —
+  it's typed standing at a hot kiln, often gloved, sometimes in bad light. The
+  pointer:coarse rule in tailwind.css lifts small controls to 16px to stop iOS
+  zooming on focus; it deliberately does NOT touch anything already larger, so
+  this field keeps its size. Don't "normalise" it to .input.
 -->
 <template>
   <Teleport to="body">
@@ -15,13 +21,17 @@
       style="background: rgba(26,18,8,0.6)"
       @click.self="$emit('close')"
     >
+      <!-- MOBILE (Aug 2026): pads past the home indicator, and caps its height
+           in dvh with overflow-y-auto — the field autofocuses, so the keyboard
+           is always up when this opens and on a short phone the action row was
+           pushed below the fold with nothing to scroll to it. -->
       <div
-class="bg-parchment w-full sm:w-[360px] sm:rounded-2xl rounded-t-2xl p-6 flex flex-col gap-5 border border-parchment-3"
-        style="box-shadow: 0 -8px 40px rgba(26,18,8,0.15)">
+        class="bg-parchment w-full sm:w-[360px] sm:rounded-2xl rounded-t-2xl p-5 sm:p-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-6 flex flex-col gap-4 sm:gap-5 border border-parchment-3 overflow-y-auto"
+        style="max-height:92vh; max-height:min(92vh, 90dvh); box-shadow: 0 -8px 40px rgba(26,18,8,0.15)">
 
         <div class="flex items-center justify-between">
           <h2 class="text-base font-bold text-ink">{{ isEdit ? 'Edit reading' : 'Log reading' }}</h2>
-          <button class="p-1.5 rounded-lg hover:bg-parchment-2 text-ink-muted hover:text-ink transition-colors" @click="$emit('close')">
+          <button class="p-2 -mr-1 rounded-lg hover:bg-parchment-2 text-ink-muted hover:text-ink transition-colors" aria-label="Close" @click="$emit('close')">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path d="M18 6L6 18M6 6l12 12"/>
             </svg>
@@ -29,7 +39,7 @@ class="bg-parchment w-full sm:w-[360px] sm:rounded-2xl rounded-t-2xl p-6 flex fl
         </div>
 
         <!-- Time info — ticks every second -->
-        <div class="bg-parchment-2 border border-parchment-3 rounded-xl px-4 py-3 flex items-center justify-between">
+        <div class="bg-parchment-2 border border-parchment-3 rounded-xl px-4 py-3 flex items-center justify-between gap-3 min-w-0">
           <div>
             <p class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint mb-0.5">Time from start</p>
             <p class="text-2xl font-bold text-ink tabular-nums">{{ minuteLabel }}</p>
@@ -48,27 +58,36 @@ class="bg-parchment w-full sm:w-[360px] sm:rounded-2xl rounded-t-2xl p-6 flex fl
               ref="tempInput"
               v-model.number="tempValue"
               type="number"
+              inputmode="numeric"
               min="0"
               :max="maxInputTemp"
               placeholder="0"
-              class="flex-1 border border-parchment-3 rounded-xl px-4 py-3 text-3xl font-bold tabular-nums text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif"
+              class="flex-1 min-w-0 border border-parchment-3 rounded-xl px-4 py-3 text-3xl font-bold tabular-nums text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif"
               @keydown.enter="submit"
             >
             <span class="text-xl font-bold text-ink-faint shrink-0">{{ unitLabel }}</span>
           </div>
         </div>
 
-        <!-- Actions -->
-        <div class="flex gap-2 pt-1 border-t border-parchment-3" :class="isEdit ? 'justify-between' : 'justify-end'">
+        <!-- Actions.
+             MOBILE (Aug 2026): in edit mode this row held "Delete reading" +
+             Cancel + Save — roughly 250px of buttons in the ~270px available at
+             320px, with nothing allowed to wrap. It now wraps, the destructive
+             label shortens to "Delete" on narrow screens, and every target
+             clears 44px. -->
+        <div class="flex flex-wrap gap-2 pt-3 border-t border-parchment-3" :class="isEdit ? 'justify-between' : 'justify-end'">
           <button
             v-if="isEdit"
-            class="px-4 py-2 border border-red-200 text-red-500 hover:bg-red-50 text-sm font-semibold rounded-lg transition-colors"
+            class="px-4 py-2.5 min-h-[44px] border border-red-200 text-red-500 hover:bg-red-50 text-sm font-semibold rounded-lg transition-colors"
             @click="$emit('delete')"
-          >Delete reading</button>
-          <div class="flex gap-2">
-            <button class="px-4 py-2 border border-parchment-3 text-ink-muted hover:bg-parchment-2 text-sm font-semibold rounded-lg transition-colors" @click="$emit('close')">Cancel</button>
+          >
+            <span class="min-[380px]:hidden">Delete</span>
+            <span class="hidden min-[380px]:inline">Delete reading</span>
+          </button>
+          <div class="flex gap-2 ml-auto">
+            <button class="px-4 py-2.5 min-h-[44px] border border-parchment-3 text-ink-muted hover:bg-parchment-2 text-sm font-semibold rounded-lg transition-colors" @click="$emit('close')">Cancel</button>
             <button
-              class="px-4 py-2 bg-flame text-parchment text-sm font-bold rounded-lg hover:bg-flame-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              class="px-4 py-2.5 min-h-[44px] bg-flame text-parchment text-sm font-bold rounded-lg hover:bg-flame-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               :disabled="!tempValue || tempValue <= 0"
               @click="submit"
             >{{ isEdit ? 'Save' : 'Log →' }}</button>

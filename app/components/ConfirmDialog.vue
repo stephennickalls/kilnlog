@@ -22,20 +22,20 @@
       @click.self="$emit('cancel')"
     >
       <div
-        class="bg-parchment w-full sm:w-[400px] sm:rounded-2xl rounded-t-2xl p-6 flex flex-col gap-4 border border-parchment-3"
+        class="bg-parchment w-full sm:w-[400px] sm:rounded-2xl rounded-t-2xl p-5 sm:p-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-6 flex flex-col gap-4 border border-parchment-3"
         style="box-shadow:0 -8px 40px rgba(26,18,8,0.15)"
       >
         <div class="flex flex-col gap-1.5">
-          <h2 class="text-base font-bold text-ink">{{ title }}</h2>
+          <h2 class="text-base font-bold text-ink break-words">{{ title }}</h2>
           <p class="text-sm text-ink-muted leading-relaxed">{{ message }}</p>
         </div>
         <div class="flex gap-2">
           <button
-            class="flex-1 py-2.5 bg-red-500 hover:bg-red-600 text-white text-sm font-bold rounded-lg transition-colors"
+            class="flex-1 min-h-[44px] py-2.5 bg-red-500 hover:bg-red-600 text-white text-sm font-bold rounded-lg transition-colors"
             @click="$emit('confirm')"
           >{{ confirmLabel }}</button>
           <button
-            class="px-4 py-2.5 border border-parchment-3 text-ink-muted text-sm font-semibold rounded-lg hover:bg-parchment-2 transition-colors"
+            class="px-4 py-2.5 min-h-[44px] border border-parchment-3 text-ink-muted text-sm font-semibold rounded-lg hover:bg-parchment-2 transition-colors"
             @click="$emit('cancel')"
           >Cancel</button>
         </div>

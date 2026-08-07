@@ -17,7 +17,10 @@
       style="background:rgba(26,18,8,0.65)"
       @click.self="!busy && $emit('close')"
     >
-      <div class="bg-parchment w-full sm:w-[420px] sm:max-w-[420px] sm:rounded-2xl rounded-t-2xl sm:max-h-[88vh] max-h-[92vh] overflow-y-auto p-6 flex flex-col gap-4 border border-red-200" style="box-shadow:0 -8px 40px rgba(26,18,8,0.2)">
+      <div
+        class="bg-parchment w-full sm:w-[420px] sm:max-w-[420px] sm:rounded-2xl rounded-t-2xl overflow-y-auto p-5 sm:p-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-6 flex flex-col gap-4 border border-red-200"
+        style="max-height:92vh; max-height:min(92vh, 88dvh); box-shadow:0 -8px 40px rgba(26,18,8,0.2)"
+      >
 
         <div class="flex flex-col gap-1.5">
           <h2 class="text-base font-bold text-red-600">Delete account</h2>
@@ -35,7 +38,7 @@
             type="text"
             placeholder="DELETE"
             :disabled="busy"
-            class="w-full border border-parchment-3 rounded-lg px-3 py-2 text-sm text-ink bg-white focus:outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100 font-serif disabled:opacity-50"
+            class="input focus:border-red-400 focus:ring-red-100 disabled:opacity-50"
             @keydown.enter="maybeConfirm"
           >
         </div>
@@ -44,14 +47,14 @@
           {{ error }}
         </p>
 
-        <div class="flex justify-end gap-2">
+        <div class="flex flex-wrap justify-end gap-2">
           <button
-            class="px-4 py-2 border border-parchment-3 text-ink-muted hover:bg-parchment-2 text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
+            class="px-4 py-2.5 min-h-[44px] border border-parchment-3 text-ink-muted hover:bg-parchment-2 text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
             :disabled="busy"
             @click="$emit('close')"
           >Cancel</button>
           <button
-            class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            class="px-4 py-2.5 min-h-[44px] bg-red-600 hover:bg-red-700 text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             :disabled="!canConfirm || busy"
             @click="maybeConfirm"
           >

@@ -42,12 +42,37 @@
     overflow-x: clip;
   }
 
-  /* 1 — no zoom on focus. Applies to phones/tablets only. */
+  /* 1 — no zoom on focus. Applies to touch pointers only.
+     NOT a blanket `!important` on every control: that also DEMOTED anything
+     deliberately larger, and the one that matters is ManualReadingModal's
+     temperature field — text-3xl (30px), sized big on purpose because it's
+     typed at a hot kiln, often gloved. Flattening it to 16px would have been
+     a worse bug than the one being fixed.
+
+     So this lifts a FLOOR instead:
+       - bare element selectors catch controls with no size class at all
+       - `input.input` (0,1,1) beats the `.input` component class (0,1,0)
+       - `input.text-sm` (0,1,1) beats a stray `.text-sm` (0,1,0)
+     Specificity does the work, so no !important, and anything text-lg and up
+     is left exactly as authored.
+
+     The `sm:` breakpoint is NOT a proxy for "not a phone" here — an iPhone 16
+     in landscape is 852px wide and still zooms, which is why this keys off
+     pointer type rather than width. */
   @media (pointer: coarse) {
     input,
     select,
-    textarea {
-      font-size: 16px !important;
+    textarea,
+    input.input,
+    select.input,
+    textarea.input,
+    input.text-xs,
+    input.text-sm,
+    select.text-xs,
+    select.text-sm,
+    textarea.text-xs,
+    textarea.text-sm {
+      font-size: 16px;
       line-height: 1.4;
     }
   }
@@ -84,8 +109,11 @@
   .btn-ghost {
     @apply inline-flex items-center justify-center px-4 py-2 border border-parchment-3 text-ink-muted hover:bg-parchment-2 text-sm font-medium rounded-lg transition-colors;
   }
+  /* text-sm is the DESKTOP size. Touch devices are lifted to 16px by the
+     pointer:coarse rule above — one place decides that, rather than every
+     call site remembering `text-base sm:text-sm`. */
   .input {
-    @apply w-full border border-parchment-3 rounded-lg px-3 py-2 text-base sm:text-sm text-ink bg-white focus:outline-none focus:ring-2 focus:ring-celadon/20 focus:border-celadon font-serif;
+    @apply w-full border border-parchment-3 rounded-lg px-3 py-2 text-sm text-ink bg-white focus:outline-none focus:ring-2 focus:ring-celadon/20 focus:border-celadon font-serif;
   }
   .label {
     @apply text-xs font-bold uppercase tracking-widest text-ink-faint;

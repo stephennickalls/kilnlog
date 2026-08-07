@@ -21,7 +21,11 @@
       style="background:rgba(26,18,8,0.6)"
       @click.self="$emit('close')"
     >
-      <div class="bg-parchment w-full sm:w-[420px] sm:rounded-2xl rounded-t-2xl flex flex-col border border-parchment-3" style="max-height:80vh; box-shadow:0 -8px 40px rgba(26,18,8,0.15)">
+      <!-- MOBILE (Aug 2026): 80vh measures a viewport that INCLUDES Safari's
+           chrome on iOS, so the sheet ran taller than the visible area and the
+           bottom of the cone grid sat off-screen. dvh tracks what's actually
+           visible. -->
+      <div class="bg-parchment w-full sm:w-[420px] sm:rounded-2xl rounded-t-2xl flex flex-col border border-parchment-3" style="max-height:80vh; max-height:min(80vh, 80dvh); box-shadow:0 -8px 40px rgba(26,18,8,0.15)">
 
         <!-- Grab handle + header -->
         <div class="flex justify-center pt-3 pb-1 sm:hidden shrink-0"><div class="w-10 h-1 bg-parchment-3 rounded-full"/></div>
@@ -30,13 +34,16 @@
             <h2 class="text-base font-bold text-ink">🔻 Cone down</h2>
             <p class="text-xs text-ink-muted mt-0.5">Tap the cone that just dropped</p>
           </div>
-          <button class="p-1.5 text-ink-muted hover:text-ink" @click="$emit('close')">
+          <button class="p-2 -mr-1 text-ink-muted hover:text-ink shrink-0" aria-label="Close" @click="$emit('close')">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
           </button>
         </div>
 
-        <!-- Cone chips -->
-        <div class="overflow-y-auto px-4 py-4 grid grid-cols-4 gap-2">
+        <!-- Cone chips. The safe-area padding matters here: when no drops are
+             logged yet this grid is the LAST thing in the sheet, so its bottom
+             row would otherwise sit under the home indicator — and this is the
+             one control the person is reaching for, gloved, at the kiln. -->
+        <div class="overflow-y-auto px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] grid grid-cols-4 gap-2">
           <button
             v-for="c in cones"
             :key="c.id"
@@ -51,7 +58,7 @@
         </div>
 
         <!-- Already logged, with undo -->
-        <div v-if="drops.length" class="border-t border-parchment-3 px-5 py-3 shrink-0 overflow-y-auto" style="max-height:30%">
+        <div v-if="drops.length" class="border-t border-parchment-3 px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shrink-0 overflow-y-auto" style="max-height:30%">
           <p class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint mb-2">Logged this firing</p>
           <ul class="flex flex-col gap-1.5">
             <li v-for="d in sortedDrops" :key="d.id" class="flex items-center gap-2 text-sm">

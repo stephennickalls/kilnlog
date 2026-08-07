@@ -28,7 +28,7 @@
       @click.self="$emit('close')"
     >
       <div
-        class="bg-parchment sm:bg-white w-full sm:w-96 sm:rounded-2xl rounded-t-2xl p-5 sm:border sm:border-parchment-3 flex flex-col gap-4"
+        class="bg-parchment sm:bg-white w-full sm:w-96 sm:rounded-2xl rounded-t-2xl p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-5 sm:border sm:border-parchment-3 flex flex-col gap-4"
         style="box-shadow:0 -8px 40px rgba(26,18,8,0.15)"
       >
         <p class="text-sm font-bold text-ink">Rename firing</p>
@@ -38,7 +38,7 @@
           v-model="name"
           type="text"
           maxlength="120"
-          class="w-full border border-parchment-3 rounded-xl px-4 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame font-serif"
+          class="input rounded-xl px-4 py-2.5 focus:border-flame focus:ring-flame/10"
           placeholder="Firing name"
           @keyup.enter="save"
         >
@@ -47,12 +47,12 @@
 
         <div class="flex gap-2">
           <button
-            class="flex-1 py-2.5 bg-flame hover:bg-flame-dark text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-40"
+            class="flex-1 py-2.5 min-h-[44px] bg-flame hover:bg-flame-dark text-white text-sm font-bold rounded-lg transition-colors disabled:opacity-40"
             :disabled="saving || !name.trim() || name.trim() === firing?.name"
             @click="save"
           >{{ saving ? 'Saving…' : 'Save' }}</button>
           <button
-            class="px-4 py-2.5 border border-parchment-3 text-ink-muted text-sm font-semibold rounded-lg hover:bg-parchment-2 transition-colors"
+            class="px-4 py-2.5 min-h-[44px] border border-parchment-3 text-ink-muted text-sm font-semibold rounded-lg hover:bg-parchment-2 transition-colors"
             @click="$emit('close')"
           >Cancel</button>
         </div>

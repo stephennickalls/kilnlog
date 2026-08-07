@@ -10,9 +10,11 @@
   Step 2 "confirm" — plan chip (+ Change), auto-filled name, then Adjust curve
                      and Notes collapsed. Blank auto-opens the editor.
 
-  PASTE (Aug 2026): step 1 also accepts a schedule pasted from a forum post,
-  blog, or kiln manual — see useSchedulePaste. It lands like any other pick but
-  opens the curve editor, because imported numbers deserve a look first.
+  PASTE (removed Aug 2026): step 1 used to accept a schedule pasted from a
+  forum post or kiln manual. Dropped at the owner's request — the entry point,
+  the import handler, and the PasteScheduleModal mount are all gone.
+  app/components/PasteScheduleModal.vue and composables/useSchedulePaste.js can
+  be deleted if nothing else references them.
 
   New-user path: Start firing → Bisque → Start firing. Three taps, no typing.
   `preselect` (D1/D2, from /schedules "Use") skips straight to step 2.
@@ -31,7 +33,10 @@
 <template>
   <Teleport to="body">
     <div v-if="open" class="fixed inset-0 flex items-end sm:items-center justify-center z-50 font-serif" style="background: rgba(26,18,8,0.6)" @click.self="$emit('close')">
-      <div class="bg-parchment w-full sm:w-[560px] sm:rounded-2xl rounded-t-2xl sm:max-h-[88vh] max-h-[92vh] flex flex-col border border-parchment-3 overflow-hidden" style="box-shadow: 0 -8px 40px rgba(26,18,8,0.15)">
+      <!-- MOBILE (Aug 2026): the vh cap measures a viewport that includes Safari's
+           chrome on iOS, so the sticky footer button could sit below the fold.
+           dvh tracks the visible area. -->
+      <div class="bg-parchment w-full sm:w-[560px] sm:rounded-2xl rounded-t-2xl flex flex-col border border-parchment-3 overflow-hidden" style="max-height:92vh; max-height:min(92vh, 88dvh); box-shadow: 0 -8px 40px rgba(26,18,8,0.15)">
 
         <!-- Header -->
         <div class="flex items-center justify-between px-5 sm:px-6 pt-5 pb-3.5 border-b border-parchment-3 shrink-0">
@@ -51,8 +56,10 @@
         <!-- ════ STEP 1 — PICK A PLAN ════════════════════════════════════════ -->
         <div v-if="step === 'pick'" class="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 sm:px-6 py-4 space-y-4">
 
-          <!-- Starters: the two obvious choices -->
-          <div class="grid grid-cols-2 gap-3">
+          <!-- Starters: the two obvious choices. Side by side they get ~134px
+               each at 320px, which squashes the sparkline into a smear; they
+               stack below 380px. -->
+          <div class="grid grid-cols-1 min-[380px]:grid-cols-2 gap-3">
             <button
               v-for="s in starters" :key="s.token"
               class="flex flex-col gap-2 p-3 rounded-xl border border-parchment-3 bg-white text-left transition-colors hover:border-flame/50"
@@ -77,17 +84,6 @@
             <svg class="w-4 h-4 text-ink-faint shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
           </button>
 
-          <!-- Paste — the format schedules actually travel in -->
-          <!-- <button class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl border border-dashed border-parchment-4 hover:border-flame/50 transition-colors text-left" @click="showPaste = true">
-            <svg class="w-4 h-4 text-ink-faint shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/>
-            </svg>
-            <span class="flex-1 min-w-0">
-              <span class="block text-sm font-semibold text-ink">Paste a schedule</span>
-              <span class="block text-[11px] text-ink-muted">From a forum post, blog, or kiln manual</span>
-            </span>
-            <svg class="w-4 h-4 text-ink-faint shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
-          </button> -->
 
           <!-- Your schedules (collapsed) -->
           <section v-if="myLibrary.length" class="space-y-1.5">
@@ -165,7 +161,7 @@
                 :value="form.name"
                 type="text"
                 placeholder="e.g. Cone 10 reduction"
-                class="w-full border border-parchment-3 rounded-xl px-4 py-2.5 text-sm text-ink bg-white focus:outline-none focus:border-flame focus:ring-2 focus:ring-flame/10 font-serif"
+                class="input rounded-xl px-4 py-2.5 focus:border-flame focus:ring-flame/10"
                 @input="onNameInput($event.target.value)"
               >
             </div>
@@ -201,7 +197,7 @@
                 <svg class="w-4 h-4 text-ink-faint transition-transform" :class="showNotes ? 'rotate-180' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
               </button>
               <div v-if="showNotes" class="px-3.5 pb-3.5 pt-3 border-t border-parchment-3">
-                <textarea v-model="form.notes" rows="2" placeholder="Clay body, glazes, weather..." class="w-full border border-parchment-3 rounded-xl px-4 py-2.5 text-sm text-ink bg-parchment focus:outline-none focus:border-flame font-serif resize-none" />
+                <textarea v-model="form.notes" rows="2" placeholder="Clay body, glazes, weather..." class="input rounded-xl px-4 py-2.5 !bg-parchment resize-none focus:border-flame focus:ring-flame/10" />
               </div>
             </div>
 
@@ -209,9 +205,9 @@
           </div>
 
           <!-- Footer -->
-          <div class="px-5 sm:px-6 pb-5 pt-3.5 border-t border-parchment-3 shrink-0 bg-parchment">
+          <div class="px-5 sm:px-6 pt-3.5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-5 border-t border-parchment-3 shrink-0 bg-parchment">
             <button
-              class="w-full py-3 bg-flame text-parchment text-sm font-bold rounded-xl hover:bg-flame-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              class="w-full py-3 min-h-[44px] bg-flame text-parchment text-sm font-bold rounded-xl hover:bg-flame-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               :disabled="!form.name.trim() || loadingPast"
               @click="submit"
             >Start firing →</button>
@@ -220,9 +216,6 @@
 
       </div>
     </div>
-
-    <!-- Paste import. z-[60] sits above this modal's z-50 so both stay open. -->
-    <PasteScheduleModal :open="showPaste" @close="showPaste = false" @import="onPasteImport" />
 
     <!-- Reduction planner -->
     <ReductionPlannerModal
@@ -274,7 +267,6 @@ const nameAutoFilled       = ref(true)
 const reductions           = ref([])                // [{ startTemp, endTemp|null }] °C
 const saveToLibrary        = ref(false)
 const showReductionPlanner = ref(false)
-const showPaste            = ref(false)
 const showMine             = ref(false)
 const showPresets          = ref(false)
 const showPast             = ref(false)
@@ -349,7 +341,6 @@ const planLabel = computed(() => {
   if (startFrom.value === 'blank')           return 'Blank curve'
   if (startFrom.value === 'starter:bisque')  return 'Bisque starter'
   if (startFrom.value === 'starter:glaze')   return 'Glaze starter'
-  if (startFrom.value === 'paste')           return 'Pasted schedule'
   if (startFrom.value.startsWith('lib:')) {
     return props.library.find(l => String(l.id) === startFrom.value.slice(4))?.name ?? 'Schedule'
   }
@@ -395,24 +386,6 @@ function guessType(name) {
 function onReductionsSaved(list) {
   reductions.value = list
   showReductionPlanner.value = false
-}
-
-// ── Paste import ──────────────────────────────────────────────────────────────
-// A pasted plan behaves like any other pick: fill the curve, jump to confirm.
-// It also force-opens "Adjust curve" — the user has just imported SOMEONE
-// ELSE'S numbers and should eyeball them (and the unit) before firing.
-// Pasted text carries no reductions, so those clear.
-function onPasteImport(result) {
-  form.schedulePoints = result.points.map(p => ({ ...p }))
-  reductions.value    = []
-  pickedType.value    = result.type ?? 'other'
-  startFrom.value     = 'paste'
-  if (nameAutoFilled.value) {
-    form.name = `${labelForType(result.type)}${result.cone ? ` cone ${result.cone}` : ''} — ${todayShort()}`
-  }
-  showPaste.value    = false
-  showAdvanced.value = true
-  step.value         = 'confirm'
 }
 
 // ── Pick (step 1 → step 2) ────────────────────────────────────────────────────
@@ -471,7 +444,6 @@ watch(() => props.open, (val) => {
   nameAutoFilled.value       = true
   saveToLibrary.value        = false
   showReductionPlanner.value = false
-  showPaste.value            = false
   showMine.value             = false
   showPresets.value          = false
   showPast.value             = false

@@ -9,6 +9,10 @@
   G1 (°F): the peak-temp meta line converts for display via useTempUnit and
   shows the unit explicitly. The sparkline is pure geometry (°C in, self-
   consistent) and is unchanged.
+
+  TOUCH (Aug 2026): "Actions recede" was implemented with hover, which on a
+  phone means they recede permanently. The ⋯ button now shows by default and
+  only hides-until-hover from sm up.
 -->
 <template>
   <div
@@ -43,10 +47,15 @@
         <span class="w-1.5 h-1.5 rounded-full" :class="theme.badgeDot" />{{ badgeLabel }}
       </span>
 
-      <!-- ⋯ overflow menu -->
+      <!-- ⋯ overflow menu.
+           TOUCH (Aug 2026): this was opacity-0 group-hover:opacity-100, and a
+           phone has no hover — so Duplicate and Delete were literally
+           unreachable on mobile, with no other route to either. It is now
+           always visible below sm (and a 36px target there), keeping the
+           reveal-on-hover behaviour only where hover exists. -->
       <div class="absolute top-3 right-3" @click.stop>
         <button
-          class="w-7 h-7 flex items-center justify-center rounded-lg text-ink-faint bg-white/70 backdrop-blur-sm opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity hover:text-ink"
+          class="w-9 h-9 sm:w-7 sm:h-7 flex items-center justify-center rounded-lg text-ink-faint bg-white/70 backdrop-blur-sm transition-opacity hover:text-ink sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
           :class="{ 'opacity-100': menuOpen }"
           aria-label="More actions"
           @click="menuOpen = !menuOpen"
@@ -79,7 +88,7 @@
     <!-- Primary action footer -->
     <div class="px-2 pb-2" @click.stop>
       <button
-        class="w-full inline-flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold border transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        class="w-full inline-flex items-center justify-center gap-1.5 py-2.5 min-h-[40px] rounded-lg text-xs font-bold border transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         :class="theme.startBtn"
         :disabled="startDisabled"
         :title="startDisabled ? 'A firing is already active — only one at a time' : ''"
@@ -92,10 +101,10 @@
 
     <!-- Delete confirm overlay -->
     <div v-if="confirmingDelete" class="absolute inset-0 z-30 bg-parchment/95 backdrop-blur-sm flex flex-col items-center justify-center gap-3 p-4 text-center" @click.stop>
-      <p class="text-sm font-semibold text-ink">Delete “{{ schedule.name }}”?</p>
+      <p class="text-sm font-semibold text-ink break-words max-w-full">Delete “{{ schedule.name }}”?</p>
       <div class="flex gap-2">
-        <button class="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-bold rounded-lg transition-colors" @click="act('confirm-delete')">Delete</button>
-        <button class="px-3 py-1.5 border border-parchment-3 text-ink-muted hover:bg-parchment-2 text-xs font-semibold rounded-lg transition-colors" @click="confirmingDelete = false">Cancel</button>
+        <button class="px-4 py-2 min-h-[40px] bg-red-500 hover:bg-red-600 text-white text-xs font-bold rounded-lg transition-colors" @click="act('confirm-delete')">Delete</button>
+        <button class="px-4 py-2 min-h-[40px] border border-parchment-3 text-ink-muted hover:bg-parchment-2 text-xs font-semibold rounded-lg transition-colors" @click="confirmingDelete = false">Cancel</button>
       </div>
     </div>
   </div>

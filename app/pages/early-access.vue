@@ -8,13 +8,15 @@
     - remaining > 0 → account creation, immediate access. The auth.users
       trigger hard-enforces the cap; last slot gets a congratulations.
     - remaining = 0 → waitlist (original /api/beta-interest flow).
-    - fetch failed  → explicit error state. NEVER a slot-count sentence:
-      a failed fetch used to render "all 0 spots are taken".
+    - fetch failed  → explicit error state.
 
-  COPY: the banner shows only spots REMAINING, never "N of 25" — the total is
-  ours to change and visitors don't need it. The waitlist copy is likewise
-  total-free ("All spots taken"). slots.total is still returned by the API;
-  just don't render it.
+  COPY (Aug 2026): NO COUNTS ARE RENDERED — not spots remaining, not testers
+  joined, not the total. A countdown ("3 spots left") reads as manufactured
+  scarcity, and a join count is unflattering while the group is genuinely
+  small. The pill now carries qualitative social proof instead. slots.remaining
+  still drives WHICH MODE renders; it just never reaches the DOM. If you ever
+  want a number back, the group has to be big enough that the number helps —
+  don't reintroduce it below ~50.
 
   SLOTS PILL: bg-ink + the flame radial-gradient, i.e. the same dark brown as
   BetaBanner.vue — keep the two in sync if that gradient changes.
@@ -53,7 +55,7 @@
     <!-- Loading -->
     <div v-if="pending" class="py-6 flex flex-col items-center gap-3">
       <span class="w-6 h-6 border-2 border-parchment-3 border-t-flame rounded-full animate-spin"/>
-      <p class="text-sm text-ink-muted">Checking available spots…</p>
+      <p class="text-sm text-ink-muted">Checking availability…</p>
     </div>
 
     <!-- Fetch failed — no counts shown -->
@@ -75,7 +77,7 @@
       <div v-if="accountCreated && signedIn" class="text-center py-4 flex flex-col items-center gap-3">
         <span class="text-5xl">{{ tookLastSlot ? '🏆' : '🎉' }}</span>
         <p class="text-base font-bold text-ink">
-          {{ tookLastSlot ? 'You got the last spot!' : 'You\'re in!' }}
+          {{ tookLastSlot ? 'You\'re in — and that was the last spot!' : 'You\'re in!' }}
         </p>
         <p class="text-sm text-ink-muted">Taking you to your kiln…</p>
       </div>
@@ -84,7 +86,7 @@
       <div v-else-if="accountCreated" class="text-center py-4 flex flex-col items-center gap-3">
         <span class="text-5xl">{{ tookLastSlot ? '🏆' : '🎉' }}</span>
         <p class="text-base font-bold text-ink">
-          {{ tookLastSlot ? 'You got the last spot!' : 'Your spot is claimed!' }}
+          {{ tookLastSlot ? 'Your spot is claimed — and that was the last one!' : 'Your spot is claimed!' }}
         </p>
         <p class="text-sm text-ink-muted leading-relaxed">
           Confirm your email at <strong class="text-ink break-all">{{ email }}</strong>, then sign in.
@@ -96,17 +98,17 @@
       </div>
 
       <template v-else>
-        <!-- Dark brown pill — same treatment as BetaBanner.vue -->
+        <!-- Dark brown pill — same treatment as BetaBanner.vue. NO COUNTS. -->
         <div
           class="text-center bg-ink text-parchment rounded-lg px-4 py-2.5 text-sm font-bold mb-4 font-serif"
           style="background-image: radial-gradient(ellipse at 15% 50%, rgba(176,92,26,0.18) 0%, transparent 60%)"
         >
-          {{ slots.remaining }}
-          {{ slots.remaining === 1 ? 'spot' : 'spots' }} left
+          Join our small group of testers
         </div>
 
         <p class="text-sm text-ink-muted text-center mb-5 leading-relaxed">
-          A spot is free — create your account and start firing straight away.
+          We're working closely with a handful of potters to shape KilnMonitor.
+          Create your account and start firing straight away —
           <strong class="text-ink">12 months free</strong> in exchange for your feedback.
         </p>
 
@@ -196,14 +198,16 @@
       </div>
 
       <template v-else>
+        <!-- Still explains WHY there's a waitlist, without a countdown. -->
         <div
           class="text-center bg-ink text-parchment rounded-lg px-4 py-2.5 text-sm font-bold mb-4 font-serif"
           style="background-image: radial-gradient(ellipse at 15% 50%, rgba(176,92,26,0.18) 0%, transparent 60%)"
         >
-          All spots taken
+          Our testing group is full for now
         </div>
 
         <p class="text-sm text-ink-muted text-center mb-5 leading-relaxed">
+          We keep the group small so we can work closely with everyone in it.
           Join the waitlist and we'll email you the moment a spot opens —
           <strong class="text-ink">12 months free</strong> when it does.
         </p>
@@ -311,6 +315,9 @@ const tookLastSlot   = ref(false)
 // CONSEQUENCE: `slots` is null while pending, which is why MODE A tests
 // `slots?.remaining`. The pending and slotsError branches must stay ABOVE it
 // in the template — they're what covers the null window.
+//
+// slots.remaining is now used ONLY to pick a mode and to set tookLastSlot.
+// Neither it nor slots.total is rendered anywhere. See the COPY note above.
 const { data: slots, pending, error: slotsError, refresh } =
   useFetch('/api/beta-slots', { lazy: true })
 
@@ -341,7 +348,7 @@ async function createAccount() {
     loading.value = false
     // auth.users trigger raises 'beta_full' if the last spot went in a race.
     if (/beta_full|spots are taken/i.test(err.message || '')) {
-      error.value = 'Sorry — that spot was just taken.'
+      error.value = 'Sorry — the group just filled up.'
       await refresh()
     } else {
       error.value = friendlyAuthError(err.message)

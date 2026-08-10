@@ -18,7 +18,7 @@
 //   - frame-src:   js.stripe.com + hooks.stripe.com for the 3DS/checkout iframe.
 //   - form-action: 'self' + Stripe (checkout/portal POST redirects).
 //   - img-src:     'self' data: blob: + https: (avatars, Supabase storage —
-//     also covers GA's legacy pixel fallback).
+//     also covers GA's legacy pixel fallback, and the favicon set in public/).
 //   - style-src:   'unsafe-inline' — Tailwind + Vue scoped styles inject inline.
 //   - frame-ancestors 'none' is the CSP-level clickjacking guard; X-Frame-Options
 //     DENY is the legacy equivalent for old browsers.
@@ -114,13 +114,52 @@ export default defineNuxtConfig({
   // available. The auto-zoom problem (Safari zooming in on focus of any control
   // under 16px, and never zooming back out) is fixed properly by the
   // `@media (pointer: coarse)` rule in tailwind.css, not by disabling zoom.
+  //
+  // ── FAVICON (Aug 2026) ──────────────────────────────────────────────────
+  // There was no `link` array here at all, so the app shipped with no icon of
+  // any kind — browsers fell back to a blank page glyph and an iOS home-screen
+  // install got a screenshot of the page instead of a mark.
+  //
+  // Every file in public/ is generated from the SAME paths as
+  // app/components/BrandFlame.vue, so the tab icon and the in-app logo cannot
+  // drift apart. Three things about that set are deliberate and easy to undo
+  // by accident if you ever regenerate them:
+  //   1. The glyph is centred on its TRUE bounding box, not on BrandFlame's
+  //      0–24 viewBox. The flame's mass sits low in that box (BrandFlame's
+  //      translate(0 -1) exists to correct for it beside cap-height text), so
+  //      centring on the viewBox leaves a standalone icon visibly low.
+  //   2. favicon.ico carries DIFFERENT artwork per size: the 16px entry is a
+  //      solid single-tone flame, because the flame-light inner core hollows
+  //      the glyph out at that size and it reads as a droplet. 32 and 48 keep
+  //      the two-tone treatment.
+  //   3. apple-touch-icon and the PWA icons are OPAQUE on ink (#221708). iOS
+  //      composites transparency onto black and Android maskable icons crop to
+  //      a circle, so neither can be given a transparent background. iOS
+  //      applies its own corner mask — do not pre-round the PNG.
+  //
+  // ORDER MATTERS in the link array: browsers take the first format they
+  // understand, and every current one prefers the SVG.
+  //
+  // CSP: no change needed. img-src 'self' already covers the icons and
+  // manifest-src 'self' already covers the manifest.
   app: {
     head: {
       viewport: 'width=device-width, initial-scale=1, viewport-fit=cover',
+      link: [
+        { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
+        // Legacy fallback — see note 2 above about the 16px entry.
+        { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico', sizes: '48x48' },
+        { rel: 'apple-touch-icon', sizes: '180x180', href: '/apple-touch-icon.png' },
+        // CHECK BEFORE DEPLOY: if a manifest already exists in public/ under
+        // another name, point this at that file and merge the icons array into
+        // it instead. Two manifests will fight over the install prompt.
+        { rel: 'manifest', href: '/site.webmanifest' },
+      ],
       meta: [
         // Stops iOS turning firing durations and cone numbers into phone links.
         { name: 'format-detection', content: 'telephone=no' },
-        // Safari tints its chrome to match the parchment background.
+        // Safari tints its chrome to match the parchment background. Kept in
+        // sync with theme_color in site.webmanifest — change both together.
         { name: 'theme-color', content: '#faf6ef' },
       ],
     },

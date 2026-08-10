@@ -1,0 +1,31 @@
+{
+  "name": "KilnMonitor",
+  "short_name": "KilnMonitor",
+  "description": "Firing tracker for potters — plan a curve, log readings, watch planned vs actual.",
+  "start_url": "/app",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#faf6ef",
+  "theme_color": "#faf6ef",
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

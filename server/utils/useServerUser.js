@@ -33,6 +33,9 @@
 // unparseable we transparently use the remote set, i.e. the Jul 2026
 // behaviour.
 //
+// ADMIN NEVER EXPIRES (Aug 2026) — hasAccess() now short-circuits on
+// role === 'admin'. See the note on the function itself.
+//
 // Return shape is unchanged: { db, user, profile }.
 // Needs service role instead? Use serviceClient() and justify at the call site.
 
@@ -84,8 +87,8 @@ function setCachedProfile(userId, profile) {
   _profileCache.set(userId, { profile, expires: Date.now() + PROFILE_TTL_MS })
 }
 
-// Exported so mutation paths (e.g. the Stripe webhook, account deletion) can
-// invalidate immediately instead of waiting out the TTL.
+// Exported so mutation paths (e.g. the Stripe webhook, account deletion, the
+// admin role editor) can invalidate immediately instead of waiting out the TTL.
 export function invalidateProfileCache(userId) {
   if (userId) _profileCache.delete(userId)
   else _profileCache.clear()
@@ -162,6 +165,14 @@ export async function useServerUser(event, { requireSubscription = true } = {}) 
 
 export function hasAccess(profile) {
   const now = new Date()
+  // ADMIN (Aug 2026): staff access is granted by role in the database, not
+  // bought, so no subscription state may lock it out. This runs FIRST and
+  // unconditionally — an admin whose trial lapsed, whose card failed, or who
+  // never had a Stripe customer at all still gets in. The role column is
+  // already in the select above, so this costs nothing.
+  // The admin console relies on this: promoting someone to admin needs no
+  // accompanying status change.
+  if (profile.role === 'admin') return true
   if (profile.subscription_status === 'active') return true
   if (
     profile.subscription_status === 'trialing' &&

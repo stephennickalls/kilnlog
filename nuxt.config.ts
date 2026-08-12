@@ -15,7 +15,8 @@
 //     googletagmanager.com serves gtag.js.
 //     'unsafe-inline' is required because Nuxt injects an inline hydration/
 //     payload script with no nonce in the current setup.
-//   - frame-src:   js.stripe.com + hooks.stripe.com for the 3DS/checkout iframe.
+//   - frame-src:   js.stripe.com + hooks.stripe.com for the 3DS/checkout iframe,
+//     and youtube-nocookie.com for the landing-page demo video (see below).
 //   - form-action: 'self' + Stripe (checkout/portal POST redirects).
 //   - img-src:     'self' data: blob: + https: (avatars, Supabase storage —
 //     also covers GA's legacy pixel fallback, and the favicon set in public/).
@@ -31,6 +32,16 @@
 // through app/plugins/auth-fetch.client.js so its interceptors (Bearer token,
 // 401 self-heal) apply to every component call. Without this, components bind
 // the stock ofetch $fetch at build time and API calls go out unauthenticated.
+//
+// DEMO VIDEO (Aug 2026): app/components/VideoEmbed.vue lazily embeds the
+// walkthrough from youtube-nocookie.com, so that origin is now in frame-src.
+// The symptom of removing it is a grey panel reading "This content is blocked"
+// where the player should be — the page itself keeps working, so it is easy to
+// miss. The -nocookie host is deliberate: it sets no tracking cookies until
+// playback, which keeps the landing page out of consent-banner territory.
+// If a video ever refuses to play, check the console for a CSP violation
+// naming www.youtube.com — YouTube redirects a few embeds there — and add
+// that origin too rather than widening the directive pre-emptively.
 
 const SUPABASE_ORIGIN = (() => {
   try {
@@ -64,6 +75,13 @@ const GA_CONNECT = [
   'https://www.googletagmanager.com',
 ].join(' ')
 
+// ── YouTube (Aug 2026) ────────────────────────────────────────────────────
+// Only the iframe origin is needed. The player's own scripts and XHRs run
+// inside that frame under YouTube's CSP, not ours, so nothing goes in
+// script-src or connect-src. Poster images are served from public/, already
+// covered by img-src 'self'.
+const YOUTUBE_FRAME = 'https://www.youtube-nocookie.com'
+
 const CSP = [
   "default-src 'self'",
   "base-uri 'self'",
@@ -74,7 +92,7 @@ const CSP = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
-  "frame-src https://js.stripe.com https://hooks.stripe.com",
+  `frame-src https://js.stripe.com https://hooks.stripe.com ${YOUTUBE_FRAME}`,
   "form-action 'self' https://checkout.stripe.com https://billing.stripe.com",
   "worker-src 'self' blob:",
   "manifest-src 'self'",

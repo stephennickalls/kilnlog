@@ -14,6 +14,13 @@
   (2.75rem = 44px at 320px); each has been lowered so the hero fits without
   the browser choosing the break points for us.
 
+  DEMO VIDEO (Aug 2026): the bridge section now carries the walkthrough. It
+  sits there rather than in the hero because it answers a question the hero
+  has just raised (what am I signing up for?), and because a visitor who only
+  wants the pitch still gets it above that fold. See `demoVideos` in the
+  script block — the selector row appears on its own once a second video is
+  added, so a new walkthrough needs no markup change.
+
   BETA-TEMP: during beta recruitment the page announces the beta (top BetaBanner)
   and every "Start free trial / signup" CTA points to /register-interest instead
   of /signup. Grep "BETA-TEMP" to find and revert every change:
@@ -229,12 +236,48 @@
       </div>
     </section>
 
-    <!-- Bridge — dark section -->
+    <!-- Bridge — dark section, carrying the demo video.
+         Copy left, video right on lg+; stacked below that with the VIDEO
+         FIRST, because on a phone the video is the faster read and the copy
+         beside it is a repeat of ground the hero already covered.
+
+         The selector row under the player hides itself while there is only
+         one video in `demoVideos`. -->
     <section class="bg-ink px-5 sm:px-8 lg:px-10 py-14 sm:py-20" style="background-image: radial-gradient(ellipse at 20% 50%, rgba(176,92,26,0.14) 0%, transparent 60%)">
-      <div class="max-w-[1200px] mx-auto">
-        <p class="text-flame-light font-semibold tracking-[0.16em] uppercase text-[0.72rem] mb-4">Built for the studio</p>
-        <h2 class="text-[clamp(1.875rem,4vw,3.25rem)] font-bold text-parchment leading-[1.12] tracking-tight mb-5">Plan it.<br>Log it.<br>Learn from it.</h2>
-        <p class="text-[1rem] sm:text-[1.05rem] text-ink-muted leading-[1.7] max-w-[560px]">Sketch your firing curve, tap in temperatures as you go, and watch your kiln track against the plan. Every firing saved forever — so you can repeat your wins and stop repeating your mistakes.</p>
+      <div class="max-w-[1200px] mx-auto grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] gap-10 lg:gap-14 items-center">
+
+        <div class="order-2 lg:order-1 min-w-0">
+          <p class="text-flame-light font-semibold tracking-[0.16em] uppercase text-[0.72rem] mb-4">Built for the studio</p>
+          <h2 class="text-[clamp(1.875rem,4vw,3.25rem)] font-bold text-parchment leading-[1.12] tracking-tight mb-5">Plan it.<br>Log it.<br>Learn from it.</h2>
+          <p class="text-[1rem] sm:text-[1.05rem] text-ink-muted leading-[1.7] max-w-[560px] mb-6">Sketch your firing curve, tap in temperatures as you go, and watch your kiln track against the plan. Every firing saved forever — so you can repeat your wins and stop repeating your mistakes.</p>
+          <p class="text-[0.9rem] text-parchment/70 leading-relaxed max-w-[560px]">{{ activeVideo.blurb }}</p>
+        </div>
+
+        <div class="order-1 lg:order-2 min-w-0">
+          <VideoEmbed
+            :video-id="activeVideo.id"
+            :poster="activeVideo.poster"
+            :title="activeVideo.title"
+            :duration="activeVideo.duration"
+          />
+
+          <!-- One video: nothing to choose between, so no selector. -->
+          <div v-if="demoVideos.length > 1" class="flex flex-wrap gap-2 mt-3">
+            <button
+              v-for="v in demoVideos"
+              :key="v.id"
+              class="px-3.5 py-2 rounded text-[0.825rem] font-semibold border transition-colors text-left"
+              :class="v.id === activeVideo.id
+                ? 'bg-flame text-parchment border-flame'
+                : 'bg-transparent text-parchment/70 border-white/15 hover:border-white/35 hover:text-parchment'"
+              @click="activeVideoId = v.id"
+            >
+              {{ v.title }}
+              <span class="opacity-60 tabular-nums ml-1">{{ v.duration }}</span>
+            </button>
+          </div>
+        </div>
+
       </div>
     </section>
 
@@ -309,7 +352,7 @@
               <p class="text-[0.9rem] text-ink-faint mb-8">That's just $4.08 per month.</p>
             -->
             <div class="mb-2">
-              <span class="text-[1.75rem] sm:text-[2.5rem] font-bold text-ink leading-tight tracking-tight">Pricing announced at launch</span>
+              <span class="text-[1.75rem] sm:text-[2.5rem] font-bold text-ink leading-tight tracking-tight">Pricing not yet available</span>
             </div>
             <p class="text-[0.9rem] text-ink-faint mb-8">One simple annual plan — priced for potters, not enterprises. Early testers get 12 months free.</p>
 
@@ -340,7 +383,7 @@
     <!-- Final CTA -->
     <section class="bg-ink px-5 sm:px-8 lg:px-10 py-16 sm:py-20 lg:py-24" style="background-image: radial-gradient(ellipse at 30% 50%, rgba(176,92,26,0.15) 0%, transparent 60%)">
       <div class="max-w-[1200px] mx-auto text-center flex flex-col items-center gap-4">
-        <h2 class="text-[clamp(1.75rem,3.5vw,2.875rem)] font-bold text-parchment leading-[1.2] tracking-tight">Never lose a good firing again.</h2>
+        <h2 class="text-[clamp(1.75rem,3.5vw,2.875rem)] font-bold text-parchment leading-[1.2] tracking-tight">Never lose good firing data again.</h2>
         <!-- BETA-TEMP: was "Start your 30-day free trial. No credit card, no commitment." -->
         <p class="text-[1rem] sm:text-[1.1rem] text-ink-muted mb-2">Help us build the kiln app you need — free early access, no credit card.</p>
         <!-- BETA-TEMP: was to="/signup" · "Get started free" -->
@@ -382,4 +425,31 @@ const pricingItems = [
   'Schedule library',
   'Works on phone & desktop',
 ]
+
+// DEMO VIDEOS (Aug 2026)
+// `id` is the YouTube video id: the part after youtu.be/ or v=, with any ?si=
+// share-tracking suffix stripped. `poster` is a file in public/ — the video is
+// not loaded at all until someone presses play (see VideoEmbed.vue), so the
+// poster is what every visitor actually pays for.
+//
+// Add the curve-building walkthrough as a second entry when it is recorded.
+// The selector row under the player appears by itself once this array has
+// more than one item; no markup change needed.
+//
+// The video must be Public or Unlisted on YouTube. Private videos refuse to
+// play in an embed, and the failure looks like a broken player.
+const demoVideos = [
+  {
+    id:       'GPC4HaF41gg',
+    title:    'Getting started',
+    duration: '3:25',
+    poster:   '/video-poster-getting-started.png',
+    blurb:    'Watch the whole setup: pick a firing type, load a preset or draw your own curve, plan a reduction, then start logging at the kiln.',
+  },
+]
+
+const activeVideoId = ref(demoVideos[0].id)
+const activeVideo = computed(() =>
+  demoVideos.find(v => v.id === activeVideoId.value) ?? demoVideos[0],
+)
 </script>

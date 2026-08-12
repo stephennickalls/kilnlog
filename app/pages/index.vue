@@ -1,9 +1,9 @@
 <!-- File: app/pages/index.vue -->
 <!--
   Marketing landing page. Celadon appears in three meaningful places:
-  1. Hero chart planned/schedule line — the schedule IS the celadon world
-  2. Active pill + rate chip — on-track/good state = celadon (matches the app)
-  3. Schedule library feature card icon — the one feature in the celadon world
+  1. Hero chart NOW line + on-track pill — on-track/good state = celadon
+  2. Cone down button — heat work lives in the celadon world (as in the app)
+  3. Schedule library feature card icon
   Everything else stays warm (flame/parchment/ink). No decoration.
 
   MOBILE (Aug 2026): every section was px-10 — 80px of a 320px screen spent on
@@ -20,6 +20,28 @@
   wants the pitch still gets it above that fold. See `demoVideos` in the
   script block — the selector row appears on its own once a second video is
   added, so a new walkthrough needs no markup change.
+
+  HERO CARD (Aug 2026): rebuilt from the flyer artwork, and from the REAL
+  components — FiringConsole.vue for the console surface and app.vue for the
+  chart ground. Everything here is copied from the shipped app rather than
+  approximated:
+    - the ink card carries FiringConsole's flame radial wash, not flat ink
+    - Log reading is the flame block with FiringConsole's plus icon
+    - Cone down is solid celadon with the SAME filled ▽ path the console uses
+      (M4 6 h16 L12 20 Z), so button and chart marker read as one concept
+    - End reduction is solid cobalt with the ⊟ glyph, as when a reduction is open
+    - the on-track pill is bg-celadon-bg / text-celadon-dark, the console's
+      delta chip exactly
+  The three buttons sit BESIDE the console bar from sm up and drop to a
+  three-column grid below it on a phone, which is the same trade the real
+  console makes at its own breakpoints. They are inert divs, not buttons:
+  nothing here is clickable except the CTAs, and a button that ignores a press
+  is worse than an obvious picture of one.
+
+  CONE DROPS (Aug 2026): logging witness cones was the single most requested
+  addition from testers, so it appears ABOVE THE FOLD four times: the
+  simplicity strip names it, the console shows the CONE DOWN button, the chart
+  marks the drop on the curve, and the stats row reports it. Grep "CONE DROPS".
 
   BETA-TEMP: during beta recruitment the page announces the beta (top BetaBanner)
   and every "Start free trial / signup" CTA points to /register-interest instead
@@ -91,7 +113,9 @@
             </div>
             <div class="min-w-0">
               <p class="text-[0.9rem] font-bold text-ink mb-0.5">No hardware. No setup. No fuss.</p>
-              <p class="text-[0.8rem] text-ink-muted leading-snug">Draw a curve, log temperatures as you fire — right from the phone in your apron pocket.</p>
+              <!-- CONE DROPS: named here so the feature is above the fold in
+                   words as well as on the chart below. -->
+              <p class="text-[0.8rem] text-ink-muted leading-snug">Draw a curve, log temperatures and cone drops as you fire — right from the phone in your apron pocket.</p>
             </div>
           </div>
 
@@ -107,103 +131,192 @@
           <p class="text-[0.825rem] text-ink-faint">Help us build the app potters actually need — free for our first testers</p>
         </div>
 
-        <!-- Chart + fire cards grid -->
-        <div class="grid grid-cols-1 md:grid-cols-[1.5fr_1fr] gap-4 sm:gap-6">
+        <!-- Chart + fire cards grid.
+             LAYOUT (Aug 2026): the split used to happen at md, where the cards
+             column was only ~250px wide — every paragraph became a tall narrow
+             ribbon, and because grid rows stretch, the chart card was padded
+             out with dead white space to match that height.
 
-          <!-- Chart card. Recreates the REAL app chart (useKilnChart.js + the
-               plot styling in app.vue): faint celadon graph-paper ground,
-               Chart.js colours — Planned = warm grey #a8a29e dashed [6,4],
-               Actual = orange #f97316 solid with a soft orange fill — a top
-               point-style legend, plus the live features (indigo reduction
-               band, celadon NOW line + target dot).
-               Story: the PLANNED grey line is the whole schedule start→end
-               (climb → 1,287° peak → hold → cool-down). The ACTUAL orange line
-               traces only up to NOW, which sits high on the rise, a touch BEHIND
-               plan. Rates are °C/MIN and ROUNDED to whole numbers (the app's
-               Math.round): at the final approach to Cone 10 a real fire slows to
-               ~60°C/hr ≈ +1°C/min — the gentle slope drawn at NOW.
-               One coordinate space (viewBox 480×200). Scale: x = 42 + h·52.5;
-               y = 176 − t·0.10156 (0°C=176, ~1477°C=26) so the peak stands tall.
-               NOW at 4.3h (x268), 1,179°C (y56); planned target there 1,225°.
+             It now waits for xl. lg was still too early: at 1024px the cards
+             column works out around 380px before its own 26px of padding, so
+             the three paragraphs were still running eight or nine words a
+             line while the chart card sat there tall beside them. From md to
+             xl the chart takes the full width and the cards run three across
+             underneath it, which is the shape that actually reads at those
+             sizes. items-start stops the shorter column being stretched to
+             the taller one at any width. -->
+        <div class="grid grid-cols-1 xl:grid-cols-[1.4fr_1fr] gap-4 sm:gap-6 items-start">
 
-               MOBILE: padding drops to p-4 so the SVG gets ~35% more width. The
-               viewBox scales, but its 9–10px labels shrink with it, so every
-               pixel of card width is a pixel of legibility. -->
+          <!-- Chart card — the flyer artwork, rebuilt from the real components.
+               See the HERO CARD note at the top of this file for what is copied
+               from where.
+
+               CHART STORY: 6 hours into a Cone 10 reduction glaze firing. The
+               ACTUAL orange line runs start → NOW and stops there, because that
+               is all that has happened. The PLANNED grey dashed line continues
+               past NOW: up to the 1,287° peak, a hold, then the cool-down.
+               Cone 010 went over at 900° on the climb, and body reduction has
+               been running since 1,010°.
+
+               COORDINATES: one space, viewBox 480×220, 11 hours wide so the
+               planned cool-down has somewhere to go.
+                 x = 46 + h·38.2      (0h=46, 4h=199, 8h=352, 11h=466)
+                 y = 182 − t·0.10615  (0°C=182, 1,287°C=45)
+               NOW is 6h (x275) at 1,214°C (y53).
+
+               There is NO separate target dot at NOW: 1,214° and 1,221° are
+               0.7px apart at this scale, so two dots would render as one blob.
+               The flyer solves it the same way — one orange marker, both
+               numbers as text beside it.
+
+               TYPE SIZE: the SVG scales with the card, so a 10px label that
+               reads fine on a 700px card renders at ~6px on a 320px phone.
+               The .chart-* classes in the scoped style block below carry a
+               larger size by default and dial back at sm. Nothing here uses a
+               font-size attribute, because CSS would override it anyway. -->
           <div class="bg-white border border-parchment-3 rounded-[14px] p-4 sm:p-6 lg:p-7 shadow-[0_8px_40px_rgba(58,30,8,0.09),0_2px_8px_rgba(58,30,8,0.05)]">
-            <div class="flex justify-between items-center gap-2 mb-[0.875rem]">
+            <div class="flex justify-between items-center gap-2 mb-3">
               <span class="text-[0.875rem] font-semibold text-ink-2 truncate min-w-0">Cone 10 Reduction</span>
               <span class="flex items-center gap-[5px] bg-celadon-bg border border-celadon/30 rounded-full px-[10px] py-[3px] text-[0.75rem] font-bold text-celadon-dark shrink-0">
                 <span class="w-[6px] h-[6px] bg-celadon rounded-full animate-pulse"/>
                 Active
               </span>
             </div>
-            <div class="flex items-baseline gap-[6px] mb-4 flex-wrap">
-              <span class="text-[2.25rem] sm:text-[2.75rem] font-bold text-flame leading-none tracking-[-0.04em]">1,179</span>
-              <span class="text-[1.05rem] sm:text-[1.2rem] font-semibold text-flame-light">°C</span>
-              <!-- Rate on-track = celadon. °C/MIN, and the app ROUNDS rate to a
-                   whole number (Math.round in useFiringStats), so it's +1, not
-                   +1.4. ~1°C/min (≈60°C/hr) is a realistic slow final approach
-                   to Cone 10, matching the gentle actual slope at NOW. -->
-              <span class="text-[0.8rem] text-celadon-dark bg-celadon-bg border border-celadon/30 rounded px-[7px] py-[2px] ml-1">+1°C/m</span>
+
+            <!-- Console row: bar + actions. Beside each other from sm up (as in
+                 the flyer and the real lg console); the actions drop to a
+                 three-across grid under the bar on a phone. -->
+            <div class="flex flex-col sm:flex-row items-stretch gap-2 mb-4">
+
+              <!-- Ink + flame glow: FiringConsole's one persistent brand surface -->
+              <div
+                class="flex-1 min-w-0 bg-ink border border-white/10 rounded-xl flex items-center gap-3 sm:gap-4 px-4 py-3"
+                style="box-shadow:0 2px 12px rgba(34,23,8,0.25); background-image: radial-gradient(ellipse at 22% 45%, rgba(184,85,28,0.35) 0%, transparent 62%)"
+              >
+                <div class="flex items-end gap-3 sm:gap-4 min-w-0">
+                  <div class="min-w-0">
+                    <div class="text-[9px] sm:text-[10px] font-semibold uppercase tracking-widest text-parchment-4/70">Current</div>
+                    <div class="flex items-baseline gap-1">
+                      <span class="text-[1.6rem] sm:text-[2rem] font-bold tabular-nums leading-none text-parchment">1,214</span>
+                      <span class="text-[0.7rem] sm:text-[0.8rem] font-medium text-parchment-4/70">°C</span>
+                    </div>
+                  </div>
+                  <svg class="w-4 h-4 mb-1.5 shrink-0 text-parchment-4/60" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                  <div class="min-w-0">
+                    <div class="text-[9px] sm:text-[10px] font-semibold uppercase tracking-widest text-parchment-4/70">Target</div>
+                    <div class="flex items-baseline gap-1">
+                      <span class="text-[1.6rem] sm:text-[2rem] font-bold tabular-nums leading-none text-parchment-4">1,221</span>
+                      <span class="text-[0.7rem] sm:text-[0.8rem] font-medium text-parchment-4/70">°C</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- The console's delta chip, on track -->
+                <div class="ml-auto shrink-0 inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-lg text-[0.8rem] sm:text-sm font-bold bg-celadon-bg text-celadon-dark">
+                  <span>✓</span> On track
+                </div>
+              </div>
+
+              <!-- Actions. Inert by design (see HERO CARD note).
+                   CONE DROPS: the middle one is why this row is here at all. -->
+              <div class="grid grid-cols-3 sm:flex gap-2 shrink-0">
+                <div class="sm:w-[84px] lg:w-24 bg-flame text-parchment rounded-xl flex flex-col items-center justify-center gap-1 py-2.5 sm:py-0">
+                  <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+                  <span class="text-[9px] sm:text-[10px] lg:text-xs font-bold uppercase tracking-wide text-center leading-tight">Log reading</span>
+                </div>
+                <div class="sm:w-[84px] lg:w-24 bg-celadon text-white rounded-xl flex flex-col items-center justify-center gap-1 py-2.5 sm:py-0">
+                  <svg class="w-4 h-4 sm:w-5 sm:h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6 h16 L12 20 Z" stroke-linejoin="round"/></svg>
+                  <span class="text-[9px] sm:text-[10px] lg:text-xs font-bold uppercase tracking-wide text-center leading-tight">Cone down</span>
+                </div>
+                <div class="sm:w-[84px] lg:w-24 bg-cobalt text-white rounded-xl flex flex-col items-center justify-center gap-1 py-2.5 sm:py-0">
+                  <span class="text-base sm:text-xl leading-none flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"/>⊟
+                  </span>
+                  <span class="text-[9px] sm:text-[10px] lg:text-xs font-bold uppercase tracking-wide text-center leading-tight">End reduction</span>
+                </div>
+              </div>
             </div>
 
             <!-- Graph-paper ground behind the plot (as in app.vue) -->
             <div class="w-full rounded-lg overflow-hidden mb-4" style="background: linear-gradient(to right, rgba(95,138,120,0.06) 1px, transparent 1px) 0 0 / 12.5% 100%, linear-gradient(to bottom, rgba(95,138,120,0.06) 1px, transparent 1px) 0 0 / 100% 25%, #fcfdfc;">
-              <svg class="w-full block" viewBox="0 0 480 200" fill="none">
-                <!-- Top legend — Chart.js point-style: orange Actual, grey Planned -->
-                <circle cx="196" cy="13" r="4" fill="#f97316"/>
-                <text x="206" y="17" font-size="11" fill="#57534e" font-family="Georgia, serif">Actual</text>
-                <circle cx="266" cy="13" r="4" fill="#a8a29e"/>
-                <text x="276" y="17" font-size="11" fill="#57534e" font-family="Georgia, serif">Planned</text>
+              <svg class="w-full block" viewBox="0 0 480 220" fill="none">
 
-                <!-- y-axis labels (°C) -->
-                <text x="4" y="179" font-size="10" fill="#a8a29e" font-family="Georgia, serif">0°C</text>
-                <text x="4" y="128" font-size="10" fill="#a8a29e" font-family="Georgia, serif">500°C</text>
-                <text x="4" y="77" font-size="10" fill="#a8a29e" font-family="Georgia, serif">1000°C</text>
+                <!-- Legend — Chart.js point style, planned then actual -->
+                <circle cx="196" cy="14" r="4" fill="#a8a29e"/>
+                <text x="206" y="18" class="chart-legend">Planned</text>
+                <circle cx="278" cy="14" r="4" fill="#f97316"/>
+                <text x="288" y="18" class="chart-legend">Actual</text>
 
-                <!-- Reduction band (open/live): body reduction from ~900°C to NOW,
-                     mapped along the actual curve. rgba matches reductionBandsPlugin
-                     (cobalt since the Aug 2026 palette sweep). -->
-                <rect x="200" y="28" width="66" height="148" fill="rgba(58,90,120,0.10)"/>
-                <line x1="200" y1="28" x2="200" y2="176" stroke="rgba(58,90,120,0.55)" stroke-width="1" stroke-dasharray="4 4"/>
-                <line x1="266" y1="28" x2="266" y2="176" stroke="rgba(58,90,120,0.55)" stroke-width="1" stroke-dasharray="4 4"/>
-                <text x="204" y="40" font-size="9" font-weight="bold" fill="rgba(40,64,87,0.9)" font-family="sans-serif">Reduction…</text>
+                <!-- y-axis -->
+                <text x="2" y="185" class="chart-axis">0°</text>
+                <text x="2" y="132" class="chart-axis">500°</text>
+                <text x="2" y="79" class="chart-axis">1000°</text>
 
-                <!-- Planned — warm grey #a8a29e dashed [6,4]. FULL schedule:
-                     climb → peak 1,287° (~5.1h) → hold → cool-down to end. -->
-                <polyline points="42,174 84,161 126,133 168,105 200,82 226,65 252,55 268,52 289,47 310,45 336,45 383,71 462,111" stroke="#a8a29e" stroke-width="2" stroke-dasharray="6 4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                <!-- Reduction band: open/live, from 1,010°C at 4h to NOW.
+                     rgba matches reductionBandsPlugin (cobalt). -->
+                <rect x="199" y="40" width="76" height="142" fill="rgba(58,90,120,0.10)"/>
+                <line x1="199" y1="40" x2="199" y2="182" stroke="rgba(58,90,120,0.5)" stroke-width="1" stroke-dasharray="4 4"/>
+                <text x="203" y="176" class="chart-note" fill="rgba(40,64,87,0.85)">Reduction</text>
 
-                <!-- Actual — orange #f97316 solid, soft orange fill. Only up to
-                     NOW; sits a touch BELOW plan (behind), slope gentle at the top. -->
-                <path d="M42,174 L84,162 L126,135 L168,107 L200,85 L226,69 L252,59 L268,56 L268,176 L42,176 Z" fill="rgba(249,115,22,0.08)"/>
-                <polyline points="42,174 84,162 126,135 168,107 200,85 226,69 252,59 268,56" stroke="#f97316" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                <!-- Planned — warm grey #a8a29e dashed [6,4], NOW onward:
+                     climb to the 1,287° peak, hold, then cool. -->
+                <polyline points="275,53 321,46 352,45 390,60 424,81 466,108" stroke="#a8a29e" stroke-width="2" stroke-dasharray="6 4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                <circle cx="321" cy="46" r="3.5" fill="#a8a29e"/>
+                <circle cx="352" cy="45" r="3.5" fill="#a8a29e"/>
+                <circle cx="390" cy="60" r="3.5" fill="#a8a29e"/>
+                <circle cx="424" cy="81" r="3.5" fill="#a8a29e"/>
+                <circle cx="466" cy="108" r="3.5" fill="#a8a29e"/>
 
-                <!-- NOW line — celadon (nowLinePlugin), high on the rise -->
-                <line x1="268" y1="28" x2="268" y2="176" stroke="rgba(95,138,120,0.9)" stroke-width="1.5"/>
-                <rect x="268" y="28" width="30" height="14" fill="rgba(95,138,120,0.95)"/>
-                <text x="283" y="38" font-size="9" font-weight="bold" fill="#fff" font-family="sans-serif" text-anchor="middle">NOW</text>
+                <!-- Actual — orange #f97316 solid with the soft orange fill.
+                     Start → NOW and no further: that is all that has happened. -->
+                <path d="M46,180 L84,166 L122,123 L161,86 L199,75 L229,74 L256,60 L275,53 L275,182 L46,182 Z" fill="rgba(249,115,22,0.08)"/>
+                <polyline points="46,180 84,166 122,123 161,86 199,75 229,74 256,60 275,53" stroke="#f97316" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                <circle cx="84" cy="166" r="3" fill="#f97316"/>
+                <circle cx="122" cy="123" r="3" fill="#f97316"/>
+                <circle cx="199" cy="75" r="3" fill="#f97316"/>
+                <circle cx="256" cy="60" r="3" fill="#f97316"/>
 
-                <!-- Planned target dot at NOW — ABOVE the actual (we're behind) -->
-                <circle cx="268" cy="52" r="4" fill="rgba(95,138,120,1)" stroke="#fff" stroke-width="1.5"/>
-                <text x="300" y="55" font-size="10" font-weight="bold" fill="rgba(58,90,72,0.95)" font-family="sans-serif">target 1,225°</text>
+                <!-- CONE DROPS: cone 010 over at 900°C on the climb. The glyph
+                     is the console's filled ▽, apex resting on the curve, so
+                     the mark and the CONE DOWN button above are one idea. -->
+                <g transform="translate(161,80)">
+                  <path d="M-5.5,-5 h11 L0,6 Z" fill="#3a2a18" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/>
+                </g>
+                <text x="120" y="103" class="chart-note" fill="rgba(58,42,24,0.85)">cone 010</text>
 
-                <!-- Latest reading marker — orange, on the actual curve -->
-                <circle cx="268" cy="56" r="4.5" fill="#f97316" stroke="#fff" stroke-width="2"/>
+                <!-- NOW line — celadon (nowLinePlugin) -->
+                <line x1="275" y1="40" x2="275" y2="182" stroke="rgba(95,138,120,0.9)" stroke-width="1.5"/>
+                <rect x="256" y="24" width="38" height="16" rx="2" fill="rgba(95,138,120,0.95)"/>
+                <text x="275" y="36" text-anchor="middle" class="chart-badge">NOW</text>
 
-                <!-- x-axis time labels -->
-                <text x="42" y="194" font-size="10" fill="#a8a29e" font-family="Georgia, serif">0h</text>
-                <text x="252" y="194" font-size="10" fill="#a8a29e" font-family="Georgia, serif" text-anchor="middle">4h</text>
-                <text x="462" y="194" font-size="10" fill="#a8a29e" font-family="Georgia, serif" text-anchor="end">8h</text>
+                <!-- Latest reading, and both numbers as text (see the note about
+                     the 0.7px gap in the card comment above) -->
+                <circle cx="275" cy="53" r="5" fill="#f97316" stroke="#fff" stroke-width="2"/>
+                <text x="284" y="50" class="chart-note" fill="#c2410c">1,214°</text>
+                <text x="284" y="63" class="chart-note" fill="rgba(58,90,72,0.95)">target 1,221°</text>
+
+                <!-- x-axis -->
+                <text x="46" y="203" class="chart-axis">0h</text>
+                <text x="199" y="203" text-anchor="middle" class="chart-axis">4h</text>
+                <text x="352" y="203" text-anchor="middle" class="chart-axis">8h</text>
               </svg>
             </div>
-            <div class="grid grid-cols-3 gap-2 border-t border-parchment-2 pt-4">
+
+            <!-- CONE DROPS: four stats, so the last cone down is a number and
+                 not only a mark. Two columns on a phone — four across a 320px
+                 card squeezed every value to a couple of characters. -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 gap-y-3 border-t border-parchment-2 pt-4">
               <div class="flex flex-col gap-[3px] min-w-0">
                 <span class="text-[0.95rem] sm:text-[1.05rem] font-bold text-ink tracking-tight">1,287°C</span>
                 <span class="text-[0.65rem] sm:text-[0.7rem] uppercase tracking-[0.08em] text-ink-faint leading-tight">Peak target</span>
               </div>
               <div class="flex flex-col gap-[3px] min-w-0">
-                <span class="text-[0.95rem] sm:text-[1.05rem] font-bold text-ink tracking-tight">4h 18m</span>
+                <span class="text-[0.95rem] sm:text-[1.05rem] font-bold text-ink tracking-tight">6h 02m</span>
                 <span class="text-[0.65rem] sm:text-[0.7rem] uppercase tracking-[0.08em] text-ink-faint leading-tight">Elapsed</span>
+              </div>
+              <div class="flex flex-col gap-[3px] min-w-0">
+                <span class="text-[0.95rem] sm:text-[1.05rem] font-bold text-ink tracking-tight">010 <span class="text-ink-faint font-semibold">@ 900°</span></span>
+                <span class="text-[0.65rem] sm:text-[0.7rem] uppercase tracking-[0.08em] text-ink-faint leading-tight">Last cone down</span>
               </div>
               <div class="flex flex-col gap-[3px] min-w-0">
                 <span class="text-[0.95rem] sm:text-[1.05rem] font-bold text-ink tracking-tight">+1<span class="text-ink-faint font-semibold">/+2</span></span>
@@ -213,14 +326,19 @@
           </div>
 
           <!-- Feature story cards — each maps to a real, shipped feature.
-               Order: NOW line/recalibrate first, then the product's soul (the
-               founder's gas-out story → Save as schedule) in the middle, then
-               planned + live reduction bands (G11). The middle card is the
-               flame-bg hero. -->
-          <div class="flex flex-col gap-3">
+               Order: logging (the daily act, and what the console above shows)
+               first, then the product's soul (the founder's gas-out story →
+               Save as schedule) in the middle, then planned + live reduction
+               bands (G11). The middle card is the flame-bg hero.
+
+               md through xl sits the three in a row beneath the full-width
+               chart; xl puts them back in a column beside it. -->
+          <div class="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-1 gap-3">
             <div class="bg-parchment-2 border border-parchment-4 rounded-[10px] px-5 sm:px-[1.625rem] py-5 sm:py-6 flex flex-col gap-2">
-              <p class="text-[0.7rem] font-bold uppercase tracking-[0.12em] text-flame">Always know where you are</p>
-              <p class="text-[0.9rem] text-ink-muted leading-relaxed">The NOW line pins this exact minute to your plan and shows the target you should be at. Running behind? Recalibrate slides the rest of the schedule to meet your kiln where it is.</p>
+              <!-- CONE DROPS: the story card, replacing the NOW-line/recalibrate
+                   card that used to sit here. -->
+              <p class="text-[0.7rem] font-bold uppercase tracking-[0.12em] text-flame">Temperatures and cones, one tap each</p>
+               <p class="text-[0.9rem] text-ink-muted leading-relaxed">Log temeratures from your pyrometer reading. Log the moment cones drop — it lands on the chart with the time and the temperature it fell at. Log temp and heat work, recorded side by side.</p>
             </div>
             <div class="bg-flame-bg border border-parchment-4 rounded-[10px] px-5 sm:px-[1.625rem] py-5 sm:py-6 flex flex-col gap-2">
               <p class="text-[0.7rem] font-bold uppercase tracking-[0.12em] text-flame">Repeat the happy accident</p>
@@ -249,7 +367,7 @@
         <div class="order-2 lg:order-1 min-w-0">
           <p class="text-flame-light font-semibold tracking-[0.16em] uppercase text-[0.72rem] mb-4">Built for the studio</p>
           <h2 class="text-[clamp(1.875rem,4vw,3.25rem)] font-bold text-parchment leading-[1.12] tracking-tight mb-5">Plan it.<br>Log it.<br>Learn from it.</h2>
-          <p class="text-[1rem] sm:text-[1.05rem] text-ink-muted leading-[1.7] max-w-[560px] mb-6">Sketch your firing curve, tap in temperatures as you go, and watch your kiln track against the plan. Every firing saved forever — so you can repeat your wins and stop repeating your mistakes.</p>
+          <p class="text-[1rem] sm:text-[1.05rem] text-ink-muted leading-[1.7] max-w-[560px] mb-6">Sketch your firing curve, tap in temperatures and cone drops as you go, and watch your kiln track against the plan. Every firing saved forever — so you can repeat your wins and stop repeating your mistakes.</p>
           <p class="text-[0.9rem] text-parchment/70 leading-relaxed max-w-[560px]">{{ activeVideo.blurb }}</p>
         </div>
 
@@ -301,8 +419,8 @@
             <div class="w-11 h-11 bg-flame/10 rounded-lg flex items-center justify-center shrink-0">
               <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M4 6h14M4 10h14M4 14h8" stroke="#b05c1a" stroke-width="1.25" stroke-linecap="round"/><circle cx="17" cy="16" r="3" stroke="#b05c1a" stroke-width="1.25"/><path d="M17 14.5v1.5l1 1" stroke="#b05c1a" stroke-width="1" stroke-linecap="round"/></svg>
             </div>
-            <h3 class="text-[1.05rem] font-bold text-ink tracking-tight">Log in a tap</h3>
-            <p class="text-[0.925rem] text-ink-muted leading-[1.65]">Check the kiln, tap in the temperature, done. The chart draws itself. Mis-typed a reading? Edit or delete it in a second.</p>
+            <h3 class="text-[1.05rem] font-bold text-ink tracking-tight">Log temperatures and cones</h3>
+             <p class="text-[0.9rem] text-ink-muted leading-relaxed">Log temeratures from your pyrometer reading. Log the moment cones drop — it lands on the chart with the time and the temperature it fell at. Log temp and heat work, recorded side by side.</p>
           </div>
 
           <!-- Schedule library — celadon icon (this is the celadon/schedule world) -->
@@ -420,7 +538,7 @@ const mobileMenu = ref(false)
 const pricingItems = [
   'Unlimited kiln firings',
   'Planned vs actual chart',
-  'Tap-to-log readings',
+  'Tap-to-log temp readings and cone drops',
   'Full firing history',
   'Schedule library',
   'Works on phone & desktop',
@@ -453,3 +571,23 @@ const activeVideo = computed(() =>
   demoVideos.find(v => v.id === activeVideoId.value) ?? demoVideos[0],
 )
 </script>
+
+<style scoped>
+/* HERO CHART TYPE (Aug 2026)
+   These sizes are in SVG user units, so they scale with the card. A 10px label
+   is right on a 700px-wide card and unreadable on a 320px phone, where the
+   viewBox renders at roughly 0.6 scale — hence the larger default and the
+   step down at sm. Set here rather than as font-size attributes because CSS
+   overrides presentation attributes anyway, and one place beats twenty. */
+.chart-axis   { font-family: Georgia, serif; fill: #a8a29e; font-size: 13px; }
+.chart-legend { font-family: Georgia, serif; fill: #57534e; font-size: 13px; }
+.chart-note   { font-family: ui-sans-serif, system-ui, sans-serif; font-weight: 700; font-size: 12px; }
+.chart-badge  { font-family: ui-sans-serif, system-ui, sans-serif; font-weight: 700; font-size: 12px; fill: #fff; }
+
+@media (min-width: 640px) {
+  .chart-axis,
+  .chart-legend { font-size: 10px; }
+  .chart-note,
+  .chart-badge  { font-size: 9.5px; }
+}
+</style>

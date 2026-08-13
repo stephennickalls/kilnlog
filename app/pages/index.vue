@@ -338,7 +338,7 @@
               <!-- CONE DROPS: the story card, replacing the NOW-line/recalibrate
                    card that used to sit here. -->
               <p class="text-[0.7rem] font-bold uppercase tracking-[0.12em] text-flame">Temperatures and cones, one tap each</p>
-               <p class="text-[0.9rem] text-ink-muted leading-relaxed">Log temeratures from your pyrometer reading. Log the moment cones drop — it lands on the chart with the time and the temperature it fell at. Log temp and heat work, recorded side by side.</p>
+               <p class="text-[0.9rem] text-ink-muted leading-relaxed">Log temperatures from your pyrometer reading. Log the moment cones drop — it lands on the chart with the time and the temperature it fell at. Log temp and heat work, recorded side by side.</p>
             </div>
             <div class="bg-flame-bg border border-parchment-4 rounded-[10px] px-5 sm:px-[1.625rem] py-5 sm:py-6 flex flex-col gap-2">
               <p class="text-[0.7rem] font-bold uppercase tracking-[0.12em] text-flame">Repeat the happy accident</p>
@@ -420,7 +420,7 @@
               <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M4 6h14M4 10h14M4 14h8" stroke="#b05c1a" stroke-width="1.25" stroke-linecap="round"/><circle cx="17" cy="16" r="3" stroke="#b05c1a" stroke-width="1.25"/><path d="M17 14.5v1.5l1 1" stroke="#b05c1a" stroke-width="1" stroke-linecap="round"/></svg>
             </div>
             <h3 class="text-[1.05rem] font-bold text-ink tracking-tight">Log temperatures and cones</h3>
-             <p class="text-[0.9rem] text-ink-muted leading-relaxed">Log temeratures from your pyrometer reading. Log the moment cones drop — it lands on the chart with the time and the temperature it fell at. Log temp and heat work, recorded side by side.</p>
+             <p class="text-[0.9rem] text-ink-muted leading-relaxed">Log temperatures from your pyrometer reading. Log the moment cones drop — it lands on the chart with the time and the temperature it fell at. Log temp and heat work, recorded side by side.</p>
           </div>
 
           <!-- Schedule library — celadon icon (this is the celadon/schedule world) -->

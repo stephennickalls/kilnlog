@@ -49,6 +49,14 @@
   "Get early access" anywhere on the site looked like nothing had happened
   for 1–4 seconds. The `pending` block at the top of the template is what
   the user now sees instead.
+
+  META PIXEL (Aug 2026): this page is the conversion point for the Facebook
+  ads, so both success paths report one. They are DIFFERENT events on purpose:
+  CompleteRegistration for a created account, Lead for a waitlist signup —
+  the same ad can land in either mode depending on whether spots are free, and
+  collapsing them would hide which. Both fire only after the server has
+  confirmed success. $fbq is a no-op stub when META_PIXEL_ID is unset, so
+  nothing here needs a guard. See app/plugins/meta-pixel.client.js.
 -->
 <template>
   <div>
@@ -289,6 +297,10 @@ definePageMeta({
 
 const supabase = useSupabaseClient()
 
+// META PIXEL: a no-op stub when META_PIXEL_ID is unset, so call sites never
+// need a guard. See app/plugins/meta-pixel.client.js.
+const { $fbq } = useNuxtApp()
+
 const email    = ref('')
 const name     = ref('')
 const password = ref('')
@@ -361,6 +373,13 @@ async function createAccount() {
   signedIn.value       = !!data?.session
   loading.value        = false
 
+  // META PIXEL: the account exists. Reported here rather than on submit so a
+  // rejected email or a lost race never counts as a conversion — both of
+  // those return above. It also has to fire BEFORE the navigateTo below:
+  // the route change tears down this context, and a pixel request that has
+  // not left yet goes with it.
+  $fbq('track', 'CompleteRegistration')
+
   // Confirmation off → session in hand. Brief celebration, then into the app.
   if (signedIn.value) {
     setTimeout(() => navigateTo('/app'), 1600)
@@ -381,6 +400,12 @@ async function submitWaitlist() {
       },
     })
     done.value = true
+    // META PIXEL: inside the try, after the await — a 4xx from the rate
+    // limiter or a network failure jumps to catch and reports nothing.
+    // NOTE a honeypot hit returns 200 without inserting, so a bot that fills
+    // "website" is counted here. That is the cost of the endpoint lying to
+    // bots on purpose, and it is the right trade.
+    $fbq('track', 'Lead')
   } catch (err) {
     error.value = err?.data?.statusMessage || 'Something went wrong. Please try again.'
   } finally {

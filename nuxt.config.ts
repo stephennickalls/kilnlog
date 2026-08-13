@@ -82,13 +82,23 @@ const GA_CONNECT = [
 // covered by img-src 'self'.
 const YOUTUBE_FRAME = 'https://www.youtube-nocookie.com'
 
+// ── META PIXEL (Aug 2026) ─────────────────────────────────────────────────
+// Same two-host shape as GA4, and the same silent-failure trap:
+//   - fbevents.js is SERVED from connect.facebook.net   → script-src
+//   - the events are SENT to www.facebook.com           → connect-src
+// The /tr/ beacon is an image and is already covered by img-src https:.
+// The pixel only loads when META_PIXEL_ID is set (see the plugin), so on a
+// machine without the env var these entries simply go unused.
+const META_SCRIPT  = 'https://connect.facebook.net'
+const META_CONNECT = 'https://www.facebook.com'
+
 const CSP = [
   "default-src 'self'",
   "base-uri 'self'",
   "object-src 'none'",
   "frame-ancestors 'none'",
-  `connect-src 'self' ${SUPABASE_SRC} https://api.stripe.com ${GA_CONNECT}`,
-  `script-src 'self' 'unsafe-inline' https://js.stripe.com ${GA_SCRIPT}`,
+  `connect-src 'self' ${SUPABASE_SRC} https://api.stripe.com ${GA_CONNECT} ${META_CONNECT}`,
+  `script-src 'self' 'unsafe-inline' https://js.stripe.com ${GA_SCRIPT} ${META_SCRIPT}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
@@ -213,6 +223,10 @@ export default defineNuxtConfig({
       // it unset locally means app/plugins/analytics.client.js no-ops, so dev
       // traffic never reaches the property.
       gaMeasurementId:        process.env.GA_MEASUREMENT_ID || '',
+      // Meta Pixel id (a long number). Set in Netlify env only — unset locally
+      // means app/plugins/meta-pixel.client.js no-ops, so dev traffic and
+      // your own testing never pollute the ad reporting.
+      metaPixelId:            process.env.META_PIXEL_ID || '',
     },
   },
 })

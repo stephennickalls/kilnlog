@@ -114,6 +114,7 @@
               @end="showEndConfirm = true"
               @reduction="onToggleReduction"
               @notes="openNotes"
+              @readings="showReadingsTable = true"
               @cone-drop="openConeSheet"
             />
             <FiringReview
@@ -211,6 +212,19 @@
       @remove="removeConeDrop"
     />
 
+    <!-- READINGS TABLE (Aug 2026): the dependable way to fix a mistyped
+         reading. The chart's tap-a-point path still works but is unreliable on
+         a phone, which is what prompted this. Stays open across edits. -->
+    <ReadingsTableModal
+      :open="showReadingsTable"
+      :readings="selectedFiring?.readings ?? []"
+      :started-at="selectedFiring?.started_at ?? 0"
+      :busy-id="readingBusyId"
+      @close="showReadingsTable = false"
+      @update="updateReadingFromTable"
+      @delete="deleteReadingFromTable"
+    />
+
     <!-- ── End firing confirm modal ──────────────────────────────────────────── -->
     <Teleport to="body">
       <div v-if="showEndConfirm" class="fixed inset-0 z-[70] flex items-end sm:items-center justify-center" style="background:rgba(26,18,8,0.6)" @click.self="showEndConfirm = false">
@@ -244,7 +258,7 @@
       @delete="sheetDeleteFiring"
       @load-more="loadOlderFirings"
     />
-    
+
 
     <!-- ── Modals ────────────────────────────────────────────────────────────── -->
     <KilnTempModal
@@ -343,6 +357,8 @@ const chartCanvas          = ref(null)
 const consoleRef           = ref(null)
 const editingReading       = ref(null)
 const showReadingModal     = ref(false)
+const showReadingsTable    = ref(false)  // tabular reading editor
+const readingBusyId        = ref(null)   // reading id with a save/delete in flight
 const showFiringSheet      = ref(false)
 const sheetDeletingId      = ref(null)   // firing id with a delete request in flight
 const showStartModal       = ref(false)
@@ -660,6 +676,9 @@ async function selectFiring(f, preloaded = null) {
   currentTemp.value = null
   consoleRef.value?.closeMenu?.()
   clearNowLine()
+  // The table is bound to selectedFiring.readings; leaving it open across a
+  // firing switch would silently repoint it at a different firing's data.
+  showReadingsTable.value = false
 
   let data = preloaded
   // LAZY LIST: a list row now has NO `notes` column, so a row passed straight
@@ -768,6 +787,37 @@ async function saveNotes() {
     toast.show(`Couldn\u2019t save notes: ${err?.data?.statusMessage ?? err?.data?.message ?? 'Unknown error'}`)
   } finally {
     notesSaving.value = false
+  }
+}
+
+// ── Readings table ───────────────────────────────────────────────────────────
+// Both handlers route through reloadReadings so the chart, currentTemp and the
+// stats all follow the edit. The table stays OPEN throughout: correcting
+// readings is usually a run of edits, not one, and closing it after each would
+// repeat the sidebar-delete mistake.
+async function updateReadingFromTable({ id, temperature }) {
+  if (readingBusyId.value) return   // ignore taps while one is in flight
+  readingBusyId.value = id
+  try {
+    await $fetch(`/api/readings/${id}`, { method: 'PUT', body: { temperature } })
+    await reloadReadings()
+  } catch (err) {
+    toast.show(`Couldn\u2019t update reading: ${err?.data?.statusMessage ?? err?.data?.message ?? 'Unknown error'}`)
+  } finally {
+    readingBusyId.value = null
+  }
+}
+
+async function deleteReadingFromTable(id) {
+  if (readingBusyId.value) return
+  readingBusyId.value = id
+  try {
+    await $fetch(`/api/readings/${id}`, { method: 'DELETE' })
+    await reloadReadings()
+  } catch (err) {
+    toast.show(`Couldn\u2019t delete reading: ${err?.data?.statusMessage ?? err?.data?.message ?? 'Unknown error'}`)
+  } finally {
+    readingBusyId.value = null
   }
 }
 
@@ -977,6 +1027,7 @@ async function performDeleteFiring(f) {
       clearNowLine()
       selectedFiring.value = currentTemp.value = null
       isLive.value = isPaused.value = false
+      showReadingsTable.value = false   // its data source just went away
     }
     await refreshFirings()
   } catch (err) {

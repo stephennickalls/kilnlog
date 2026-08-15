@@ -41,6 +41,13 @@
   room for it there. Driven by delta.iconOnly, NOT by a width class — a future
   breakpoint change must not silently bring the words back.
 
+  EDIT READINGS (Aug 2026): both menus carry a 'readings' action opening the
+  tabular editor (ReadingsTableModal). The chart's tap-a-point-to-edit path
+  still exists but is unreliable on a phone — a few pixels of hit area, points
+  overlapping when readings are close together — so the table is the dependable
+  route to fixing a mistyped value. Emits only; app.vue owns the sheet and the
+  API calls.
+
   G11: the overflow menu gains a reduction toggle — "Start reduction" when none is
   open, "End reduction" when one is in progress. Emits a single 'reduction' action;
   the parent captures the current temperature and calls the API.
@@ -155,10 +162,14 @@
 
         <div v-if="menuOpen" class="fixed inset-0 z-40" @click="menuOpen = false" />
         <div v-if="menuOpen" class="absolute right-0 top-full mt-2 w-52 z-50 bg-white border border-parchment-3 rounded-xl p-1.5 flex flex-col gap-0.5" style="box-shadow:0 4px 20px rgba(58,30,8,0.12)">
-          <!-- Order matches the mobile sheet: notes, recalibrate, pause/resume, end.
-               No cone or reduction entries here — at lg+ both are standalone
-               controls in the row (celadon button, cobalt toggle).
+          <!-- Order matches the mobile sheet: edit readings, notes, recalibrate,
+               pause/resume, end. No cone or reduction entries here — at lg+ both
+               are standalone controls in the row (celadon button, cobalt toggle).
                Palette: ink/ink-muted = utilities, flame = resume, red = destructive. -->
+          <button class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-ink hover:bg-parchment-2 transition-colors text-left" @click="emitAction('readings')">
+            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+            Edit readings
+          </button>
           <button class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-ink hover:bg-parchment-2 transition-colors text-left" @click="emitAction('notes')">
             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg>
             Notes
@@ -273,7 +284,7 @@
       <div v-if="menuOpen" class="lg:hidden fixed inset-0 z-[80] flex flex-col justify-end font-serif" style="background:rgba(26,18,8,0.6)" @click.self="menuOpen = false">
         <!-- SAFE AREA + dvh (Aug 2026): p-3 alone put "Cancel" underneath the
              iPhone home indicator. The height cap uses dvh because 100vh on
-             iOS measures a viewport that includes Safari's chrome; with seven
+             iOS measures a viewport that includes Safari's chrome; with eight
              actions on a short phone the sheet could otherwise run off-screen
              with no way to scroll. -->
         <div
@@ -281,7 +292,8 @@
           style="max-height:85vh; max-height:min(85vh, 85dvh)"
         >
           <div class="flex justify-center pb-1"><div class="w-10 h-1 bg-parchment-3 rounded-full"/></div>
-          <!-- Order: cone down, reduction, notes, recalibrate, pause/resume, end.
+          <!-- Order: cone down, reduction, edit readings, notes, recalibrate,
+               pause/resume, end.
                Palette (option 3, "two solids"): the two firing EVENTS are loud
                solids — celadon = cone down (heat-work), cobalt = reduction
                (atmosphere) — utilities are silent white, resume is flame, end
@@ -292,6 +304,9 @@
           </button>
           <button v-if="isLive && !showConeButton" class="w-full py-3 bg-cobalt active:bg-cobalt-dark text-white text-sm font-bold rounded-xl transition-colors" @click="emitAction('reduction')">
             {{ reductionOpen ? '⊟ End reduction' : '⊞ Start reduction' }}
+          </button>
+          <button class="w-full py-3 border border-parchment-3 bg-white text-ink text-sm font-bold rounded-xl" @click="emitAction('readings')">
+            <svg class="w-4 h-4 inline -mt-0.5 mr-1.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>Edit readings
           </button>
           <button class="w-full py-3 border border-parchment-3 bg-white text-ink text-sm font-bold rounded-xl" @click="emitAction('notes')">
             <svg class="w-4 h-4 inline -mt-0.5 mr-1.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"/><path d="M14 2v6h6M16 13H8M16 17H8"/></svg>Notes
@@ -333,7 +348,7 @@ const props = defineProps({
   showConeButton: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['open-temp', 'log-reading', 'pause', 'resume', 'recalibrate', 'end', 'reduction', 'notes', 'cone-drop'])
+const emit = defineEmits(['open-temp', 'log-reading', 'pause', 'resume', 'recalibrate', 'end', 'reduction', 'notes', 'cone-drop', 'readings'])
 
 const { displayTemp, displayDelta, unitLabel } = useTempUnit()
 

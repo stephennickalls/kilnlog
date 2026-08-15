@@ -31,6 +31,16 @@
   shrink-0 inside an overflow-hidden parent, so the longer label was clipped
   mid-word instead of degrading.
 
+  ON-TRACK CHIP (Aug 2026): on mobile the on-track state renders as a BARE TICK,
+  no words, at every width. The ahead/behind labels are short enough to fit
+  ("45° behind" degrades to "45°" below 380px), but "On track" has no natural
+  short form — "on track" is the same length — so it was the one state that
+  crowded the status line. Dropping its words costs nothing: the hero temperature
+  is already celadon-light in that state via delta.textClass, so on-track is
+  still legible at a glance. Desktop keeps the full "✓ On track" pill; there is
+  room for it there. Driven by delta.iconOnly, NOT by a width class — a future
+  breakpoint change must not silently bring the words back.
+
   G11: the overflow menu gains a reduction toggle — "Start reduction" when none is
   open, "End reduction" when one is in progress. Emits a single 'reduction' action;
   the parent captures the current temperature and calls the API.
@@ -79,7 +89,9 @@
           </template>
         </button>
 
-        <!-- Light state pill — deliberately unchanged so state reads loudest on the ink -->
+        <!-- Light state pill — deliberately unchanged so state reads loudest on
+             the ink. Keeps its words in every state: unlike the mobile strip,
+             this row has the width for them. -->
         <div v-if="delta" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-sm font-bold shrink-0" :class="delta.class">
           <span>{{ delta.icon }}</span> {{ delta.label }}
         </div>
@@ -192,13 +204,20 @@
                HALF rather than wrapping — the firing state, cut off mid-word.
                delta.short ("45°") already existed on the computed but was
                never rendered; it now carries the sub-380px case, and the
-               target label may truncate as the last resort. -->
+               target label may truncate as the last resort.
+
+               ON TRACK: renders as a bare tick here at EVERY mobile width.
+               "On track" has no shorter form to degrade to, so it was the one
+               state that crowded this line. The hero temp above is already
+               celadon-light in that state, so nothing is lost. -->
           <div v-if="targetTemp !== null" class="flex items-center gap-1.5 min-w-0">
             <span class="text-xs text-parchment-4/80 whitespace-nowrap truncate min-w-0">target <b class="font-bold text-parchment-3 tabular-nums">{{ targetTemp }}{{ unitLabel }}</b></span>
             <span v-if="delta" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[11px] font-bold shrink-0 whitespace-nowrap" :class="delta.class">
               {{ delta.icon }}
-              <span class="min-[380px]:hidden">{{ delta.short }}</span>
-              <span class="hidden min-[380px]:inline">{{ delta.label }}</span>
+              <template v-if="!delta.iconOnly">
+                <span class="min-[380px]:hidden">{{ delta.short }}</span>
+                <span class="hidden min-[380px]:inline">{{ delta.label }}</span>
+              </template>
             </span>
           </div>
 
@@ -370,12 +389,17 @@ const currentColorClass = computed(() => {
 // threshold and stays °C. The NUMBER shown to the user converts via displayDelta.
 // `class` (the chip) keeps LIGHT state-pill styling — it pops hardest on ink.
 // `textClass` is the on-ink text colour for the hero number + arrow.
+//
+// `iconOnly` is read ONLY by the mobile status line, where the on-track chip
+// renders as a bare tick. Ahead/behind have a natural short form ("45°") to
+// degrade to; "On track" does not, so it is the one state that crowds that
+// line. Desktop ignores this flag — it has the width for the words.
 const delta = computed(() => {
   if (props.currentTemp === null || props.targetTempC === null) return null
   const dC = Math.round(props.currentTemp - props.targetTempC)
   const absC = Math.abs(dC)
   const absDisplay = Math.abs(displayDelta(dC))
-  if (absC <= 15) return { icon: '✓', label: 'On track', short: 'on track', class: 'bg-celadon-bg text-celadon-dark', textClass: 'text-celadon-light' }
+  if (absC <= 15) return { icon: '✓', label: 'On track', short: 'on track', iconOnly: true, class: 'bg-celadon-bg text-celadon-dark', textClass: 'text-celadon-light' }
   if (dC > 15)    return { icon: '↑', label: `${absDisplay}° ahead`, short: `${absDisplay}°`, class: 'bg-amber-50 text-amber-700', textClass: 'text-amber-400' }
   return { icon: '↓', label: `${absDisplay}° behind`, short: `${absDisplay}°`, class: 'bg-blue-50 text-blue-700', textClass: 'text-blue-400' }
 })

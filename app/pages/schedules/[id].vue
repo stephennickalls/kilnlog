@@ -6,6 +6,14 @@
   under 16px makes iOS Safari zoom the page in on focus and never zoom back
   out. The curve header uses two wrapping groups rather than a flex-1 spacer,
   which forced label + badge + unit toggle + reduction button onto one line.
+
+  CURVE REBUILD (Aug 2026): changing type or cone here does NOT regenerate the
+  curve. On /schedules/new the points on screen are machine-made and nobody
+  minds them being replaced; here they are the user's saved schedule, and
+  silently rewriting it because they corrected a dropdown is destroying data to
+  be helpful. So the rebuild is OFFERED — CurveRebuildBar appears above the
+  editor and does nothing until pressed. The rule and the curve profiles behind
+  it live in useStarterCurve.js, shared with new.vue so the twins cannot drift.
 -->
 <template>
   <div class="min-h-screen bg-parchment font-serif">
@@ -95,7 +103,22 @@
             </button>
           </div>
         </div>
-        <ScheduleCurveEditor v-model="editPoints" :reductions="editReductions" :stroke="theme.stroke" :fill="theme.fill" />
+
+        <!-- Type or cone moved under a saved curve. Offered, never applied. -->
+        <CurveRebuildBar
+          :visible="curveOffer"
+          :label="curveRebuildLabel"
+          @apply="rebuildCurve"
+          @dismiss="dismissCurveOffer"
+        />
+
+        <ScheduleCurveEditor
+          :model-value="editPoints"
+          :reductions="editReductions"
+          :stroke="theme.stroke"
+          :fill="theme.fill"
+          @update:model-value="onCurveEdit"
+        />
         <div class="pt-3 border-t border-parchment-3">
           <ConePackEditor v-model="editConePack" :target-cone="form.cone" />
         </div>
@@ -162,6 +185,23 @@ const showReductionPlanner = ref(false)
 const id    = computed(() => Number(route.params.id))
 const theme = computed(() => themeForType(form.type))
 
+// generated: FALSE from the outset. Everything on this page is a saved
+// schedule, so a type or cone change raises the offer rather than rebuilding.
+// It only flips true if the user actually presses Rebuild.
+const {
+  offer:        curveOffer,
+  label:        curveRebuildLabel,
+  rebuild:      rebuildCurve,
+  adopt:        adoptCurve,
+  markEdited:   markCurveEdited,
+  dismissOffer: dismissCurveOffer,
+} = useAutoCurve(form, editPoints, { generated: false })
+
+function onCurveEdit(pts) {
+  editPoints.value = pts
+  markCurveEdited()
+}
+
 function flash(msg) {
   status.value = msg
   setTimeout(() => { if (status.value === msg) status.value = '' }, 2800)
@@ -210,6 +250,10 @@ async function load() {
       router.replace(`/schedules/${copy.id}?copyOf=${encodeURIComponent(s.name)}`)
       return
     }
+
+    // Before the form assignments: they would otherwise read as the user
+    // changing type and cone, and the rebuild bar would greet them on load.
+    adoptCurve()
 
     form.name            = s.name
     form.type            = s.type ?? 'bisque'

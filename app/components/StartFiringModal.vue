@@ -4,18 +4,40 @@
   preselect }, emits @create { name, notes, schedulePoints, reductions,
   conePack, saveToLibrary }.
 
-  Step 1 "pick"    — a mini schedule library. Bisque/Glaze starter cards, a
-                     blank-curve row, then Your schedules / Presets / Past
-                     firings behind collapsed expanders.
+  Step 1 "pick"    — a mini schedule library. Starter cards, then Your
+                     schedules / Presets / Past firings behind collapsed
+                     expanders, then "Build a new plan" last.
   Step 2 "confirm" — plan chip (+ Change), auto-filled name, then Adjust curve
-                     and Notes collapsed. Blank auto-opens the editor.
+                     and Notes collapsed.
 
   New-user path: Start firing → Bisque → Start firing. Three taps, no typing.
-  `preselect` (D1/D2, from /schedules "Use") skips straight to step 2.
+  `preselect` (from /schedules "Use") skips straight to step 2.
 
-  CONE PACK (Aug 2026): the witness cones planned for this firing travel with
-  the plan — chosen when the kiln is loaded, not mid-firing. Copied from the
-  chosen schedule; ConePackEditor lives in the Adjust-curve expander.
+  ORDER OF STEP 1 (Aug 2026): "Build a new plan" sits at the BOTTOM. It used to
+  sit directly under the starters, where it read as a third equally-weighted
+  choice and pulled new users into an authoring task before they had seen a
+  single curve. It is the escape hatch for someone who has looked at every
+  saved and preset schedule and found nothing — so it comes after those lists,
+  not before them.
+
+  STARTERS COME FROM THE DB (Aug 2026). The two big cards used to be
+  BISQUE_POINTS / GLAZE_POINTS declared right here — a second source of curves
+  alongside schedule_library, free to drift from it, and carrying a 2h
+  cool-down that no kiln can do. Now they are library rows with
+  `starter_rank` set (see migrations/20260819_starter_schedules.sql), so a
+  starter is editable, duplicable and inspectable like any other schedule, and
+  there is exactly ONE place curves live. Nothing is hardcoded as a fallback on
+  purpose: if the library fails to load there is no curve to show, and quietly
+  substituting a fake one is worse than showing the presets list.
+
+  BUILDING a curve is NOT in this modal: it routes to /schedules/new instead.
+  Authoring is a task, not a tap — the sheet caps at 88dvh, which leaves no room
+  to drag points on a phone, and a curve drawn here used to evaporate unless the
+  user happened to tick "save to library". The editor makes saving the default.
+
+  CONE PACK: the witness cones planned for this firing travel with the plan —
+  chosen when the kiln is loaded, not mid-firing. Copied from the chosen
+  schedule; ConePackEditor lives in the Adjust-curve expander.
 
   SCROLL: the scroll pane is `flex-1 min-h-0 overflow-y-auto` and its CONTENT
   is a plain block (space-y-*), NOT a flex column. A flex-col scroll pane lets
@@ -51,9 +73,10 @@
         <!-- ════ STEP 1 — PICK A PLAN ════════════════════════════════════════ -->
         <div v-if="step === 'pick'" class="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 sm:px-6 py-4 space-y-4">
 
-          <!-- Starters: side by side they get ~134px each at 320px, which
-               smears the sparkline; they stack below 380px. -->
-          <div class="grid grid-cols-1 min-[380px]:grid-cols-2 gap-3">
+          <!-- Starters (schedule_library rows with starter_rank set).
+               Side by side they get ~134px each at 320px, which smears the
+               sparkline, so they stack below 380px. -->
+          <div v-if="starters.length" class="grid grid-cols-1 min-[380px]:grid-cols-2 gap-3">
             <button
               v-for="s in starters" :key="s.token"
               class="flex flex-col gap-2 p-3 rounded-xl border border-parchment-3 bg-white text-left transition-colors hover:border-flame/50"
@@ -61,22 +84,17 @@
               @click="pick(s.token)"
             >
               <div class="rounded-lg overflow-hidden" :style="{ background: themeForType(s.type).groundBg }">
-                <ScheduleSparkline :points="s.points" :width="240" :height="52" :stroke="themeForType(s.type).stroke" :fill="themeForType(s.type).fill" class="w-full" style="height:52px" />
+                <ScheduleSparkline :points="s.points" :reductions="s.reductions" :width="240" :height="52" :stroke="themeForType(s.type).stroke" :fill="themeForType(s.type).fill" class="w-full" style="height:52px" />
               </div>
-              <span class="text-sm font-bold text-ink">{{ s.label }}</span>
+              <span class="text-sm font-bold text-ink">{{ s.name }}</span>
               <span class="text-[11px] text-ink-muted leading-snug">{{ s.sub }}</span>
             </button>
           </div>
 
-          <!-- Blank — up top, but quiet -->
-          <button class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl border border-dashed border-parchment-4 hover:border-flame/50 transition-colors text-left" @click="pick('blank')">
-            <svg class="w-4 h-4 text-ink-faint shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-            <span class="flex-1 min-w-0">
-              <span class="block text-sm font-semibold text-ink">Blank curve</span>
-              <span class="block text-[11px] text-ink-muted">Draw your own plan from scratch</span>
-            </span>
-            <svg class="w-4 h-4 text-ink-faint shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
-          </button>
+          <!-- Library still in flight. Placeholders, not a fake curve. -->
+          <div v-else-if="!library.length" class="grid grid-cols-1 min-[380px]:grid-cols-2 gap-3">
+            <div v-for="n in 2" :key="'sk'+n" class="h-[136px] rounded-xl border border-parchment-3 bg-white/60 animate-pulse" />
+          </div>
 
           <!-- Your schedules (collapsed) -->
           <section v-if="myLibrary.length" class="space-y-1.5">
@@ -89,8 +107,9 @@
             </template>
           </section>
 
-          <!-- Presets (collapsed) -->
-          <section class="space-y-1.5">
+          <!-- Presets (collapsed). Starters are excluded — they are already
+               the two cards above, and listing them twice reads as clutter. -->
+          <section v-if="presetLibrary.length" class="space-y-1.5">
             <button class="w-full flex items-center justify-between px-1 py-1.5 text-left" @click="showPresets = !showPresets">
               <span class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Preset schedules ({{ presetLibrary.length }})</span>
               <svg class="w-4 h-4 text-ink-faint transition-transform" :class="showPresets ? 'rotate-180' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
@@ -125,6 +144,21 @@
             </template>
           </section>
 
+          <!-- LAST. Authoring a curve is a task, not a tap: it leaves for the
+               full editor, where there is room and where saving is the default.
+               The hairline marks it as the end of the list rather than another
+               item in it. -->
+          <div class="pt-1 border-t border-parchment-3">
+            <button class="w-full flex items-center gap-3 px-3.5 py-2.5 mt-3 rounded-xl border border-dashed border-parchment-4 hover:border-flame/50 transition-colors text-left" @click="goToEditor">
+              <svg class="w-4 h-4 text-ink-faint shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+              <span class="flex-1 min-w-0">
+                <span class="block text-sm font-semibold text-ink">Build a new plan</span>
+                <span class="block text-[11px] text-ink-muted">Opens the schedule editor, then starts firing</span>
+              </span>
+              <svg class="w-4 h-4 text-ink-faint shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M7 17L17 7M7 7h10v10"/></svg>
+            </button>
+          </div>
+
         </div>
 
         <!-- ════ STEP 2 — CONFIRM ════════════════════════════════════════════ -->
@@ -142,7 +176,7 @@
               />
               <span class="flex-1 min-w-0">
                 <span class="block text-sm font-semibold text-ink truncate">{{ planLabel }}</span>
-                <span class="block text-[11px] text-ink-muted">{{ form.schedulePoints.length ? planSummary(form.schedulePoints) : 'Blank — draw your curve below' }}</span>
+                <span class="block text-[11px] text-ink-muted">{{ form.schedulePoints.length ? planSummary(form.schedulePoints) : 'No curve on this plan' }}</span>
               </span>
               <button v-if="!preselect" class="text-xs font-semibold shrink-0 hover:underline" :style="{ color: theme.stroke }" @click="step = 'pick'">Change</button>
             </div>
@@ -159,7 +193,7 @@
               >
             </div>
 
-            <!-- Adjust curve (collapsed; auto-open for blank) -->
+            <!-- Adjust curve (collapsed) -->
             <div class="rounded-xl border border-parchment-3 bg-white overflow-hidden">
               <button class="w-full flex items-center justify-between px-3.5 py-3 text-left" @click="showAdvanced = !showAdvanced">
                 <span class="text-sm font-semibold text-ink">
@@ -237,26 +271,11 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'create'])
 
-const BISQUE_POINTS = [
-  { offsetMinutes: 0,   targetTemp: 20   },
-  { offsetMinutes: 60,  targetTemp: 120  },
-  { offsetMinutes: 180, targetTemp: 600  },
-  { offsetMinutes: 300, targetTemp: 1000 },
-  { offsetMinutes: 360, targetTemp: 1000 },
-  { offsetMinutes: 480, targetTemp: 80   },
-]
-const GLAZE_POINTS = [
-  { offsetMinutes: 0,   targetTemp: 20   },
-  { offsetMinutes: 60,  targetTemp: 200  },
-  { offsetMinutes: 180, targetTemp: 600  },
-  { offsetMinutes: 360, targetTemp: 1280 },
-  { offsetMinutes: 480, targetTemp: 1280 },
-  { offsetMinutes: 600, targetTemp: 100  },
-]
+const router = useRouter()
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const step                 = ref('pick')            // 'pick' | 'confirm'
-const startFrom            = ref('starter:bisque')
+const startFrom            = ref('')                // '' | 'lib:N' | 'past:N' | 'preselect'
 const pickedType           = ref('bisque')          // drives themeForType
 const loadingPast          = ref(false)
 const nameAutoFilled       = ref(true)
@@ -282,21 +301,40 @@ const form = reactive({
 
 const theme = computed(() => themeForType(pickedType.value))
 
-const starters = [
-  { token: 'starter:bisque', type: 'bisque', label: 'Bisque firing', sub: 'First fire of raw clay · ~8h to 1000°C', points: BISQUE_POINTS },
-  { token: 'starter:glaze',  type: 'glaze',  label: 'Glaze firing',  sub: 'Glaze fire · ~10h to 1280°C',           points: GLAZE_POINTS },
-]
-
-// ── Source groupings ──────────────────────────────────────────────────────────
-const myLibrary     = computed(() => props.library.filter(l => l.user_id !== null))
-const presetLibrary = computed(() => props.library.filter(l => l.user_id === null))
-const presetTypes   = computed(() => [...new Set(presetLibrary.value.map(l => l.type))].sort())
-function presetsOfType(type) { return presetLibrary.value.filter(l => l.type === type) }
-
 // db points → editor shape
 function normPoints(points) {
   return (points ?? []).map(p => ({ offsetMinutes: p.offset_minutes, targetTemp: p.target_temp }))
 }
+
+// ── Source groupings ──────────────────────────────────────────────────────────
+// A starter is just a built-in with starter_rank set (migration
+// 20260819_starter_schedules.sql). Rank ascending is the card order.
+const starters = computed(() =>
+  props.library
+    .filter(l => l.user_id === null && l.starter_rank != null)
+    .sort((a, b) => a.starter_rank - b.starter_rank)
+    .map(l => ({
+      token:      `lib:${l.id}`,
+      type:       l.type ?? 'other',
+      name:       l.name,
+      // The card's second line is editorial copy, so it comes from the row.
+      // planSummary is the fallback, never nothing.
+      sub:        l.description || planSummary(normPoints(l.points)),
+      points:     normPoints(l.points),
+      reductions: l.reductions ?? [],
+    }))
+)
+
+const myLibrary     = computed(() => props.library.filter(l => l.user_id !== null))
+const presetLibrary = computed(() => props.library.filter(l => l.user_id === null && l.starter_rank == null))
+const presetTypes   = computed(() => [...new Set(presetLibrary.value.map(l => l.type))].sort())
+function presetsOfType(type) { return presetLibrary.value.filter(l => l.type === type) }
+
+// No starters flagged (fresh db, or the flag was cleared) — open the presets
+// list so step 1 is never a dead end. Deliberately NOT a hardcoded curve.
+watch([starters, () => props.library], () => {
+  if (props.library.length && !starters.value.length) showPresets.value = true
+})
 
 // Matches the schedules-page card meta: "999°C peak · 13h"
 function planSummary(pts) {
@@ -337,10 +375,7 @@ ScheduleRow.props = ['schedule']
 ScheduleRow.emits = ['pick']
 
 const planLabel = computed(() => {
-  if (props.preselect)                       return props.preselect.name || 'Loaded plan'
-  if (startFrom.value === 'blank')           return 'Blank curve'
-  if (startFrom.value === 'starter:bisque')  return 'Bisque starter'
-  if (startFrom.value === 'starter:glaze')   return 'Glaze starter'
+  if (props.preselect) return props.preselect.name || 'Loaded plan'
   if (startFrom.value.startsWith('lib:')) {
     return props.library.find(l => String(l.id) === startFrom.value.slice(4))?.name ?? 'Schedule'
   }
@@ -355,9 +390,6 @@ function todayShort() {
   return new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })
 }
 function suggestedName(token) {
-  if (token === 'starter:bisque') return `Bisque firing — ${todayShort()}`
-  if (token === 'starter:glaze')  return `Glaze firing — ${todayShort()}`
-  if (token === 'blank')          return `Firing — ${todayShort()}`
   if (token.startsWith('lib:')) {
     const lib = props.library.find(l => String(l.id) === token.slice(4))
     return lib ? `${lib.name} — ${todayShort()}` : ''
@@ -388,31 +420,21 @@ function onReductionsSaved(list) {
   showReductionPlanner.value = false
 }
 
+// Leaves the modal entirely. ?then=fire makes the editor's save go straight to
+// starting the firing rather than dropping the user on the schedule page.
+function goToEditor() {
+  emit('close')
+  router.push('/schedules/new?then=fire')
+}
+
 // ── Pick (step 1 → step 2) ────────────────────────────────────────────────────
+// Starters land here as plain `lib:` tokens — there is no separate branch for
+// them, which is the point of moving them into the library.
 async function pick(token) {
   startFrom.value = token
   if (nameAutoFilled.value) form.name = suggestedName(token)
 
-  if (token === 'blank') {
-    form.schedulePoints = []
-    reductions.value    = []
-    conePack.value      = []
-    targetCone.value    = ''
-    pickedType.value    = 'other'
-    showAdvanced.value  = true         // blank is meaningless without the editor
-  } else if (token === 'starter:bisque') {
-    form.schedulePoints = BISQUE_POINTS.map(p => ({ ...p }))
-    reductions.value    = []
-    conePack.value      = ['07', '06', '05']   // guide / target / guard
-    targetCone.value    = '06'
-    pickedType.value    = 'bisque'
-  } else if (token === 'starter:glaze') {
-    form.schedulePoints = GLAZE_POINTS.map(p => ({ ...p }))
-    reductions.value    = []
-    conePack.value      = ['9', '10', '11']
-    targetCone.value    = '10'
-    pickedType.value    = 'glaze'
-  } else if (token.startsWith('lib:')) {
+  if (token.startsWith('lib:')) {
     const lib = props.library.find(l => String(l.id) === token.slice(4))
     if (lib) {
       form.schedulePoints = normPoints(lib.points)
@@ -472,7 +494,7 @@ watch(() => props.open, (val) => {
     nameAutoFilled.value = false
     step.value           = 'confirm'
   } else {
-    startFrom.value     = 'starter:bisque'
+    startFrom.value     = ''
     pickedType.value    = 'bisque'
     form.schedulePoints = []
     reductions.value    = []

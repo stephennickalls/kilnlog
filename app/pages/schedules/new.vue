@@ -3,6 +3,20 @@
   Two modes in one page: plain create (seeded from the library) and
   from-firing (?fromFiring=id), where a real firing's readings are simplified
   into a reusable curve via the detail slider.
+
+  ?then=fire means the user arrived from Start firing's "Build a new plan", so
+  saving lights the firing rather than dropping them on the schedule page.
+
+  CURVE GENERATION (Aug 2026): the local BISQUE_DEFAULT constant is gone. Type
+  and cone now drive the curve through useAutoCurve — pick either one in either
+  order and the curve rebuilds from the pair. That rule and the profiles behind
+  it live in useStarterCurve.js, shared with /schedules/[id] and with the Steps
+  table's quick starts, because five copies of "a reasonable bisque" in five
+  files is how they all ended up different.
+
+  The rebuild is only silent while the curve is still machine-made. Once the
+  points came from somewhere real — a library seed, a firing's readings, a drag
+  in the editor — changing type or cone offers a rebuild instead of taking one.
 -->
 <template>
   <div class="min-h-screen bg-parchment font-serif">
@@ -34,6 +48,12 @@
     </div>
 
     <main v-else class="max-w-2xl mx-auto px-4 sm:px-6 py-6 pb-safe flex flex-col gap-5 min-w-0">
+
+      <!-- Arrived from Start firing: say where this ends up. -->
+      <div v-if="startAfterSave" class="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-flame-bg border border-flame/20 text-sm text-flame-dark min-w-0">
+        <svg class="w-4 h-4 shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+        <span class="min-w-0 break-words">Build your plan here — saving it will start the firing.</span>
+      </div>
 
       <!-- ── FROM-FIRING: source badge + slider ────────────────────────── -->
       <template v-if="isFromFiring">
@@ -76,13 +96,16 @@
       </template>
 
       <!-- ── PLAIN CREATE: seed from library ──────────────────────────── -->
+      <!-- "Blank curve" is not blank: it regenerates from the current type and
+           cone, because an empty grid is a worse starting point than a
+           conventional curve you can drag. -->
       <template v-else>
         <div class="flex flex-col gap-1.5">
           <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Start from</label>
           <div class="relative">
             <select v-model="selectedLibraryId"
               class="input rounded-xl px-4 py-2.5 pr-9 appearance-none focus:border-flame focus:ring-flame/10">
-              <option value="">Blank curve</option>
+              <option value="">Standard curve for this type and cone</option>
               <optgroup v-if="userSchedules.length" label="Your schedules">
                 <option v-for="s in userSchedules" :key="s.id" :value="s.id">{{ s.name }}</option>
               </optgroup>
@@ -147,6 +170,16 @@
             </button>
           </div>
         </div>
+
+        <!-- Only appears when the curve is the user's own work and the type or
+             cone moved under it. -->
+        <CurveRebuildBar
+          :visible="curveOffer"
+          :label="curveRebuildLabel"
+          @apply="rebuildCurve"
+          @dismiss="dismissCurveOffer"
+        />
+
         <!-- From-firing: raw readings faint underneath -->
         <ScheduleCurveEditor
           v-if="isFromFiring"
@@ -157,7 +190,14 @@
           :fill="theme.fill"
           @update:model-value="onEditorChange"
         />
-        <ScheduleCurveEditor v-else v-model="editPoints" :reductions="editReductions" :stroke="theme.stroke" :fill="theme.fill" />
+        <ScheduleCurveEditor
+          v-else
+          :model-value="editPoints"
+          :reductions="editReductions"
+          :stroke="theme.stroke"
+          :fill="theme.fill"
+          @update:model-value="onEditorChange"
+        />
         <div class="pt-3 border-t border-parchment-3">
           <ConePackEditor v-model="editConePack" :target-cone="form.cone" />
         </div>
@@ -169,7 +209,7 @@
           class="w-full min-h-[44px] py-2.5 bg-flame hover:bg-flame-dark text-parchment text-sm font-bold rounded-xl transition-colors disabled:opacity-40"
           :disabled="saving || !form.name.trim()"
           @click="save"
-        >{{ saving ? 'Saving…' : 'Save schedule' }}</button>
+        >{{ saving ? 'Saving…' : (startAfterSave ? 'Save & start firing →' : 'Save schedule') }}</button>
       </div>
 
     </main>
@@ -205,20 +245,14 @@ import { simplify, SUGGESTED_EPSILON, detailToEpsilon, epsilonToDetail } from '~
 
 definePageMeta({ middleware: ['auth'], path: '/schedules/new' })
 
-const BISQUE_DEFAULT = [
-  { offsetMinutes: 0,   targetTemp: 20   },
-  { offsetMinutes: 60,  targetTemp: 120  },
-  { offsetMinutes: 180, targetTemp: 600  },
-  { offsetMinutes: 300, targetTemp: 1000 },
-  { offsetMinutes: 360, targetTemp: 1000 },
-  { offsetMinutes: 480, targetTemp: 80   },
-]
-
 const route  = useRoute()
 const router = useRouter()
 
 const fromFiringId = computed(() => route.query.fromFiring ? Number(route.query.fromFiring) : null)
 const isFromFiring = computed(() => !!fromFiringId.value)
+
+// From StartFiringModal's "Build a new plan": save should light the firing.
+const startAfterSave = computed(() => route.query.then === 'fire')
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const loadingFiring     = ref(false)
@@ -236,12 +270,26 @@ const regenerating      = ref(false)
 
 // Shared
 const form       = reactive({ name: '', type: 'bisque', cone: '', description: '' })
-const editPoints = ref(BISQUE_DEFAULT.map(p => ({ ...p })))
+const editPoints = ref([])
 const theme      = computed(() => themeForType(form.type))
 
 const editReductions       = ref([])   // [{ startTemp, endTemp|null, kind }] °C
 const editConePack         = ref([])   // planned witness cones — names
 const showReductionPlanner = ref(false)
+
+// ── Type + cone → curve ───────────────────────────────────────────────────────
+// From-firing points are derived from real readings, so they start adopted,
+// not generated: changing the type there must never wipe the simplified curve.
+// A plain create starts generated and rebuilds freely until the user drags a
+// point or seeds from the library.
+const {
+  offer:        curveOffer,
+  label:        curveRebuildLabel,
+  rebuild:      rebuildCurve,
+  adopt:        adoptCurve,
+  markEdited:   markCurveEdited,
+  dismissOffer: dismissCurveOffer,
+} = useAutoCurve(form, editPoints, { generated: !isFromFiring.value })
 
 function onReductionsSaved(list) {
   editReductions.value = list
@@ -257,7 +305,12 @@ const presetSchedules   = computed(() => librarySchedules.value.filter(s => s.us
 // ── Mount ─────────────────────────────────────────────────────────────────────
 onMounted(async () => {
   if (!isFromFiring.value) {
+    // Something conventional on screen before the library request returns.
+    // useAutoCurve redoes this once /api/cones lands with the real cone
+    // temperature, since until then the peak is only a type fallback.
+    rebuildCurve()
     try { librarySchedules.value = await $fetch('/api/schedules') } catch {}
+    if (startAfterSave.value) form.name = `Firing — ${todayShort()}`
     return
   }
 
@@ -285,6 +338,11 @@ onMounted(async () => {
     initialSimplified.value = initPts.map(p => ({ ...p }))
     editPoints.value        = initPts.map(p => ({ ...p }))
 
+    // Before form.type is assigned: that assignment would otherwise be read as
+    // the user changing the type and raise a rebuild offer over a curve they
+    // never chose.
+    adoptCurve()
+
     form.name = `${data.name} (from ${formatFiringDate(data.started_at ?? data.created_at)})`
     form.type = guessType(data.name)
 
@@ -300,6 +358,9 @@ onMounted(async () => {
   loadingFiring.value = false
 })
 
+function todayShort() {
+  return new Date().toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })
+}
 function formatFiringDate(unix) {
   if (!unix) return 'firing'
   return new Date(unix * 1000).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })
@@ -318,10 +379,12 @@ function flash(msg) {
 // ── Seed from library ─────────────────────────────────────────────────────────
 watch(selectedLibraryId, (val) => {
   if (!val) {
-    editPoints.value     = BISQUE_DEFAULT.map(p => ({ ...p }))
+    // Back to generated. The type and cone on screen still stand, so this
+    // rebuilds from them rather than clearing to an empty grid.
     editReductions.value = []   // blank slate, no leak from the last pick
     editConePack.value   = []
-    form.name = ''; form.type = 'glaze'; form.cone = ''
+    form.name = ''
+    rebuildCurve()
     return
   }
   const sched = librarySchedules.value.find(s => s.id === Number(val))
@@ -334,6 +397,10 @@ watch(selectedLibraryId, (val) => {
     .filter(r => r.start_temp != null)
     .map(r => ({ startTemp: r.start_temp, endTemp: r.end_temp ?? null, kind: r.kind }))
   editConePack.value = [...(sched.cone_pack ?? [])]
+
+  // Before the type/cone assignments below, for the same reason as from-firing.
+  adoptCurve()
+
   form.name = ''
   form.type = sched.type ?? 'glaze'
   form.cone = sched.cone ?? ''
@@ -348,17 +415,20 @@ watch(slider, (val) => {
   regenerating.value   = true
   editPoints.value     = newPts.map(p => ({ ...p }))
   hasManualEdits.value = false
+  adoptCurve()          // simplified readings, not a generated curve
   nextTick(() => { regenerating.value = false })
 })
 
 function onEditorChange(pts) {
   editPoints.value = pts
   if (!regenerating.value) hasManualEdits.value = true
+  markCurveEdited()
 }
 function resetToInitial() {
   regenerating.value   = true
   editPoints.value     = initialSimplified.value.map(p => ({ ...p }))
   hasManualEdits.value = false
+  adoptCurve()
   nextTick(() => { regenerating.value = false })
 }
 
@@ -380,6 +450,12 @@ async function save() {
         conePack:    editConePack.value,
       },
     })
+    // Came from Start firing: save and light it, rather than dropping the user
+    // on the schedule page to find the button.
+    if (startAfterSave.value) {
+      router.replace(`/app?startSchedule=${result.id}`)
+      return
+    }
     router.replace(`/schedules/${result.id}`)
   } catch (err) {
     flash(`Couldn't save: ${err?.data?.message ?? err.message ?? 'error'}`)

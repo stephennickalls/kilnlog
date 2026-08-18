@@ -1,39 +1,13 @@
 // File: app/composables/useKilnChart.js
 //
-// G11 CHANGE SUMMARY (search "G11" for the spots):
-//   - reductionBandsPlugin: shaded vertical bands behind the curves, mapped
-//     temperature → x(minutes) using the ACTUAL readings curve. beforeDatasetsDraw.
-//   - setReductions(periods) + lastReductions cache (replayed on rebuild).
-//
-// NOW-LINE CHANGE SUMMARY (search "NOW-LINE"):
-//   - nowLinePlugin: vertical "you are here" line at the current elapsed minute,
-//     afterDatasetsDraw (on top). Shows the PLANNED target temp at this moment.
-//   - setNowLine(startedAt) + clearNowLine(). Live firings only.
-//
-// G1 °F CHANGE SUMMARY (search "G1"):
-//   - The chart's DATA stays in °C (all datasets, interpolation, autoFitY,
-//     reduction-band temp mapping, now-line target lookup). Only LABELS shown to
-//     the user convert: y-axis tick callback, tooltip, curve labels, and the
-//     now-line target label. Conversion uses useTempUnit.
-//   - setUnit() lets the parent force a re-render (axis ticks + labels) when the
-//     user flips the toggle. The unit ref is captured once; we read .value at
-//     draw/format time so it's always current, and setUnit() triggers a redraw.
-//
-// CONE DROPS CHANGE SUMMARY (Aug 2026, search "CONE DROPS"):
-//   - coneDropsPlugin: ▽ marker + cone label at each witnessed drop,
-//     afterDatasetsDraw (on top, same layer as the now-line). y-position is the
-//     snapshotted temp_at_drop when present, else the actual curve at that
-//     minute; the marker floats above the line so it never sits on the stroke.
-//   - setConeDrops(drops, startedAt) maps rows → { cone, minutes, tempC } and
-//     caches in lastConeDrops (already-mapped, so rebuild needs no replay call —
-//     the plugin reads the cache directly).
+// Layers, bottom to top: cone ruler, atmosphere bands, datasets, now-line,
+// cone drops. All DATA is °C; only labels convert (useTempUnit).
 
 import { nextTick } from 'vue'
 import { Chart, registerables } from 'chart.js'
 
 Chart.register(...registerables)
 
-// ── Zoom plugin: browser-only, lazy registration ──────────────────────────────
 let zoomReady = false
 let zoomRegisterPromise = null
 
@@ -42,17 +16,20 @@ function ensureZoomPlugin() {
   if (!import.meta.client) return Promise.resolve()
   if (zoomRegisterPromise) return zoomRegisterPromise
   zoomRegisterPromise = import('chartjs-plugin-zoom')
-    .then(({ default: zoomPlugin }) => {
-      Chart.register(zoomPlugin)
-      zoomReady = true
-      console.debug('[useKilnChart] zoom plugin registered (lazy)')
-    })
+    .then(({ default: zoomPlugin }) => { Chart.register(zoomPlugin); zoomReady = true })
     .catch(err => console.error('[useKilnChart] FAILED to register zoom plugin:', err))
   return zoomRegisterPromise
 }
 
+// Right-hand room for cone labels ("06 · 999°"); collapses when there are none.
+const CONE_GUTTER = 62
+const NO_CONE_GUTTER = 8
+
+// Fallback ruler density when the firing has no cone pack.
+const MAX_CONE_LINES = 6
+const MIN_CONE_GAP_C = 25
+
 export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showLabels = false } = {}) {
-  // G1: conversion helpers. Read .value at draw/format time → always current.
   const { unitLabel, isF } = useTempUnit()
   const cToDisplay = (c) => (isF.value ? c * 9 / 5 + 32 : c)
 
@@ -62,13 +39,16 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
   let lastSchedule   = { points: [], offset: 0 }
   let lastReadings   = { rows: [], startedAt: 0 }
   let lastReductions = []
-  let lastReductionsStartedAt = 0   // REDUCTION-TIME: firing start for time-anchored bands
-  let lastConeDrops  = []        // CONE DROPS: [{ cone, minutes, tempC|null }]
+  let lastReductionsStartedAt = 0
+  let lastConeDrops  = []        // [{ cone, minutes, tempC|null }]
+  let lastCones      = []        // [{ name, temp_c }]
+  let targetConeName = null
+  let packNames      = []        // firing's planned cone pack; [] = no pack
 
-  let reductionBands = []        // G11: { startX, endX, open } in minutes
-  let nowLine = null             // NOW-LINE: null | { minutes, targetTemp (°C) }
+  let coneLines      = []        // [{ name, tempC, target }]
+  let reductionBands = []        // [{ startX, endX, open, planned, kind }]
+  let nowLine        = null      // null | { minutes, targetTemp (°C) }
 
-  // G1: curve label plugin — converts the °C data point to the display unit.
   const curveLabelsPlugin = {
     id: 'curveLabels',
     afterDatasetsDraw(chart) {
@@ -80,138 +60,196 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
         ctx.font = 'bold 10px sans-serif'
         ctx.fillStyle = '#78716c'
         ctx.textAlign = 'center'
+        ctx.textBaseline = 'alphabetic'
         scheduleData.forEach((pt, i) => {
-          const meta = chart.getDatasetMeta(0)
-          const el   = meta.data[i]
+          const el = chart.getDatasetMeta(0).data[i]
           if (!el) return
           const { x, y } = el.getProps(['x', 'y'], true)
-          const offset = i % 2 === 0 ? -14 : 14
-          ctx.fillText(`${Math.round(cToDisplay(pt.y))}°`, x, y + offset)
+          ctx.fillText(`${Math.round(cToDisplay(pt.y))}°`, x, y + (i % 2 === 0 ? -14 : 14))
         })
         ctx.restore()
       }
 
       const actualData = chart.data.datasets[1]?.data ?? []
       if (actualData.length) {
-        const meta    = chart.getDatasetMeta(1)
         const lastIdx = actualData.length - 1
-        const el      = meta.data[lastIdx]
+        const el = chart.getDatasetMeta(1).data[lastIdx]
         if (el) {
           const { x, y } = el.getProps(['x', 'y'], true)
-          const lastPt   = actualData[lastIdx]
           ctx.save()
           ctx.font      = 'bold 11px sans-serif'
           ctx.fillStyle = '#f97316'
           ctx.textAlign = 'left'
-          ctx.fillText(`${Math.round(cToDisplay(lastPt.y))}°`, x + 5, y - 6)
+          ctx.textBaseline = 'alphabetic'
+          ctx.fillText(`${Math.round(cToDisplay(actualData[lastIdx].y))}°`, x + 5, y - 6)
           ctx.restore()
         }
       }
     },
   }
 
-  // G11: map a temperature (°C) to the x(minute) where the ACTUAL curve first
-  // reaches it. Data is °C, so this stays °C.
-  function minuteAtTemp(actualPoints, temp) {
-    if (!actualPoints.length) return null
-    for (let i = 0; i < actualPoints.length - 1; i++) {
-      const a = actualPoints[i], b = actualPoints[i + 1]
+  // ── Cone ruler ─────────────────────────────────────────────────────────────
+  // The ruler IS the pack when the firing has one: the potter already chose
+  // which cones are in the kiln, so no filtering heuristic applies. Without a
+  // pack, fall back to peak-anchored selection — walk down from the plan's peak
+  // keeping lines far enough apart to read. (Anchoring on the plan's FLOOR
+  // would admit the whole Orton table, since every plan starts near room temp.)
+  function computeConeLines() {
+    const temps = [
+      ...(chart?.data?.datasets?.[0]?.data ?? []),
+      ...(chart?.data?.datasets?.[1]?.data ?? []),
+    ].map(p => p.y).filter(v => v != null && isFinite(v))
+
+    if (!lastCones.length || !temps.length) {
+      coneLines = []
+    } else {
+      const peak = Math.max(...temps)
+      let kept
+      let target = null
+
+      if (packNames.length) {
+        const inPack = new Set(packNames)
+        kept = lastCones.filter(c => inPack.has(c.name)).sort((a, b) => a.temp_c - b.temp_c)
+        target = (targetConeName && kept.find(c => c.name === targetConeName))
+          || [...kept].reverse().find(c => c.temp_c <= peak)
+          || kept[kept.length - 1] || null
+      } else {
+        const candidates = lastCones
+          .filter(c => c.temp_c <= peak + 30)
+          .sort((a, b) => b.temp_c - a.temp_c)
+
+        target = (targetConeName && candidates.find(c => c.name === targetConeName))
+          || candidates.find(c => c.temp_c <= peak) || candidates[0] || null
+
+        kept = target ? [target] : []
+        for (const c of candidates) {
+          if (kept.length >= MAX_CONE_LINES) break
+          if (target && c.name === target.name) continue
+          if (kept.some(k => Math.abs(k.temp_c - c.temp_c) < MIN_CONE_GAP_C)) continue
+          kept.push(c)
+        }
+      }
+
+      coneLines = kept.map(c => ({
+        name: c.name,
+        tempC: c.temp_c,
+        target: !!target && c.name === target.name,
+      }))
+    }
+
+    if (chart?.options?.layout?.padding) {
+      chart.options.layout.padding.right = coneLines.length ? CONE_GUTTER : NO_CONE_GUTTER
+    }
+  }
+
+  const coneLinesPlugin = {
+    id: 'coneLines',
+    beforeDatasetsDraw(chart) {
+      if (!coneLines.length) return
+      const { ctx, chartArea, scales } = chart
+      if (!chartArea || !scales?.y) return
+      ctx.save()
+      for (const line of coneLines) {
+        const yPix = scales.y.getPixelForValue(line.tempC)
+        if (yPix < chartArea.top || yPix > chartArea.bottom) continue
+
+        ctx.strokeStyle = line.target ? 'rgba(95,138,120,0.75)' : 'rgba(168,162,158,0.45)'
+        ctx.lineWidth   = line.target ? 1.5 : 1
+        ctx.setLineDash(line.target ? [8, 3] : [4, 5])
+        ctx.beginPath()
+        ctx.moveTo(chartArea.left, yPix)
+        ctx.lineTo(chartArea.right, yPix)
+        ctx.stroke()
+        ctx.setLineDash([])
+
+        ctx.font         = line.target ? 'bold 11px sans-serif' : '10px sans-serif'
+        ctx.fillStyle    = line.target ? 'rgba(63,99,84,1)' : 'rgba(120,113,108,0.9)'
+        ctx.textAlign    = 'left'
+        ctx.textBaseline = 'middle'
+        ctx.fillText(`${line.name} · ${Math.round(cToDisplay(line.tempC))}°`, chartArea.right + 6, yPix)
+      }
+      ctx.restore()
+    },
+  }
+
+  // ── Temp ⇄ time mapping (°C) ───────────────────────────────────────────────
+  function minuteAtTemp(points, temp) {
+    if (!points.length) return null
+    for (let i = 0; i < points.length - 1; i++) {
+      const a = points[i], b = points[i + 1]
       const lo = Math.min(a.y, b.y), hi = Math.max(a.y, b.y)
       if (temp >= lo && temp <= hi) {
         const span = b.y - a.y
-        const frac = span === 0 ? 0 : (temp - a.y) / span
-        return a.x + frac * (b.x - a.x)
+        return a.x + (span === 0 ? 0 : (temp - a.y) / span) * (b.x - a.x)
       }
     }
-    const first = actualPoints[0], last = actualPoints[actualPoints.length - 1]
+    const first = points[0], last = points[points.length - 1]
     if (temp <= Math.min(first.y, last.y)) return first.x
     return null
   }
 
-  // REDUCTION-TIME: like minuteAtTemp, but only considers crossings at or
-  // after fromX — used to place a legacy closed reduction's end without
-  // snapping back to an earlier crossing of the same temperature.
-  function minuteAtTempAfter(actualPoints, temp, fromX) {
-    if (!actualPoints.length) return null
-    for (let i = 0; i < actualPoints.length - 1; i++) {
-      const a = actualPoints[i], b = actualPoints[i + 1]
+  // Crossings at or after fromX only — stops a legacy closed band snapping back
+  // to an earlier crossing of the same temperature and collapsing to a sliver.
+  function minuteAtTempAfter(points, temp, fromX) {
+    if (!points.length) return null
+    for (let i = 0; i < points.length - 1; i++) {
+      const a = points[i], b = points[i + 1]
       if (b.x < fromX) continue
       const lo = Math.min(a.y, b.y), hi = Math.max(a.y, b.y)
       if (temp >= lo && temp <= hi) {
         const span = b.y - a.y
-        const frac = span === 0 ? 0 : (temp - a.y) / span
-        const x = a.x + frac * (b.x - a.x)
+        const x = a.x + (span === 0 ? 0 : (temp - a.y) / span) * (b.x - a.x)
         if (x >= fromX) return x
       }
     }
     return null
   }
 
-  // NOW-LINE: map x(minute) → planned curve's y(temp, °C). Stays °C.
-  // (Generic linear interpolation over {x,y} points — CONE DROPS reuses it
-  // against the ACTUAL curve as the fallback y-position.)
-  function targetAtMinute(plannedPoints, minute) {
-    if (!plannedPoints.length) return null
-    if (minute <= plannedPoints[0].x) return plannedPoints[0].y
-    const last = plannedPoints[plannedPoints.length - 1]
+  function targetAtMinute(points, minute) {
+    if (!points.length) return null
+    if (minute <= points[0].x) return points[0].y
+    const last = points[points.length - 1]
     if (minute >= last.x) return last.y
-    for (let i = 0; i < plannedPoints.length - 1; i++) {
-      const a = plannedPoints[i], b = plannedPoints[i + 1]
+    for (let i = 0; i < points.length - 1; i++) {
+      const a = points[i], b = points[i + 1]
       if (minute >= a.x && minute <= b.x) {
         const span = b.x - a.x
-        const frac = span === 0 ? 0 : (minute - a.x) / span
-        return a.y + frac * (b.y - a.y)
+        return a.y + (span === 0 ? 0 : (minute - a.x) / span) * (b.y - a.y)
       }
     }
     return null
   }
 
-  // REDUCTION-TIME FIX (Aug 2026): live-firing reductions anchor by TIME.
-  // The old temp-only mapping had two live bugs: (1) "start reduction" used the
-  // last reading's temp, so the band's left edge sat at that PAST reading's
-  // minute instead of NOW, and (2) once the next reading landed, the band
-  // appeared to have been running across the whole gap. Now: rows carrying
-  // created_at (all firing reductions) map start = created_at, end = ended_at
-  // or the live NOW minute while open. Rows without timestamps (library
-  // schedules' planned reductions, which have no timeline) keep the original
-  // temp → actual-curve mapping.
+  // ── Atmosphere bands ───────────────────────────────────────────────────────
+  // Live rows anchor by TIME (created_at / ended_at / NOW). origin='planned'
+  // rows have no timeline of their own — their created_at is the firing's
+  // creation moment — so they anchor by TEMP against the PLANNED curve. Keep
+  // these two paths separate.
   function computeReductionBands() {
     const actual = chart?.data?.datasets?.[1]?.data ?? []
     const startedAt = lastReductionsStartedAt
     const bands = []
+
     for (const p of lastReductions) {
       const open = p.end_temp == null && !p.ended_at
+      const kind = p.kind === 'oxidation' ? 'oxidation' : 'reduction'
 
-      // origin === 'planned' rows were inserted with the firing — their
-      // created_at is the firing's creation moment, not a reduction event, so
-      // they must use the temp mapping below. Live rows time-anchor.
       if (startedAt && p.created_at && p.origin !== 'planned') {
-        // Time-anchored (live/ended firing rows)
         const startX = (p.created_at - startedAt) / 60
         let endX
         if (p.ended_at) {
           endX = (p.ended_at - startedAt) / 60
         } else if (open) {
-          endX = (Date.now() / 1000 - startedAt) / 60          // tracks NOW
+          endX = (Date.now() / 1000 - startedAt) / 60
         } else {
-          // Legacy/degraded closed row (end_temp set, ended_at missing — old
-          // data, or a PUT that didn't return ended_at). The FIRST crossing of
-          // end_temp is usually ≤ startX (you end near the temp you started),
-          // which used to collapse the band to a sliver. Scan for a crossing
-          // AFTER startX instead; if none, extend to the last reading.
           const e = minuteAtTempAfter(actual, p.end_temp, startX)
           endX = e !== null ? e
                : (actual.length ? Math.max(actual[actual.length - 1].x, startX) : startX)
         }
-        if (endX < startX) endX = startX
-        bands.push({ startX, endX, open })
+        bands.push({ startX, endX: Math.max(endX, startX), open, planned: false, kind })
         continue
       }
 
-      // Temp-anchored fallback. PLANNED rows map against the PLANNED curve
-      // (dataset 0) — they're intent, visible from the first second, exactly
-      // like the schedule editor's preview. Legacy/other rows keep mapping
-      // against the ACTUAL curve (dataset 1), preserving old behaviour.
       const isPlanned = p.origin === 'planned'
       const source = isPlanned ? (chart?.data?.datasets?.[0]?.data ?? []) : actual
       const startX = minuteAtTemp(source, p.start_temp)
@@ -223,10 +261,24 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
         const e = minuteAtTemp(source, p.end_temp)
         endX = e === null ? (source.length ? source[source.length - 1].x : startX) : e
       }
-      if (endX < startX) [endX] = [startX]
-      bands.push({ startX, endX, open, planned: isPlanned })
+      bands.push({ startX, endX: Math.max(endX, startX), open, planned: isPlanned, kind })
     }
     reductionBands = bands
+  }
+
+  const BAND_STYLE = {
+    reduction: {
+      fill:   { planned: 'rgba(58,90,120,0.06)',  open: 'rgba(58,90,120,0.10)',  closed: 'rgba(58,90,120,0.14)' },
+      stroke: { planned: 'rgba(58,90,120,0.35)',  open: 'rgba(58,90,120,0.55)',  closed: 'rgba(58,90,120,0.45)' },
+      text:   { planned: 'rgba(40,64,87,0.55)',   open: 'rgba(40,64,87,0.9)',    closed: 'rgba(40,64,87,0.75)' },
+      label:  { planned: 'Planned reduction',     open: 'Reduction…',            closed: 'Reduction' },
+    },
+    oxidation: {
+      fill:   { planned: 'rgba(202,138,4,0.06)',  open: 'rgba(202,138,4,0.10)',  closed: 'rgba(202,138,4,0.13)' },
+      stroke: { planned: 'rgba(180,120,20,0.35)', open: 'rgba(180,120,20,0.55)', closed: 'rgba(180,120,20,0.45)' },
+      text:   { planned: 'rgba(146,94,10,0.6)',   open: 'rgba(146,94,10,0.95)',  closed: 'rgba(146,94,10,0.8)' },
+      label:  { planned: 'Planned oxidation',     open: 'Oxidation…',            closed: 'Oxidation' },
+    },
   }
 
   const reductionBandsPlugin = {
@@ -237,30 +289,26 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
       if (!chartArea || !scales?.x) return
       ctx.save()
       for (const band of reductionBands) {
+        const style = BAND_STYLE[band.kind] ?? BAND_STYLE.reduction
+        const state = band.planned ? 'planned' : (band.open ? 'open' : 'closed')
+
         const xPix1 = scales.x.getPixelForValue(band.startX)
         const xPix2 = scales.x.getPixelForValue(band.endX)
         const left  = Math.max(Math.min(xPix1, xPix2), chartArea.left)
         const right = Math.min(Math.max(xPix1, xPix2), chartArea.right)
         const width = Math.max(right - left, 1.5)
 
-        // Planned bands are intent — fainter than lived reality.
-        ctx.fillStyle = band.planned
-          ? 'rgba(58,90,120,0.06)'
-          : (band.open ? 'rgba(58,90,120,0.10)' : 'rgba(58,90,120,0.14)')
+        ctx.fillStyle = style.fill[state]
         ctx.fillRect(left, chartArea.top, width, chartArea.bottom - chartArea.top)
 
-        ctx.strokeStyle = band.planned
-          ? 'rgba(58,90,120,0.35)'
-          : (band.open ? 'rgba(58,90,120,0.55)' : 'rgba(58,90,120,0.45)')
+        ctx.strokeStyle = style.stroke[state]
         ctx.lineWidth = 1
         ctx.setLineDash([3, 3])
         ctx.beginPath()
         ctx.moveTo(left, chartArea.top)
         ctx.lineTo(left, chartArea.bottom)
         ctx.stroke()
-        // REDUCTION-TIME: closed live bands and bounded planned bands get a
-        // dashed RIGHT edge; open live bands stay right-edge-less — their edge
-        // is the advancing NOW.
+        // Open live bands get no right edge: their edge is the advancing NOW.
         if (band.planned || !band.open) {
           ctx.beginPath()
           ctx.moveTo(right, chartArea.top)
@@ -271,15 +319,12 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
 
         if (width > 30) {
           ctx.font = 'bold 9px sans-serif'
-          ctx.fillStyle = band.planned ? 'rgba(40,64,87,0.55)' : (band.open ? 'rgba(40,64,87,0.9)' : 'rgba(40,64,87,0.75)')
+          ctx.fillStyle = style.text[state]
           ctx.textAlign = 'left'
-          ctx.fillText(
-            band.planned ? 'Planned reduction' : (band.open ? 'Reduction…' : 'Reduction'),
-            left + 4,
-            // Planned label sits one line lower so a live band drawn over the
-            // same span doesn't collide with it.
-            chartArea.top + (band.planned ? 24 : 12)
-          )
+          ctx.textBaseline = 'alphabetic'
+          // Planned label sits a line lower so a live band over the same span
+          // doesn't collide with it.
+          ctx.fillText(style.label[state], left + 4, chartArea.top + (band.planned ? 24 : 12))
         }
       }
       ctx.restore()
@@ -315,7 +360,6 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
       ctx.textBaseline = 'middle'
       ctx.fillText(tag, tagX + 4, chartArea.top + 7)
 
-      // Target marker — nowLine.targetTemp is °C; y-scale is °C; label converts.
       if (nowLine.targetTemp !== null && nowLine.targetTemp !== undefined) {
         const yPix = scales.y.getPixelForValue(nowLine.targetTemp)
         if (yPix >= chartArea.top && yPix <= chartArea.bottom) {
@@ -329,24 +373,19 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
 
           const label = `target ${Math.round(cToDisplay(nowLine.targetTemp))}°`
           ctx.font = 'bold 10px sans-serif'
-          const lblW = ctx.measureText(label).width
-          const nearRight = xPix + 8 + lblW > chartArea.right
+          const nearRight = xPix + 8 + ctx.measureText(label).width > chartArea.right
           ctx.textAlign = nearRight ? 'right' : 'left'
           ctx.textBaseline = 'middle'
           ctx.fillStyle = 'rgba(58,90,72,0.95)'
           ctx.fillText(label, xPix + (nearRight ? -8 : 8), yPix)
         }
       }
-
       ctx.restore()
     },
   }
 
-  // CONE DROPS: ▽ marker + cone label at each witnessed drop. Drawn on top
-  // (afterDatasetsDraw, same layer as the now-line). Celadon, matching the
-  // Cone-down button — heat-work witnessed is the celadon event. y comes from
-  // the snapshotted temp when present, else the actual curve at that minute;
-  // the marker floats above so it never sits on the orange stroke.
+  // Marker + label per witnessed drop, plus a hairline to that cone's reference
+  // line. The gap between the two is the kiln's calibration, so it is drawn.
   const coneDropsPlugin = {
     id: 'coneDrops',
     afterDatasetsDraw(chart) {
@@ -364,7 +403,22 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
           ? chartArea.top + 26
           : Math.max(chartArea.top + 22, scales.y.getPixelForValue(tempC) - 20)
 
-        // ▽ marker — celadon (#5f8a78), white stroke for lift off the curves
+        const ref = coneLines.find(l => l.name === d.cone)
+        if (ref && tempC != null) {
+          const refY  = scales.y.getPixelForValue(ref.tempC)
+          const dropY = scales.y.getPixelForValue(tempC)
+          if (Math.abs(refY - dropY) > 2 && refY >= chartArea.top && refY <= chartArea.bottom) {
+            ctx.strokeStyle = 'rgba(95,138,120,0.5)'
+            ctx.lineWidth = 1
+            ctx.setLineDash([2, 3])
+            ctx.beginPath()
+            ctx.moveTo(xPix, dropY)
+            ctx.lineTo(xPix, refY)
+            ctx.stroke()
+            ctx.setLineDash([])
+          }
+        }
+
         ctx.beginPath()
         ctx.moveTo(xPix - 8, yPix - 6)
         ctx.lineTo(xPix + 8, yPix - 6)
@@ -376,7 +430,6 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
         ctx.lineWidth = 1.5
         ctx.stroke()
 
-        // cone label above — celadon-dark
         ctx.font = 'bold 12px sans-serif'
         ctx.textAlign = 'center'
         ctx.textBaseline = 'bottom'
@@ -390,14 +443,12 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
   function isAlive() {
     if (!chart || !canvasRef.value) return false
     if (chart.canvas !== canvasRef.value) return false
-    if (!canvasRef.value.isConnected) return false
-    return true
+    return canvasRef.value.isConnected
   }
 
   function ensureAlive() {
     if (isAlive()) return true
     if (!canvasRef.value || !canvasRef.value.isConnected) return false
-    console.debug('[useKilnChart] chart not alive — rebuilding')
     rebuild()
     return isAlive()
   }
@@ -409,41 +460,33 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     if (lastSchedule.points.length) setSchedule(lastSchedule.points, lastSchedule.offset)
     if (lastReadings.rows.length)   setReadings(lastReadings.rows, lastReadings.startedAt)
     if (lastReductions.length)      setReductions(lastReductions, lastReductionsStartedAt)
-    // CONE DROPS: lastConeDrops is cached already-mapped; the plugin reads it
-    // directly, so no replay call is needed here.
+    computeConeLines()
+    // lastConeDrops is cached already-mapped; the plugin reads it directly.
   }
 
-  // autoFitY works in °C (the data space). The axis is °C; only tick LABELS
-  // convert. This keeps the fit identical regardless of unit.
+  // Fits in °C (the data space); only tick labels convert.
   function autoFitY() {
     if (!chart) return
     const allPoints = [
       ...(chart.data.datasets[0]?.data ?? []),
       ...(chart.data.datasets[1]?.data ?? []),
     ].map(p => p.y).filter(v => v != null && isFinite(v))
-
     if (!allPoints.length) return
 
     const dataMax = Math.max(...allPoints)
     const dataMin = Math.min(...allPoints)
+    const range    = Math.max(dataMax - dataMin, 200)
+    const headroom = range * 0.15
 
-    const range      = Math.max(dataMax - dataMin, 200)
-    const headroom   = range * 0.15
-    const yMax       = Math.min(Math.ceil(dataMax + headroom), 1500)
-    const yMin       = Math.max(Math.floor(dataMin - headroom * 0.5), 0)
-
-    chart.options.scales.y.min          = yMin
-    chart.options.scales.y.suggestedMax = yMax
-    chart.options.scales.y.max          = yMax
+    chart.options.scales.y.min          = Math.max(Math.floor(dataMin - headroom * 0.5), 0)
+    chart.options.scales.y.max          = Math.min(Math.ceil(dataMax + headroom), 1500)
+    chart.options.scales.y.suggestedMax = chart.options.scales.y.max
   }
 
   async function init() {
     await ensureZoomPlugin()
     if (!canvasRef.value) await nextTick()
-    if (!canvasRef.value) {
-      console.warn('[useKilnChart] init() — canvas ref still null after nextTick; skipping build')
-      return
-    }
+    if (!canvasRef.value) return
     buildChart()
   }
 
@@ -451,10 +494,12 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     if (!canvasRef.value) return
     if (chart) { try { chart.destroy() } catch {} }
 
-    // CONE DROPS: coneDropsPlugin added to the always-on set.
-    const extraPlugins = [reductionBandsPlugin, nowLinePlugin, coneDropsPlugin, ...(showLabels ? [curveLabelsPlugin] : [])]
+    const extraPlugins = [
+      coneLinesPlugin, reductionBandsPlugin, nowLinePlugin, coneDropsPlugin,
+      ...(showLabels ? [curveLabelsPlugin] : []),
+    ]
 
-    const config = {
+    chart = new Chart(canvasRef.value, {
       type: 'line',
       plugins: extraPlugins,
       data: {
@@ -503,6 +548,7 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
         maintainAspectRatio: false,
         animation: false,
         interaction: { mode: 'index', intersect: false },
+        layout: { padding: { right: coneLines.length ? CONE_GUTTER : NO_CONE_GUTTER } },
         onClick: (event, elements) => {
           if (!onPointClick) return
           const hit = elements.find(el => el.datasetIndex === 1)
@@ -528,9 +574,8 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
             titleColor: '#1c1917',
             bodyColor: '#78716c',
             callbacks: {
-              // G1: parsed.y is °C; convert for the label.
               label: ctx => {
-                if (ctx.dataset.label === 'Signal lost') return '⚠️ No signal'
+                if (ctx.dataset.label === 'Signal lost') return 'No signal'
                 const c = ctx.parsed.y
                 const v = c == null ? null : cToDisplay(c)
                 return `${ctx.dataset.label}: ${v == null ? '—' : v.toFixed(1)}${unitLabel.value}`
@@ -539,21 +584,11 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
           },
           zoom: enableZoom ? {
             pan: { enabled: true, mode: 'x' },
-            zoom: {
-              wheel: { enabled: true },
-              pinch: { enabled: true },
-              mode: 'x',
-            },
-            limits: {
-              x: { min: 0, max: 120, minRange: 30 },
-              y: { min: 0, max: 1500 },
-            },
+            zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' },
+            limits: { x: { min: 0, max: 120, minRange: 30 }, y: { min: 0, max: 1500 } },
           } : {
             pan: { enabled: false },
-            zoom: {
-              wheel: { enabled: false },
-              pinch: { enabled: false },
-            },
+            zoom: { wheel: { enabled: false }, pinch: { enabled: false } },
           },
         },
         scales: {
@@ -569,65 +604,74 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
             ticks: {
               color: '#a8a29e',
               maxTicksLimit: showLabels ? 4 : 6,
-              // G1: tick values are °C; show them in the active unit.
               callback: (value) => Math.round(cToDisplay(value)) + '°',
             },
-            grid:  { color: '#f5f5f4' },
+            grid: { color: '#f5f5f4' },
             min: 0,
             max: 300,
             suggestedMax: 300,
           },
         },
       },
-    }
-
-    chart = new Chart(canvasRef.value, config)
+    })
   }
 
   function setSchedule(points, offset = 0) {
     lastSchedule = { points: points ?? [], offset }
     if (!ensureAlive()) return
-    chart.data.datasets[0].data = points.map(p => ({
+    chart.data.datasets[0].data = (points ?? []).map(p => ({
       x: p.offset_minutes + offset,
-      y: p.target_temp,                // °C
+      y: p.target_temp,
     }))
-    if (points.length) {
-      const maxX = Math.max(...points.map(p => p.offset_minutes + offset))
-      xMax = maxX + 60
+    if (points?.length) {
+      xMax = Math.max(...points.map(p => p.offset_minutes + offset)) + 60
       chart.options.scales.x.min = 0
       chart.options.scales.x.max = xMax
-      if (chart.options.plugins.zoom?.limits?.x) {
-        chart.options.plugins.zoom.limits.x.max = xMax
-      }
+      if (chart.options.plugins.zoom?.limits?.x) chart.options.plugins.zoom.limits.x.max = xMax
     }
     autoFitY()
+    computeConeLines()
+    computeReductionBands()
     chart.update('none')
   }
 
   function setReadings(rows, startedAt) {
     lastReadings = { rows: rows ?? [], startedAt }
     if (!ensureAlive()) return
-    chart.data.datasets[1].data = rows.map(r => ({
+    chart.data.datasets[1].data = (rows ?? []).map(r => ({
       x:  Math.round((r.timestamp - startedAt) / 60),
-      y:  r.temperature,               // °C
+      y:  r.temperature,
       id: r.id,
       ts: r.timestamp,
     }))
     autoFitY()
+    computeConeLines()
     computeReductionBands()
     chart.update('none')
   }
 
   function setReductions(periods, startedAt = 0) {
     lastReductions = periods ?? []
-    lastReductionsStartedAt = startedAt || 0   // REDUCTION-TIME
+    lastReductionsStartedAt = startedAt || 0
     if (!ensureAlive()) return
     computeReductionBands()
     chart.update('none')
   }
 
-  // CONE DROPS: map rows → plugin-ready points. Caches mapped data so a
-  // rebuild redraws markers without a replay call.
+  // cones: /api/cones rows (needs temp_c). opts.pack: the firing's planned cone
+  // names — the ruler becomes exactly these. opts.targetCone: name to
+  // emphasise; otherwise the highest line under the plan's peak wins.
+  function setConeLines(cones, opts = {}) {
+    lastCones = (cones ?? [])
+      .filter(c => Number.isFinite(Number(c.temp_c)))
+      .map(c => ({ name: c.name, temp_c: Number(c.temp_c) }))
+    packNames      = Array.isArray(opts.pack) ? opts.pack.filter(n => typeof n === 'string') : []
+    targetConeName = opts.targetCone ?? null
+    computeConeLines()
+    if (!ensureAlive()) return
+    chart.update('none')
+  }
+
   function setConeDrops(drops, startedAt) {
     lastConeDrops = (drops ?? [])
       .filter(d => startedAt && d.dropped_at)
@@ -644,14 +688,9 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     if (!ensureAlive()) return
     if (!startedAt) { nowLine = null; chart.update('none'); return }
     const minutes = (Date.now() / 1000 - startedAt) / 60
-    const planned = chart.data.datasets[0]?.data ?? []
-    const targetTemp = targetAtMinute(planned, minutes)   // °C
-    nowLine = { minutes, targetTemp }
-    // REDUCTION-TIME: an open time-anchored band's right edge is NOW, so it
-    // advances with the same tick as the now-line. Cheap — a handful of rows.
+    nowLine = { minutes, targetTemp: targetAtMinute(chart.data.datasets[0]?.data ?? [], minutes) }
     computeReductionBands()
-    const currentMax = chart.options.scales.x.max ?? 0
-    if (minutes > currentMax) chart.options.scales.x.max = minutes + 5
+    if (minutes > (chart.options.scales.x.max ?? 0)) chart.options.scales.x.max = minutes + 5
     chart.update('none')
   }
 
@@ -661,9 +700,6 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     chart.update('none')
   }
 
-  // G1: force a redraw when the unit toggles. Data is unchanged; only labels
-  // and ticks re-render. The unit ref is shared, so reading .value at draw time
-  // already reflects the new unit — this just repaints.
   function setUnit() {
     if (!ensureAlive()) return
     chart.update('none')
@@ -680,32 +716,18 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
   function setSignalLost(startedAt, lastReadingTimestamp) {
     if (!ensureAlive()) return
     const nowMinutes = (Date.now() / 1000 - startedAt) / 60
-    let anchorX, anchorY
+    const actualData = chart.data.datasets[1].data
+    let anchorX = 0, anchorY = 20
 
-    if (lastReadingTimestamp === null) {
-      anchorX = 0
-      anchorY = 20
-    } else {
-      const actualData = chart.data.datasets[1].data
-      if (!actualData.length) {
-        anchorX = 0
-        anchorY = 20
-      } else {
-        const lastPoint = actualData[actualData.length - 1]
-        anchorX = lastPoint.x
-        anchorY = lastPoint.y
-      }
+    if (lastReadingTimestamp !== null && actualData.length) {
+      const lastPoint = actualData[actualData.length - 1]
+      anchorX = lastPoint.x
+      anchorY = lastPoint.y
     }
 
     const endX = Math.max(nowMinutes, anchorX + 0.5)
-    chart.data.datasets[2].data = [
-      { x: anchorX, y: anchorY },
-      { x: endX,    y: anchorY },
-    ]
-
-    const currentMax = chart.options.scales.x.max ?? 0
-    if (endX > currentMax) chart.options.scales.x.max = endX + 5
-
+    chart.data.datasets[2].data = [{ x: anchorX, y: anchorY }, { x: endX, y: anchorY }]
+    if (endX > (chart.options.scales.x.max ?? 0)) chart.options.scales.x.max = endX + 5
     autoFitY()
     chart.update('none')
   }
@@ -738,9 +760,8 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
 
   return {
     init, setSchedule, setReadings, setReductions,
-    setConeDrops,                                       // CONE DROPS
-    setNowLine, clearNowLine,
-    setUnit,                                            // G1
+    setConeLines, setConeDrops,
+    setNowLine, clearNowLine, setUnit,
     setManualMode, setSignalLost, clearSignalLost, resetZoom, resize, destroy,
   }
 }

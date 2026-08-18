@@ -1,15 +1,18 @@
 // File: server/api/reductions/[id].put.js
-// PUT /api/reductions/:id — end (close) a reduction period.
+// PUT /api/reductions/:id - end (close) an atmosphere period.
 // Body: { endTemp: number }  (current reading at the moment of the tap)
 //
-// REDUCTION-TIME (Aug 2026): periods are now anchored by TIME — created_at
-// opens the band, ended_at (set here) closes it. end_temp is a recorded fact,
-// not geometry, so ANY end temperature is valid: above the start (climbing),
-// below it (kilns routinely stall or dip in reduction — incomplete combustion
+// REDUCTION-TIME (Aug 2026): periods are anchored by TIME - created_at opens
+// the band, ended_at (set here) closes it. end_temp is a recorded fact, not
+// geometry, so ANY end temperature is valid: above the start (climbing),
+// below it (kilns routinely stall or dip in reduction - incomplete combustion
 // costs efficiency), or exactly equal. The old "must differ" rule existed only
 // to prevent a zero-width band under temp-anchoring; the matching DB CHECK
-// (end_temp <> start_temp) must be dropped alongside this — see the
-// cone/reduction migration notes.
+// (end_temp <> start_temp) must be dropped alongside this.
+//
+// CONE-FIRST (Aug 2026): kind is set at open and never changed here - closing
+// a band records when it ended, not what it was. It is returned so the client
+// row shape matches the POST.
 const MIN_TEMP = -200
 const MAX_TEMP = 1400
 
@@ -40,7 +43,7 @@ export default defineEventHandler(async (event) => {
     .from('reduction_periods')
     .update({ end_temp: endTemp, ended_at: Math.floor(Date.now() / 1000) })
     .eq('id', id)
-    .select('id, start_temp, end_temp, created_at, ended_at, origin')
+    .select('id, start_temp, end_temp, created_at, ended_at, origin, kind')
     .single()
 
   if (error) throw await serverError('reductions.end.failed', error, { userId: user.id, reductionId: id })

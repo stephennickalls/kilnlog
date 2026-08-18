@@ -1,11 +1,23 @@
-// server/api/firings/index.post.js
+// File: server/api/firings/index.post.js
 //
-// PACKAGE 3 — D4 (atomic create), G5 (single active), S7 (validation).
+// PACKAGE 3 - D4 (atomic create), G5 (single active), S7 (validation).
 // - Accepts optional `startedAt` so create+start is ONE request.
-// - Accepts optional `reductions` ([{ startTemp, endTemp|null }] °C) planned
-//   for this firing; inserted into reduction_periods keyed by firing_id.
+// - Accepts optional `reductions` ([{ startTemp, endTemp|null, kind }] °C)
+//   planned for this firing; inserted into reduction_periods by firing_id.
 // - Single-active enforced by a friendly pre-check + the
 //   one_active_firing_per_user partial unique index (real guarantee).
+//
+// CONE-FIRST (Aug 2026):
+// - `fuel` ('gas' | 'wood', default 'gas'). There is no electric mode.
+// - auto_end_hours is derived from the fuel SERVER-SIDE and never sent by the
+//   client: the fuel choice IS the configuration. A wood firing runs for days
+//   with long unlogged stretches; a 36h gas limit would close it mid-stoke.
+// - reductions carry `kind` ('reduction' | 'oxidation') so a plan can express
+//   the finishing oxidation, not only the reduction window.
+// - `conePack` (string[]): the witness cones planned for this firing, copied
+//   from the schedule like the curve. Validated against the cones table via
+//   sanitizeConePack (server/utils/conePack.js); unknown names drop silently -
+//   the pack is presentation priority, never a gate on logging.
 
 const MAX_NAME       = 120
 const MAX_NOTES      = 5000
@@ -16,6 +28,9 @@ const MIN_TEMP       = -200
 const MAX_TEMP       = 1400
 const MIN_TS         = 1577836800   // 2020-01-01
 const FUTURE_SKEW    = 5 * 60
+
+const FUELS = ['gas', 'wood']
+const KINDS = ['reduction', 'oxidation']
 
 function bad(msg) { return createError({ statusCode: 400, statusMessage: msg }) }
 
@@ -34,7 +49,10 @@ function sanitizeReductions(input) {
       if (Math.round(e) === Math.round(start)) throw bad('Reduction end must differ from start')
       end = Math.round(e)
     }
-    out.push({ start_temp: Math.round(start), end_temp: end })
+    // Unknown/absent kind falls back to 'reduction' - the pre-cone-first
+    // meaning of every row, so an old client keeps working unchanged.
+    const kind = KINDS.includes(r?.kind) ? r.kind : 'reduction'
+    out.push({ start_temp: Math.round(start), end_temp: end, kind })
   }
   return out
 }
@@ -58,6 +76,12 @@ function validateBody(body) {
     startedAt = ts
   }
 
+  let fuel = 'gas'
+  if (body.fuel !== undefined && body.fuel !== null && body.fuel !== '') {
+    if (!FUELS.includes(body.fuel)) throw bad('Fuel must be gas or wood')
+    fuel = body.fuel
+  }
+
   let points = []
   if (body.schedulePoints !== undefined) {
     if (!Array.isArray(body.schedulePoints)) throw bad('schedulePoints must be an array')
@@ -72,14 +96,20 @@ function validateBody(body) {
 
   const reductions = sanitizeReductions(body.reductions)
 
-  return { name, notes, startedAt, points, reductions }
+  // Raw names only here; resolution against the cones table needs the db, so
+  // the handler runs sanitizeConePack after validation.
+  const conePackInput = Array.isArray(body.conePack) ? body.conePack : []
+
+  return { name, notes, startedAt, fuel, points, reductions, conePackInput }
 }
 
 export default defineEventHandler(async (event) => {
   const { db, user } = await useServerUser(event)
 
   const body = await readBody(event)
-  const { name, notes, startedAt, points, reductions } = validateBody(body ?? {})
+  const { name, notes, startedAt, fuel, points, reductions, conePackInput } = validateBody(body ?? {})
+
+  const conePack = await sanitizeConePack(db, conePackInput)
 
   // Friendly pre-check; race-safe enforcement is the partial unique index.
   if (startedAt) {
@@ -100,7 +130,16 @@ export default defineEventHandler(async (event) => {
 
   const { data: firing, error } = await db
     .from('firings')
-    .insert({ name, notes, started_at: startedAt, user_id: user.id })
+    .insert({
+      name,
+      notes,
+      started_at: startedAt,
+      user_id: user.id,
+      fuel,
+      // Silent per-fuel auto-end limit. See server/utils/autoEndStale.js.
+      auto_end_hours: AUTO_END_HOURS_BY_FUEL[fuel] ?? null,
+      cone_pack: conePack,
+    })
     .select()
     .single()
 
@@ -128,8 +167,14 @@ export default defineEventHandler(async (event) => {
     // REDUCTION-TIME (Aug 2026): planned rows are marked origin='planned' so the
     // chart temp-anchors them; live tapped rows (origin='live', the default)
     // time-anchor by created_at. Without this, a planned reduction's
-    // created_at ≈ started_at made it render from minute ~0.
-    const rows = reductions.map(r => ({ firing_id: firing.id, start_temp: r.start_temp, end_temp: r.end_temp, origin: 'planned' }))
+    // created_at ~ started_at made it render from minute ~0.
+    const rows = reductions.map(r => ({
+      firing_id:  firing.id,
+      start_temp: r.start_temp,
+      end_temp:   r.end_temp,
+      origin:     'planned',
+      kind:       r.kind,
+    }))
     const { error: redErr } = await db.from('reduction_periods').insert(rows)
     if (redErr) {
       await db.from('firings').delete().eq('id', firing.id)   // cascade clears partials
@@ -137,9 +182,10 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  // Durable lifecycle event — the app's heartbeat on /admin/logs.
+  // Durable lifecycle event - the app's heartbeat on /admin/logs.
   await logger.tracked('info', startedAt ? 'firing.started' : 'firing.created', {
-    userId: user.id, firingId: firing.id, points: points.length, planned_reductions: reductions.length,
+    userId: user.id, firingId: firing.id, fuel, points: points.length,
+    planned_reductions: reductions.length, cone_pack: conePack.length,
   })
   return firing
 })

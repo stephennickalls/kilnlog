@@ -1,15 +1,13 @@
 <!-- app/pages/schedules/index.vue -->
 <!--
   Schedules library. Manages schedules; never starts a firing itself (Start opens
-  the modal preselected — Slice D). Two groups: "Your schedules" (browse-by-shape)
-  and "Presets" (search-by-attribute → filter chips). Primary card tap = Edit.
+  the modal preselected). Two groups: "Your schedules" (browse-by-shape) and
+  "Presets" (search-by-attribute → filter chips). Primary card tap = Edit.
   Card colour follows firing type via useScheduleTheme.
 
-  MOBILE (Aug 2026): the hand-rolled header is now the shared AppNav — its only
-  navigation control below sm was "Back to app", which was hidden at exactly the
-  width where it mattered. The card grids also capped their min track at 100%,
-  because a 232px minimum plus 32px of page padding needs 264px and anything
-  narrower made the track overflow instead of falling to one column.
+  MOBILE: the card grids cap their min track at 100%, because a 232px minimum
+  plus 32px of page padding needs 264px and anything narrower made the track
+  overflow instead of falling to one column.
 -->
 <template>
   <div class="min-h-screen bg-parchment font-serif">
@@ -25,7 +23,7 @@
 
     <main class="max-w-6xl mx-auto px-4 sm:px-6 py-6 pb-safe flex flex-col gap-8 sm:gap-10 min-w-0">
 
-      <!-- G5: one firing at a time — note when starting is blocked -->
+      <!-- One firing at a time — note when starting is blocked -->
       <NuxtLink
         v-if="activeFiring"
         to="/app"
@@ -75,10 +73,9 @@
 
         <!-- Presets -->
         <section v-if="presets.length" class="flex flex-col gap-3">
-          <!-- MOBILE (Aug 2026): the chips used ml-auto inside a wrapping row,
-               so once the hint text wrapped they landed hard right on a line of
-               their own with the heading orphaned above. Heading and hint are
-               one group now; the chips are a second that wraps as a unit. -->
+          <!-- Heading and hint are one group; the chips are a second that wraps
+               as a unit. With ml-auto they landed hard right on their own line
+               once the hint wrapped, orphaning the heading. -->
           <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-2 px-0.5">
             <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1 min-w-0">
               <h2 class="text-sm font-bold text-ink">Presets</h2>
@@ -133,16 +130,15 @@ definePageMeta({ middleware: ['auth'] })
 
 const router = useRouter()
 
-// G5: know whether a firing is active so we can disable Start affordances.
+// Know whether a firing is active so we can disable Start affordances.
 const { activeFiring, loadActiveFiring } = useActiveFiring()
 
-const schedules   = ref([])
-const loading     = ref(true)
-const status      = ref('')
+const schedules    = ref([])
+const loading      = ref(true)
+const status       = ref('')
 const activeFilter = ref('all')
 
-// Filter by the same firing types the user can assign. "All" + the two most
-// common; bisque/glaze cover the bulk, others fall under whichever they match.
+// Bisque/glaze cover the bulk; others fall under whichever they match.
 const filters = [
   { key: 'all',    label: 'All' },
   { key: 'bisque', label: 'Bisque' },
@@ -174,8 +170,9 @@ function flash(msg) {
 }
 
 function goEdit(s) { router.push(`/schedules/${s.id}`) }
+
 function startFromSchedule(s) {
-  // G5 fallback — the card disables this when active, but guard anyway.
+  // The card disables this when a firing is active, but guard anyway.
   if (activeFiring.value) {
     flash(`"${activeFiring.value.name}" is still firing — end it first.`)
     return
@@ -188,14 +185,22 @@ async function duplicate(s) {
     const points = (s.points ?? s.schedule_library_points ?? []).map(p => ({
       offsetMinutes: p.offset_minutes, targetTemp: p.target_temp,
     }))
+    // A duplicate that loses the atmosphere plan, the cone pack or the
+    // description isn't a duplicate — the curve is only part of a schedule.
+    const reductions = (s.reductions ?? [])
+      .filter(r => r.start_temp != null)
+      .map(r => ({ startTemp: r.start_temp, endTemp: r.end_temp ?? null, kind: r.kind }))
     const copy = await $fetch('/api/schedules', {
       method: 'POST',
       body: {
         name: `${s.name} (copy)`,
         type: s.type ?? null,
         cone: s.cone ?? null,
+        description: s.description ?? null,
         source: s.user_id === null ? 'preset_copy' : 'custom',
         points,
+        reductions,
+        conePack: s.cone_pack ?? [],
       },
     })
     flash('Duplicated')

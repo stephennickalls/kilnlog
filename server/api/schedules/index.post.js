@@ -1,7 +1,10 @@
-// server/api/schedules/index.post.js
+// File: server/api/schedules/index.post.js
+// Creates a library schedule with points, planned atmosphere periods, and a
+// cone pack (the witness cones planned for firings run from this schedule).
 const MIN_TEMP = -200
 const MAX_TEMP = 1400
 const MAX_REDUCTIONS = 50
+const KINDS = ['reduction', 'oxidation']
 
 function sanitizeReductions(input) {
   if (!Array.isArray(input)) return []
@@ -13,10 +16,11 @@ function sanitizeReductions(input) {
     if (r?.endTemp !== null && r?.endTemp !== undefined && r?.endTemp !== '') {
       const e = Number(r.endTemp)
       if (!Number.isFinite(e) || e < MIN_TEMP || e > MAX_TEMP) continue
-      if (Math.round(e) === Math.round(start)) continue   // end must differ
+      if (Math.round(e) === Math.round(start)) continue
       end = Math.round(e)
     }
-    out.push({ start_temp: Math.round(start), end_temp: end })
+    const kind = KINDS.includes(r?.kind) ? r.kind : 'reduction'
+    out.push({ start_temp: Math.round(start), end_temp: end, kind })
   }
   return out
 }
@@ -30,6 +34,7 @@ export default defineEventHandler(async (event) => {
   if (!type?.trim()) throw createError({ statusCode: 400, statusMessage: 'Schedule type is required' })
 
   const validSource = ['custom', 'from_firing', 'preset_copy'].includes(source) ? source : 'custom'
+  const conePack = await sanitizeConePack(db, body.conePack)
 
   const { data: schedule, error } = await db
     .from('schedule_library')
@@ -37,10 +42,11 @@ export default defineEventHandler(async (event) => {
       name: name.trim(),
       type: type.trim(),
       cone: cone?.trim() || null,
-      description: description?.trim()?.slice(0, 500) || null,  // G10
+      description: description?.trim()?.slice(0, 500) || null,
       source: validSource,
       is_built_in: 0,
       user_id: user.id,
+      cone_pack: conePack,
     })
     .select()
     .single()
@@ -59,7 +65,7 @@ export default defineEventHandler(async (event) => {
 
   const reductions = sanitizeReductions(body.reductions)
   if (reductions.length) {
-    const rows = reductions.map(r => ({ library_id: schedule.id, start_temp: r.start_temp, end_temp: r.end_temp }))
+    const rows = reductions.map(r => ({ library_id: schedule.id, start_temp: r.start_temp, end_temp: r.end_temp, kind: r.kind }))
     const { error: redErr } = await db.from('reduction_periods').insert(rows)
     if (redErr) throw await serverError('schedules.create.reductions_failed', redErr, { userId: user.id, scheduleId: schedule.id })
   }

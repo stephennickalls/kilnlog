@@ -1,14 +1,11 @@
 <!-- File: app/pages/schedules/[id].vue -->
 <!--
-  MOBILE (Aug 2026): brought in line with schedules/new.vue, which this page is
-  a near-twin of. Same four fixes:
-    - the hand-rolled header replaced with the shared AppNav
-    - text-sm controls swapped for the shared .input (sub-16px controls make
-      iOS Safari zoom the page in on focus and never zoom back out)
-    - the curve header's flex-1 spacer, which forced label + badge + unit
-      toggle + reduction button onto one line, replaced with two wrapping groups
-    - grid-cols-2 type+cone stacked below 380px, and the toast lifted clear of
-      the home indicator
+  Near-twin of schedules/new.vue; keep the two in step.
+
+  MOBILE: text-sm controls swapped for the shared .input, because any control
+  under 16px makes iOS Safari zoom the page in on focus and never zoom back
+  out. The curve header uses two wrapping groups rather than a flex-1 spacer,
+  which forced label + badge + unit toggle + reduction button onto one line.
 -->
 <template>
   <div class="min-h-screen bg-parchment font-serif">
@@ -60,7 +57,7 @@
         <ConeSelect v-model="form.cone" />
       </div>
 
-      <!-- Description (G10) -->
+      <!-- Description -->
       <div class="flex flex-col gap-1.5">
         <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Description <span class="text-ink-faint/60 normal-case font-normal tracking-normal">(optional)</span></label>
         <textarea
@@ -82,14 +79,12 @@
             <span v-if="form.type" class="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0" :class="theme.badgeText">{{ form.type }}</span>
           </div>
           <div class="flex items-center gap-3 shrink-0">
-            <!-- G1: the unit toggle lives here as well as in StartFiringModal. The
-                 Steps table asks for a RATE (°C/hr vs °F/hr), so someone editing a
-                 schedule they pasted in Fahrenheit needs to flip back and check
-                 against their source without leaving the page. -->
+            <!-- The Steps table asks for a RATE (°C/hr vs °F/hr), so someone
+                 editing a schedule written in Fahrenheit needs to flip back and
+                 check against their source without leaving the page. -->
             <TempUnitToggle />
-            <!-- Reduction planner trigger (above the curve/table) -->
             <button
-              class="flex items-center gap-1.5 py-1 text-xs font-semibold text-indigo-700 hover:text-indigo-900 transition-colors"
+              class="flex items-center gap-1.5 py-1 text-xs font-semibold text-cobalt-dark hover:text-cobalt transition-colors"
               @click="showReductionPlanner = true"
             >
               <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
@@ -101,6 +96,9 @@
           </div>
         </div>
         <ScheduleCurveEditor v-model="editPoints" :reductions="editReductions" :stroke="theme.stroke" :fill="theme.fill" />
+        <div class="pt-3 border-t border-parchment-3">
+          <ConePackEditor v-model="editConePack" :target-cone="form.cone" />
+        </div>
       </div>
 
       <!-- Actions -->
@@ -152,12 +150,13 @@ definePageMeta({ middleware: ['auth'] })
 const route  = useRoute()
 const router = useRouter()
 
-const loading            = ref(true)
-const saving             = ref(false)
-const status             = ref('')
-const form               = reactive({ name: '', type: 'bisque', cone: '', description: '' })
-const editPoints         = ref([])
-const editReductions     = ref([])   // [{ startTemp, endTemp|null }] °C
+const loading              = ref(true)
+const saving               = ref(false)
+const status               = ref('')
+const form                 = reactive({ name: '', type: 'bisque', cone: '', description: '' })
+const editPoints           = ref([])
+const editReductions       = ref([])   // [{ startTemp, endTemp|null, kind }] °C
+const editConePack         = ref([])   // planned witness cones — names
 const showReductionPlanner = ref(false)
 
 const id    = computed(() => Number(route.params.id))
@@ -191,12 +190,22 @@ async function load() {
   try {
     const s = await $fetch(`/api/schedules/${id.value}`)
 
+    // Presets are read-only: editing one silently forks it to the user first.
     if (s.user_id === null) {
       const pts = (s.points ?? []).map(p => ({ offsetMinutes: p.offset_minutes, targetTemp: p.target_temp }))
-      const reds = (s.reductions ?? []).map(r => ({ startTemp: r.start_temp, endTemp: r.end_temp ?? null }))
+      const reds = (s.reductions ?? []).map(r => ({ startTemp: r.start_temp, endTemp: r.end_temp ?? null, kind: r.kind }))
       const copy = await $fetch('/api/schedules', {
         method: 'POST',
-        body: { name: `${s.name} (copy)`, type: s.type ?? 'bisque', cone: s.cone ?? null, description: s.description ?? null, source: 'preset_copy', points: pts, reductions: reds },
+        body: {
+          name: `${s.name} (copy)`,
+          type: s.type ?? 'bisque',
+          cone: s.cone ?? null,
+          description: s.description ?? null,
+          source: 'preset_copy',
+          points: pts,
+          reductions: reds,
+          conePack: s.cone_pack ?? [],
+        },
       })
       router.replace(`/schedules/${copy.id}?copyOf=${encodeURIComponent(s.name)}`)
       return
@@ -207,7 +216,8 @@ async function load() {
     form.cone            = s.cone ?? ''
     form.description     = s.description ?? ''
     editPoints.value     = (s.points ?? []).map(p => ({ offsetMinutes: p.offset_minutes, targetTemp: p.target_temp }))
-    editReductions.value = (s.reductions ?? []).map(r => ({ startTemp: r.start_temp, endTemp: r.end_temp ?? null }))
+    editReductions.value = (s.reductions ?? []).map(r => ({ startTemp: r.start_temp, endTemp: r.end_temp ?? null, kind: r.kind }))
+    editConePack.value   = [...(s.cone_pack ?? [])]
   } catch (err) {
     flash(`Couldn't load: ${err?.data?.message ?? err.message ?? 'error'}`)
   }
@@ -221,7 +231,8 @@ function saveBody() {
     cone: form.cone?.trim() || null,
     description: form.description?.trim() || null,
     points: editPoints.value,
-    reductions: editReductions.value,   // [{ startTemp, endTemp|null }] °C
+    reductions: editReductions.value,   // [{ startTemp, endTemp|null, kind }] °C
+    conePack: editConePack.value,
   }
 }
 

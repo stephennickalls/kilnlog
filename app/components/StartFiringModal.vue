@@ -1,8 +1,8 @@
 <!-- app/components/StartFiringModal.vue -->
 <!--
-  TWO-STEP WIZARD (Aug 2026 redesign). External contract unchanged:
-  props { open, library, pastFirings, preselect }, emits @create
-  { name, notes, schedulePoints, reductions, saveToLibrary }. app.vue untouched.
+  TWO-STEP WIZARD. External contract: props { open, library, pastFirings,
+  preselect }, emits @create { name, notes, schedulePoints, reductions,
+  conePack, saveToLibrary }.
 
   Step 1 "pick"    — a mini schedule library. Bisque/Glaze starter cards, a
                      blank-curve row, then Your schedules / Presets / Past
@@ -10,32 +10,27 @@
   Step 2 "confirm" — plan chip (+ Change), auto-filled name, then Adjust curve
                      and Notes collapsed. Blank auto-opens the editor.
 
-  PASTE (removed Aug 2026): step 1 used to accept a schedule pasted from a
-  forum post or kiln manual. Dropped at the owner's request — the entry point,
-  the import handler, and the PasteScheduleModal mount are all gone.
-  app/components/PasteScheduleModal.vue and composables/useSchedulePaste.js can
-  be deleted if nothing else references them.
-
   New-user path: Start firing → Bisque → Start firing. Three taps, no typing.
   `preselect` (D1/D2, from /schedules "Use") skips straight to step 2.
 
-  SCROLL (fix): the scroll pane is `flex-1 min-h-0 overflow-y-auto` and its
-  CONTENT is a plain block (space-y-*), NOT a flex column. A flex-col scroll
-  pane lets its children flex-shrink to fit instead of overflowing, which
-  silently crushed the curve editor and the Notes card to slivers and meant
-  nothing ever scrolled.
+  CONE PACK (Aug 2026): the witness cones planned for this firing travel with
+  the plan — chosen when the kiln is loaded, not mid-firing. Copied from the
+  chosen schedule; ConePackEditor lives in the Adjust-curve expander.
+
+  SCROLL: the scroll pane is `flex-1 min-h-0 overflow-y-auto` and its CONTENT
+  is a plain block (space-y-*), NOT a flex column. A flex-col scroll pane lets
+  its children shrink to fit instead of overflowing, which crushed the curve
+  editor and Notes card to slivers and meant nothing ever scrolled.
 
   COLOUR: sparklines and the curve editor use themeForType (useScheduleTheme),
-  same as ScheduleCard — bisque warm, glaze/single celadon, raku cobalt — so
-  the modal parses the same way the schedules page does. ScheduleSparkline is
-  reused rather than re-implemented, so reduction bands render here too.
+  same as ScheduleCard, so the modal parses the same way the schedules page
+  does. ScheduleSparkline is reused rather than re-implemented.
 -->
 <template>
   <Teleport to="body">
     <div v-if="open" class="fixed inset-0 flex items-end sm:items-center justify-center z-50 font-serif" style="background: rgba(26,18,8,0.6)" @click.self="$emit('close')">
-      <!-- MOBILE (Aug 2026): the vh cap measures a viewport that includes Safari's
-           chrome on iOS, so the sticky footer button could sit below the fold.
-           dvh tracks the visible area. -->
+      <!-- dvh: the vh cap measures a viewport that includes Safari's chrome on
+           iOS, so the sticky footer button could sit below the fold. -->
       <div class="bg-parchment w-full sm:w-[560px] sm:rounded-2xl rounded-t-2xl flex flex-col border border-parchment-3 overflow-hidden" style="max-height:92vh; max-height:min(92vh, 88dvh); box-shadow: 0 -8px 40px rgba(26,18,8,0.15)">
 
         <!-- Header -->
@@ -56,9 +51,8 @@
         <!-- ════ STEP 1 — PICK A PLAN ════════════════════════════════════════ -->
         <div v-if="step === 'pick'" class="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 sm:px-6 py-4 space-y-4">
 
-          <!-- Starters: the two obvious choices. Side by side they get ~134px
-               each at 320px, which squashes the sparkline into a smear; they
-               stack below 380px. -->
+          <!-- Starters: side by side they get ~134px each at 320px, which
+               smears the sparkline; they stack below 380px. -->
           <div class="grid grid-cols-1 min-[380px]:grid-cols-2 gap-3">
             <button
               v-for="s in starters" :key="s.token"
@@ -83,7 +77,6 @@
             </span>
             <svg class="w-4 h-4 text-ink-faint shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
           </button>
-
 
           <!-- Your schedules (collapsed) -->
           <section v-if="myLibrary.length" class="space-y-1.5">
@@ -170,22 +163,25 @@
             <div class="rounded-xl border border-parchment-3 bg-white overflow-hidden">
               <button class="w-full flex items-center justify-between px-3.5 py-3 text-left" @click="showAdvanced = !showAdvanced">
                 <span class="text-sm font-semibold text-ink">
-                  Adjust curve<span v-if="reductions.length" class="text-ink-muted font-normal"> · {{ reductions.length }} reduction{{ reductions.length === 1 ? '' : 's' }}</span>
+                  Adjust curve<span v-if="reductions.length" class="text-ink-muted font-normal"> · {{ reductions.length }} reduction{{ reductions.length === 1 ? '' : 's' }}</span><span v-if="conePack.length" class="text-ink-muted font-normal"> · {{ conePack.length }} cones</span>
                 </span>
                 <svg class="w-4 h-4 text-ink-faint transition-transform" :class="showAdvanced ? 'rotate-180' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
               </button>
               <div v-if="showAdvanced" class="px-3.5 pb-4 pt-3 space-y-3 border-t border-parchment-3">
                 <div class="flex items-center justify-between">
                   <TempUnitToggle />
-                  <button class="flex items-center gap-1.5 text-xs font-semibold text-indigo-700 hover:text-indigo-900 transition-colors" @click="showReductionPlanner = true">
+                  <button class="flex items-center gap-1.5 text-xs font-semibold text-cobalt-dark hover:text-cobalt transition-colors" @click="showReductionPlanner = true">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
                     {{ reductions.length ? `Edit reduction (${reductions.length})` : 'Add reduction' }}
                   </button>
                 </div>
                 <ScheduleCurveEditor v-model="form.schedulePoints" :reductions="reductions" :stroke="theme.stroke" :fill="theme.fill" />
+                <div class="pt-1 border-t border-parchment-3">
+                  <ConePackEditor v-model="conePack" :target-cone="targetCone" />
+                </div>
                 <label class="flex items-start gap-2.5 cursor-pointer pt-1">
                   <input type="checkbox" :checked="saveToLibrary" class="mt-0.5 accent-flame" @change="saveToLibrary = $event.target.checked">
-                  <span class="text-xs text-ink-muted leading-snug"><span class="font-semibold text-ink">Save this plan to my library</span> — reuse it (and its reductions) next time.</span>
+                  <span class="text-xs text-ink-muted leading-snug"><span class="font-semibold text-ink">Save this plan to my library</span> — reuse it (and its reductions and cone pack) next time.</span>
                 </label>
               </div>
             </div>
@@ -236,7 +232,7 @@ const props = defineProps({
   open:        Boolean,
   library:     { type: Array, default: () => [] },  // built-ins + own (/api/schedules)
   pastFirings: { type: Array, default: () => [] },  // user's finished firings
-  preselect:   { type: Object, default: null },     // { name?, schedulePoints, reductions? }
+  preselect:   { type: Object, default: null },     // { name?, schedulePoints, reductions?, conePack?, cone? }
 })
 
 const emit = defineEmits(['close', 'create'])
@@ -264,7 +260,7 @@ const startFrom            = ref('starter:bisque')
 const pickedType           = ref('bisque')          // drives themeForType
 const loadingPast          = ref(false)
 const nameAutoFilled       = ref(true)
-const reductions           = ref([])                // [{ startTemp, endTemp|null }] °C
+const reductions           = ref([])                // [{ startTemp, endTemp|null, kind }] °C
 const saveToLibrary        = ref(false)
 const showReductionPlanner = ref(false)
 const showMine             = ref(false)
@@ -272,6 +268,11 @@ const showPresets          = ref(false)
 const showPast             = ref(false)
 const showAdvanced         = ref(false)
 const showNotes            = ref(false)
+
+// The witness cones planned for this firing, copied from the chosen schedule.
+// targetCone drives ConePackEditor's guide/target/guard suggestion.
+const conePack   = ref([])
+const targetCone = ref('')
 
 const form = reactive({
   name:           '',
@@ -307,8 +308,7 @@ function planSummary(pts) {
 }
 
 // ── Row: one library schedule, themed by its own type ─────────────────────────
-// Inline so the list markup isn't repeated three times. Renders ScheduleSparkline
-// exactly as ScheduleCard does, at thumbnail size.
+// Inline so the list markup isn't repeated three times.
 const ScheduleRow = (p, { emit: e }) => {
   const s  = p.schedule
   const th = themeForType(s.type)
@@ -396,21 +396,29 @@ async function pick(token) {
   if (token === 'blank') {
     form.schedulePoints = []
     reductions.value    = []
+    conePack.value      = []
+    targetCone.value    = ''
     pickedType.value    = 'other'
     showAdvanced.value  = true         // blank is meaningless without the editor
   } else if (token === 'starter:bisque') {
     form.schedulePoints = BISQUE_POINTS.map(p => ({ ...p }))
     reductions.value    = []
+    conePack.value      = ['07', '06', '05']   // guide / target / guard
+    targetCone.value    = '06'
     pickedType.value    = 'bisque'
   } else if (token === 'starter:glaze') {
     form.schedulePoints = GLAZE_POINTS.map(p => ({ ...p }))
     reductions.value    = []
+    conePack.value      = ['9', '10', '11']
+    targetCone.value    = '10'
     pickedType.value    = 'glaze'
   } else if (token.startsWith('lib:')) {
     const lib = props.library.find(l => String(l.id) === token.slice(4))
     if (lib) {
       form.schedulePoints = normPoints(lib.points)
-      reductions.value    = (lib.reductions ?? []).map(r => ({ startTemp: r.start_temp, endTemp: r.end_temp ?? null }))
+      reductions.value    = (lib.reductions ?? []).map(r => ({ startTemp: r.start_temp, endTemp: r.end_temp ?? null, kind: r.kind }))
+      conePack.value      = [...(lib.cone_pack ?? [])]
+      targetCone.value    = lib.cone ?? ''
       pickedType.value    = lib.type ?? 'other'
     }
   } else if (token.startsWith('past:')) {
@@ -421,7 +429,9 @@ async function pick(token) {
     try {
       const data = await $fetch(`/api/firings/${token.slice(5)}`)
       form.schedulePoints = normPoints(data.schedule)
-      reductions.value    = (data.reductions ?? []).map(r => ({ startTemp: r.start_temp, endTemp: r.end_temp ?? null }))
+      reductions.value    = (data.reductions ?? []).map(r => ({ startTemp: r.start_temp, endTemp: r.end_temp ?? null, kind: r.kind }))
+      conePack.value      = [...(data.cone_pack ?? [])]
+      targetCone.value    = ''
     } catch {
       form.schedulePoints = []
     } finally {
@@ -455,6 +465,8 @@ watch(() => props.open, (val) => {
     form.name            = props.preselect.name ?? ''
     form.schedulePoints  = (props.preselect.schedulePoints ?? []).map(p => ({ ...p }))
     reductions.value     = (props.preselect.reductions ?? []).map(r => ({ ...r }))
+    conePack.value       = [...(props.preselect.conePack ?? [])]
+    targetCone.value     = props.preselect.cone ?? ''
     pickedType.value     = props.preselect.type ?? guessType(props.preselect.name)
     startFrom.value      = 'preselect'
     nameAutoFilled.value = false
@@ -464,6 +476,8 @@ watch(() => props.open, (val) => {
     pickedType.value    = 'bisque'
     form.schedulePoints = []
     reductions.value    = []
+    conePack.value      = []
+    targetCone.value    = ''
     form.name           = ''
     step.value          = 'pick'
   }
@@ -476,6 +490,7 @@ function submit() {
     notes:          form.notes,
     schedulePoints: form.schedulePoints,
     reductions:     reductions.value,
+    conePack:       conePack.value,
     saveToLibrary:  saveToLibrary.value,
   })
 }

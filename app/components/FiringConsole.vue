@@ -1,69 +1,24 @@
 <!-- app/components/FiringConsole.vue -->
 <!--
-  Live firing console, built around the current-vs-target comparison. Delta colour
-  encodes state (blue=behind, amber=ahead, CELADON=on track). Desktop (lg+): compact
-  row. Below lg: tight strip.
+  Live firing console. Desktop (lg+): compact row. Below lg: tight strip.
 
-  BRAND (Option B): the current/target card is the app's one persistent ink+glow
-  surface — ink ground with a flame radial wash, echoing the landing page's
-  "Firing insight" tile and the beta banner. State colours shift to their LIGHT
-  variants on this surface (celadon-light / amber-400 / blue-400) so the
-  on-track language stays legible; the delta chip keeps its light state-pill
-  styling for maximum pop. The rate card (desktop) stays white, so rate colour
-  needs BOTH palettes: rateColorClass (light surface) + rateColorClassDark
-  (ink surface, mobile strip).
+  Cone-first ranking on the mobile pill:
+    line 1  hero temp + live rate
+    line 2  next cone, its rating, ETA at this rate
+    line 3  target + delta chip (demoted, not removed)
+    line 4  atmosphere state and next transition (only when the plan has bands)
 
-  Mobile layout (iPhone-width): the compact strip is TWO siblings —
-    [ pill: text zone + LOG ]  [ standalone ⋮ menu ]
-  The menu lives OUTSIDE the overflow-hidden pill, so LOG can no longer overlap it,
-  and the text zone (flex-1, min-w-0, overflow-hidden) truncates instead of sliding
-  under the buttons. Info stack in the text zone: hero Current → status line
-  "target N° · Δ" → rate. The arrow glyph is dropped on mobile to reclaim width.
-  "Readings" is desktop-only (not needed live on a phone).
+  BRAND: the hero card is ink with a flame radial glow, so state colours use
+  their LIGHT variants there; the delta chip keeps light state-pill styling.
+  The desktop rate card is white, hence two rate palettes.
 
-  Mobile menu: a Teleported bottom sheet (can't be clipped); desktop keeps its
-  anchored dropdown with a backdrop for outside-click. It pads past the home
-  indicator and caps its height in dvh, so the last action is always reachable.
+  UNITS: currentTemp / targetTempC are raw °C. The on-track window is ±15°C and
+  stays °C; the number shown converts via displayDelta.
 
-  NARROW PHONES (Aug 2026): at 320px the text zone gets ~136px. The status
-  line's delta chip therefore switches to delta.short ("45°") below 380px and
-  the full label ("45° behind") above it — previously both children were
-  shrink-0 inside an overflow-hidden parent, so the longer label was clipped
-  mid-word instead of degrading.
-
-  ON-TRACK CHIP (Aug 2026): on mobile the on-track state renders as a BARE TICK,
-  no words, at every width. The ahead/behind labels are short enough to fit
-  ("45° behind" degrades to "45°" below 380px), but "On track" has no natural
-  short form — "on track" is the same length — so it was the one state that
-  crowded the status line. Dropping its words costs nothing: the hero temperature
-  is already celadon-light in that state via delta.textClass, so on-track is
-  still legible at a glance. Desktop keeps the full "✓ On track" pill; there is
-  room for it there. Driven by delta.iconOnly, NOT by a width class — a future
-  breakpoint change must not silently bring the words back.
-
-  EDIT READINGS (Aug 2026): both menus carry a 'readings' action opening the
-  tabular editor (ReadingsTableModal). The chart's tap-a-point-to-edit path
-  still exists but is unreliable on a phone — a few pixels of hit area, points
-  overlapping when readings are close together — so the table is the dependable
-  route to fixing a mistyped value. Emits only; app.vue owns the sheet and the
-  API calls.
-
-  G11: the overflow menu gains a reduction toggle — "Start reduction" when none is
-  open, "End reduction" when one is in progress. Emits a single 'reduction' action;
-  the parent captures the current temperature and calls the API.
-
-  NOTES (Jul 2026): the overflow menu also carries a 'notes' action, sitting with
-  recalibrate / reduction / end. It emits only — app.vue owns the modal and the
-  PUT (firings.notes already exists server-side; no API work was needed).
-
-  ICONS (Aug 2026): emoji glyphs replaced with inline SVGs (Notes was 📝) —
-  matches the SVG-only icon language used everywhere else in the app.
-
-  G1 (°F): currentTemp / targetTemp arrive as raw °C numbers and are converted
-  for display via useTempUnit. The on-track / ahead / behind comparison stays in
-  °C (both operands °C), and the difference shown to the user is converted with
-  displayDelta (a delta has no +32 offset). Rate colour reads the raw °C rate
-  props (rateC / targetRateC) instead of re-parsing formatted strings.
+  Mobile: the ⋮ menu is a Teleported sheet outside the overflow-hidden pill,
+  padded past the home indicator, capped in dvh. On-track renders as a bare tick
+  at every mobile width (delta.iconOnly) since it has no shorter form; ahead and
+  behind fall back to delta.short below 380px.
 -->
 <template>
   <div class="flex flex-col gap-2">
@@ -71,7 +26,6 @@
     <!-- ─────────────── Desktop (lg+) ─────────────── -->
     <div class="hidden lg:flex gap-2 items-stretch">
 
-      <!-- BRAND: ink + flame glow (was bg-white border-parchment-3) -->
       <div
         class="bg-ink border border-white/10 rounded-xl flex items-center gap-5 px-5 py-2"
         style="box-shadow:0 2px 12px rgba(34,23,8,0.25); background-image: radial-gradient(ellipse at 22% 45%, rgba(184,85,28,0.35) 0%, transparent 62%)"
@@ -94,11 +48,18 @@
               </div>
             </div>
           </template>
+
+          <div v-if="coneInfo" class="pl-4 border-l border-white/10">
+            <div class="text-[10px] font-semibold uppercase tracking-widest text-parchment-4/70">Next cone</div>
+            <div class="flex items-baseline gap-1.5">
+              <svg class="w-4 h-4 self-center shrink-0 text-celadon-light" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6 h16 L12 20 Z" stroke-linejoin="round"/></svg>
+              <span class="text-2xl font-bold tabular-nums leading-none text-celadon-light">{{ coneInfo.name }}</span>
+              <span class="text-xs font-medium text-parchment-4/70 tabular-nums">{{ coneInfo.tempLabel }}</span>
+            </div>
+            <div v-if="coneInfo.eta" class="text-[11px] font-semibold text-celadon-light/90 tabular-nums">{{ coneInfo.eta }}</div>
+          </div>
         </button>
 
-        <!-- Light state pill — deliberately unchanged so state reads loudest on
-             the ink. Keeps its words in every state: unlike the mobile strip,
-             this row has the width for them. -->
         <div v-if="delta" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-sm font-bold shrink-0" :class="delta.class">
           <span>{{ delta.icon }}</span> {{ delta.label }}
         </div>
@@ -124,24 +85,16 @@
         <span class="text-xs font-bold uppercase tracking-wide">Log reading</span>
       </button>
 
-      <!-- CONE DROPS: standalone action, always broken out at lg+. Solid
-           celadon — the equal-weight twin of the flame Log Reading button
-           (option D). The filled ▽ glyph is the same mark the chart draws at
-           each drop, so button and marker read as one concept. -->
+      <!-- The filled glyph is the same mark the chart draws at each drop. -->
       <button
         v-if="isLive"
         class="w-28 shrink-0 bg-celadon hover:bg-celadon-dark active:bg-celadon-dark text-white rounded-xl flex flex-col items-center justify-center gap-1 transition-colors"
         @click="$emit('cone-drop')"
       >
-        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M4 6 h16 L12 20 Z" stroke-linejoin="round"/>
-        </svg>
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6 h16 L12 20 Z" stroke-linejoin="round"/></svg>
         <span class="text-xs font-bold uppercase tracking-wide">Cone down</span>
       </button>
 
-      <!-- REDUCTION TOGGLE (lg+): same block form as Log reading / Cone down,
-           solid cobalt like its siblings, darker on hover. State lives in the
-           label + pulsing dot: "Reduction" closed, "End reduction" + pulse open. -->
       <button
         v-if="isLive"
         class="w-28 shrink-0 bg-cobalt hover:bg-cobalt-dark active:bg-cobalt-dark text-white rounded-xl flex flex-col items-center justify-center gap-1 transition-colors"
@@ -162,10 +115,7 @@
 
         <div v-if="menuOpen" class="fixed inset-0 z-40" @click="menuOpen = false" />
         <div v-if="menuOpen" class="absolute right-0 top-full mt-2 w-52 z-50 bg-white border border-parchment-3 rounded-xl p-1.5 flex flex-col gap-0.5" style="box-shadow:0 4px 20px rgba(58,30,8,0.12)">
-          <!-- Order matches the mobile sheet: edit readings, notes, recalibrate,
-               pause/resume, end. No cone or reduction entries here — at lg+ both
-               are standalone controls in the row (celadon button, cobalt toggle).
-               Palette: ink/ink-muted = utilities, flame = resume, red = destructive. -->
+          <!-- No cone or reduction entries at lg+: both are standalone buttons. -->
           <button class="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-semibold text-ink hover:bg-parchment-2 transition-colors text-left" @click="emitAction('readings')">
             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
             Edit readings
@@ -187,40 +137,27 @@
     </div>
 
     <!-- ─────────────── Compact (below lg) ─────────────── -->
-    <!-- Two siblings: the pill (text + LOG) and a standalone menu button. The
-         menu is OUTSIDE the overflow-hidden pill so LOG cannot overlap it. -->
     <div class="lg:hidden flex items-stretch gap-2">
 
-      <!-- Pill: text zone + LOG — BRAND ink+glow ground; LOG stays flame.
-           md: cap the width — a phone-shaped stats pill stretched across an
-           iPad reads badly (huge empty ink field), so it stops growing at
-           460px and the actions sit beside it. -->
       <div
         class="flex-1 min-w-0 md:max-w-[460px] bg-ink border border-white/10 rounded-2xl flex items-stretch overflow-hidden"
         style="box-shadow:0 2px 12px rgba(34,23,8,0.25); background-image: radial-gradient(ellipse at 18% 40%, rgba(184,85,28,0.35) 0%, transparent 60%)"
       >
         <button class="flex-1 min-w-0 overflow-hidden px-3.5 py-3 text-left flex flex-col justify-center gap-1" @click="$emit('open-temp')">
-          <!-- Hero: current temp -->
-          <div class="flex items-baseline gap-1">
+          <div class="flex items-baseline gap-1 min-w-0">
             <span class="text-[9px] font-semibold uppercase tracking-wide text-parchment-4/70 mr-0.5">Now</span>
             <span class="text-4xl font-bold tabular-nums leading-none transition-colors" :class="currentColorClass">{{ currentDisplay ?? '—' }}</span>
             <span class="text-sm font-medium" :class="currentTemp !== null ? currentColorClass : 'text-parchment-4/50'">{{ unitLabel }}</span>
+            <span class="text-[11px] font-semibold tabular-nums ml-1.5 truncate" :class="rateColorClassDark">{{ rateShort }}</span>
           </div>
 
-          <!-- Status line: target + delta (arrow dropped — reclaims width on narrow phones)
+          <div v-if="coneInfo" class="flex items-center gap-1.5 min-w-0">
+            <svg class="w-3 h-3 shrink-0 text-celadon-light" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6 h16 L12 20 Z" stroke-linejoin="round"/></svg>
+            <span class="text-xs font-bold text-parchment-3 whitespace-nowrap">cone {{ coneInfo.name }}</span>
+            <span class="text-xs text-parchment-4/80 tabular-nums whitespace-nowrap">· {{ coneInfo.tempLabel }}</span>
+            <span v-if="coneInfo.eta" class="text-xs font-semibold text-celadon-light tabular-nums truncate min-w-0">· {{ coneInfo.eta }}</span>
+          </div>
 
-               MOBILE (Aug 2026): both children were shrink-0 inside a
-               min-w-0 + overflow-hidden parent, so at 320px (≈136px of text
-               zone) a longer label like "45° behind" was silently SLICED IN
-               HALF rather than wrapping — the firing state, cut off mid-word.
-               delta.short ("45°") already existed on the computed but was
-               never rendered; it now carries the sub-380px case, and the
-               target label may truncate as the last resort.
-
-               ON TRACK: renders as a bare tick here at EVERY mobile width.
-               "On track" has no shorter form to degrade to, so it was the one
-               state that crowded this line. The hero temp above is already
-               celadon-light in that state, so nothing is lost. -->
           <div v-if="targetTemp !== null" class="flex items-center gap-1.5 min-w-0">
             <span class="text-xs text-parchment-4/80 whitespace-nowrap truncate min-w-0">target <b class="font-bold text-parchment-3 tabular-nums">{{ targetTemp }}{{ unitLabel }}</b></span>
             <span v-if="delta" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[11px] font-bold shrink-0 whitespace-nowrap" :class="delta.class">
@@ -230,12 +167,12 @@
                 <span class="hidden min-[380px]:inline">{{ delta.label }}</span>
               </template>
             </span>
+            <span v-if="reductionOpen" class="inline-flex items-center gap-1 text-[11px] font-bold text-cobalt-light shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-cobalt-light animate-pulse"/>Live</span>
           </div>
 
-          <!-- Rate line -->
-          <div class="flex items-center gap-2 mt-0.5">
-            <span class="text-[11px] text-parchment-4/80 whitespace-nowrap">Rate <b class="font-bold" :class="rateColorClassDark">{{ rateShort }}</b><span class="text-parchment-4/50">/{{ targetRate }}</span></span>
-            <span v-if="reductionOpen" class="inline-flex items-center gap-1 text-[11px] font-bold text-cobalt-light shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-cobalt-light animate-pulse"/>Reduction</span>
+          <div v-if="atmosphereInfo" class="flex items-center gap-1.5 min-w-0 mt-0.5">
+            <span v-if="atmosphereInfo.stateLabel" class="px-1.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide shrink-0" :class="atmosphereInfo.stateClass">{{ atmosphereInfo.stateLabel }}</span>
+            <span v-if="atmosphereInfo.nextLabel" class="text-[11px] text-parchment-4/80 truncate min-w-0">{{ atmosphereInfo.nextLabel }}</span>
           </div>
         </button>
 
@@ -245,23 +182,15 @@
         </button>
       </div>
 
-      <!-- CONE DROPS: standalone button when the parent says there's room
-           (≥ iPad-portrait width with the sidebar closed). Solid celadon,
-           matching the lg version (option D). Otherwise it stays in the ⋮ menu. -->
       <button
         v-if="isLive && showConeButton"
         class="hidden md:flex shrink-0 w-[88px] bg-celadon active:bg-celadon-dark text-white rounded-2xl flex-col items-center justify-center gap-1 transition-colors"
         @click="$emit('cone-drop')"
       >
-        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M4 6 h16 L12 20 Z" stroke-linejoin="round"/>
-        </svg>
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6 h16 L12 20 Z" stroke-linejoin="round"/></svg>
         <span class="text-[10px] font-bold uppercase">Cone down</span>
       </button>
 
-      <!-- REDUCTION TOGGLE: standalone beside the cone button when there's
-           room (same showConeButton condition). Solid cobalt like its
-           siblings; state lives in the label + pulsing dot. -->
       <button
         v-if="isLive && showConeButton"
         class="hidden md:flex shrink-0 w-[88px] bg-cobalt active:bg-cobalt-dark text-white rounded-2xl flex-col items-center justify-center gap-1 transition-colors"
@@ -273,32 +202,21 @@
         <span class="text-[10px] font-bold uppercase">{{ reductionOpen ? 'End red.' : 'Reduce' }}</span>
       </button>
 
-      <!-- Standalone menu (sheet teleported below to escape overflow-hidden) -->
       <button class="shrink-0 w-12 bg-white border border-parchment-3 rounded-2xl flex items-center justify-center text-ink-muted active:bg-parchment-2 transition-colors" style="box-shadow:0 2px 12px rgba(58,30,8,0.06)" @click="menuOpen = !menuOpen">
         <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
       </button>
     </div>
 
-    <!-- Mobile overflow menu — bottom sheet (Teleported so overflow-hidden can't clip it) -->
     <Teleport to="body">
       <div v-if="menuOpen" class="lg:hidden fixed inset-0 z-[80] flex flex-col justify-end font-serif" style="background:rgba(26,18,8,0.6)" @click.self="menuOpen = false">
-        <!-- SAFE AREA + dvh (Aug 2026): p-3 alone put "Cancel" underneath the
-             iPhone home indicator. The height cap uses dvh because 100vh on
-             iOS measures a viewport that includes Safari's chrome; with eight
-             actions on a short phone the sheet could otherwise run off-screen
-             with no way to scroll. -->
         <div
           class="bg-parchment rounded-t-2xl p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex flex-col gap-2 overflow-y-auto"
           style="max-height:85vh; max-height:min(85vh, 85dvh)"
         >
           <div class="flex justify-center pb-1"><div class="w-10 h-1 bg-parchment-3 rounded-full"/></div>
-          <!-- Order: cone down, reduction, edit readings, notes, recalibrate,
-               pause/resume, end.
-               Palette (option 3, "two solids"): the two firing EVENTS are loud
-               solids — celadon = cone down (heat-work), cobalt = reduction
-               (atmosphere) — utilities are silent white, resume is flame, end
-               is red. Cone entry hides when the standalone button is broken
-               out beside the pill (showConeButton, md+). -->
+          <!-- Firing events are loud solids (celadon heat-work, cobalt
+               atmosphere); utilities silent white. Cone entry hides when the
+               standalone button is broken out beside the pill. -->
           <button v-if="isLive && !showConeButton" class="w-full py-3 bg-celadon active:bg-celadon-dark text-white text-sm font-bold rounded-xl transition-colors" @click="emitAction('cone-drop')">
             <svg class="w-4 h-4 inline -mt-0.5 mr-1.5" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6 h16 L12 20 Z" stroke-linejoin="round"/></svg>Cone down
           </button>
@@ -320,7 +238,12 @@
       </div>
     </Teleport>
 
-    <!-- Paused banner -->
+    <div v-if="atmosphereInfo" class="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white border border-parchment-3 text-xs">
+      <span v-if="atmosphereInfo.stateLabel" class="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide" :class="atmosphereInfo.stateClassLight">{{ atmosphereInfo.stateLabel }}</span>
+      <span v-else class="text-[10px] font-bold uppercase tracking-wide text-ink-faint">Neutral</span>
+      <span v-if="atmosphereInfo.nextLabel" class="text-ink-muted">{{ atmosphereInfo.nextLabel }}</span>
+    </div>
+
     <div v-if="isPaused" class="flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold">
       ⏸ Paused — resume when your kiln is firing again
     </div>
@@ -331,21 +254,20 @@
 import { computed, ref, watch } from 'vue'
 
 const props = defineProps({
-  currentTemp:   { type: Number, default: null },   // raw °C
-  targetTemp:    { type: Number, default: null },   // ALREADY in display unit (from useFiringStats)
-  rateOfChange:  { type: String, default: '—' },    // formatted display string
-  targetRate:    { type: String, default: '—' },    // formatted display string
-  rateC:         { type: Number, default: null },   // raw °C/min (colour logic)
-  targetRateC:   { type: Number, default: null },   // raw °C/min (colour logic)
-  targetTempC:   { type: Number, default: null },   // raw °C (delta logic)
-  readingCount:  { type: Number, default: 0 },
-  isLive:        Boolean,
-  isPaused:      Boolean,
-  reductionOpen: { type: Boolean, default: false },   // G11
-  // CONE DROPS: parent decides when there's room for the standalone button in
-  // the compact tier (iPad portrait with the sidebar closed, etc). The lg+
-  // desktop row always shows it.
+  currentTemp:    { type: Number, default: null },   // raw °C
+  targetTemp:     { type: Number, default: null },   // already in display unit
+  rateOfChange:   { type: String, default: '—' },
+  targetRate:     { type: String, default: '—' },
+  rateC:          { type: Number, default: null },   // raw °C/min
+  targetRateC:    { type: Number, default: null },   // raw °C/min
+  targetTempC:    { type: Number, default: null },   // raw °C
+  readingCount:   { type: Number, default: 0 },
+  isLive:         Boolean,
+  isPaused:       Boolean,
+  reductionOpen:  { type: Boolean, default: false },
   showConeButton: { type: Boolean, default: false },
+  nextCone:       { type: Object, default: null },   // { name, tempC, etaMinutes|null }
+  atmosphere:     { type: Object, default: null },   // { state, next }
 })
 
 const emit = defineEmits(['open-temp', 'log-reading', 'pause', 'resume', 'recalibrate', 'end', 'reduction', 'notes', 'cone-drop', 'readings'])
@@ -356,17 +278,39 @@ const menuOpen = ref(false)
 function emitAction(name) { menuOpen.value = false; emit(name) }
 watch(() => [props.isLive, props.isPaused], () => { menuOpen.value = false })
 
-// Current temp converted for display (target arrives pre-converted from stats).
 const currentDisplay = computed(() =>
   props.currentTemp === null ? null : displayTemp(props.currentTemp)
 )
 
-// Rate colour from raw °C rates — no string parsing. Thresholds are in °C/min;
-// comparing two °C rates is unit-agnostic, so no conversion needed here.
-// LIGHT-surface palette (desktop white rate card).
+// The ETA is an estimate against the cone's ~60C/hr rating, never authoritative
+// over the witness cone, hence the "~" and "at this rate".
+const coneInfo = computed(() => {
+  const c = props.nextCone
+  if (!c) return null
+  return {
+    name: c.name,
+    tempLabel: `${displayTemp(c.tempC)}°`,
+    eta: c.etaMinutes == null ? null : `~${c.etaMinutes} min at this rate`,
+  }
+})
+
+const atmosphereInfo = computed(() => {
+  const a = props.atmosphere
+  if (!a) return null
+  const verb = a.next?.kind === 'oxidation' ? 'oxidise' : 'reduce'
+  return {
+    stateLabel: a.state ? a.state.toUpperCase() : null,
+    stateClass: a.state === 'oxidation' ? 'bg-amber-400/20 text-amber-300' : 'bg-cobalt/40 text-cobalt-light',
+    stateClassLight: a.state === 'oxidation' ? 'bg-amber-50 text-amber-700' : 'bg-cobalt-bg text-cobalt-dark',
+    nextLabel: a.next
+      ? `${verb} from ${a.next.cone ? `cone ${a.next.cone} · ` : ''}${displayTemp(a.next.tempC)}°`
+      : null,
+  }
+})
+
+// Thresholds are °C/min; comparing two °C rates needs no conversion.
 const rateColorClass = computed(() => {
-  const actual = props.rateC
-  const target = props.targetRateC
+  const actual = props.rateC, target = props.targetRateC
   if (actual === null) return 'text-ink-faint'
   if (target === null) return 'text-celadon'
   const diff = actual - target
@@ -375,10 +319,8 @@ const rateColorClass = computed(() => {
   return 'text-celadon'
 })
 
-// BRAND: same logic, INK-surface palette (mobile strip lives on the ink card).
 const rateColorClassDark = computed(() => {
-  const actual = props.rateC
-  const target = props.targetRateC
+  const actual = props.rateC, target = props.targetRateC
   if (actual === null) return 'text-parchment-4/60'
   if (target === null) return 'text-celadon-light'
   const diff = actual - target
@@ -387,35 +329,22 @@ const rateColorClassDark = computed(() => {
   return 'text-celadon-light'
 })
 
-// Mobile short rate: strip the unit suffix from the formatted string.
-const rateShort = computed(() =>
-  (props.rateOfChange ?? '—').replace('°/m', '').replace('°C/m', '').replace('°F/m', '')
-)
+const rateShort = computed(() => props.rateOfChange ?? '—')
 
-// BRAND: both hero-temp surfaces are ink now, so the state colours here are the
-// light variants (delta.textClass below is dark-surface-tuned).
 const currentColorClass = computed(() => {
   if (props.currentTemp === null) return 'text-parchment-4/50'
   if (!delta.value) return 'text-flame-light'
   return delta.value.textClass
 })
 
-// Delta computed in °C (both operands °C). The 15°C on-track window is a °C
-// threshold and stays °C. The NUMBER shown to the user converts via displayDelta.
-// `class` (the chip) keeps LIGHT state-pill styling — it pops hardest on ink.
-// `textClass` is the on-ink text colour for the hero number + arrow.
-//
-// `iconOnly` is read ONLY by the mobile status line, where the on-track chip
-// renders as a bare tick. Ahead/behind have a natural short form ("45°") to
-// degrade to; "On track" does not, so it is the one state that crowds that
-// line. Desktop ignores this flag — it has the width for the words.
+// Computed in °C; the ±15 window is a °C threshold. iconOnly is read only by
+// the mobile status line, where on-track renders as a bare tick.
 const delta = computed(() => {
   if (props.currentTemp === null || props.targetTempC === null) return null
   const dC = Math.round(props.currentTemp - props.targetTempC)
-  const absC = Math.abs(dC)
   const absDisplay = Math.abs(displayDelta(dC))
-  if (absC <= 15) return { icon: '✓', label: 'On track', short: 'on track', iconOnly: true, class: 'bg-celadon-bg text-celadon-dark', textClass: 'text-celadon-light' }
-  if (dC > 15)    return { icon: '↑', label: `${absDisplay}° ahead`, short: `${absDisplay}°`, class: 'bg-amber-50 text-amber-700', textClass: 'text-amber-400' }
+  if (Math.abs(dC) <= 15) return { icon: '✓', label: 'On track', short: 'on track', iconOnly: true, class: 'bg-celadon-bg text-celadon-dark', textClass: 'text-celadon-light' }
+  if (dC > 15) return { icon: '↑', label: `${absDisplay}° ahead`, short: `${absDisplay}°`, class: 'bg-amber-50 text-amber-700', textClass: 'text-amber-400' }
   return { icon: '↓', label: `${absDisplay}° behind`, short: `${absDisplay}°`, class: 'bg-blue-50 text-blue-700', textClass: 'text-blue-400' }
 })
 

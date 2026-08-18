@@ -1,20 +1,11 @@
 <!-- File: app/pages/app.vue -->
 <template>
-  <!-- MOBILE (Aug 2026): h-screen is 100vh, which on iOS EXCLUDES Safari's
-       URL bar — the bottom of the console and the chart's Reset-zoom button
-       sat underneath it. 100dvh tracks the actually-visible height. Applied
-       inline rather than as a class so it reliably beats h-screen; browsers
-       without dvh drop the declaration and fall back to 100vh. -->
+  <!-- 100dvh, not h-screen: 100vh on iOS excludes Safari's URL bar and buried
+       the console and the Reset-zoom button underneath it. -->
   <div class="flex flex-col h-screen overflow-hidden font-serif bg-parchment" style="height:100dvh">
 
-    <!-- ── Header ───────────────────────────────────────────────────────────
-         MOBILE (Aug 2026): was a hand-rolled row of brand + FeedbackButton +
-         TempUnitToggle + UserMenu with nothing allowed to shrink. Their
-         combined min-content exceeded 375px, which is what pushed the page
-         wider than the screen. AppNav owns the layout now — it drops the
-         wordmark on narrow screens and renders the section tabs on md+. The
-         hamburger stays here because on THIS page it opens the firing list,
-         not navigation; the sidebar takes over at sm, so it hides there. -->
+    <!-- AppNav owns header layout; the hamburger stays here because on this
+         page it opens the firing list, not navigation. -->
     <AppNav :sticky="false" container="max-w-none">
       <template #lead>
         <button
@@ -27,7 +18,6 @@
       </template>
 
       <template #actions>
-        <!-- FEEDBACK: label renders lg+ only; collapses to an icon on mobile. -->
         <FeedbackButton />
         <TempUnitToggle size="md" @change="setChartUnit" />
       </template>
@@ -36,7 +26,6 @@
     <!-- ── Body ─────────────────────────────────────────────────────────────── -->
     <div class="flex flex-1 overflow-hidden min-w-0">
 
-      <!-- Sidebar — desktop only -->
       <FiringSidebar
         class="hidden sm:flex"
         :open="sidebarOpen"
@@ -55,28 +44,18 @@
         @load-more="loadOlderFirings"
       />
 
-      <!-- Main content -->
       <main class="flex-1 flex flex-col min-w-0 overflow-hidden">
 
+        <PastDueBanner :grace-ends-at="pastDueGraceEndsAt" />
+        <AnnouncementBanner :announcements="announcements" @dismiss="dismissAnnouncement" />
 
-          <PastDueBanner :grace-ends-at="pastDueGraceEndsAt" />
-
-          <!-- ANNOUNCEMENTS: admin-pushed banners (from /api/bootstrap) -->
-          <AnnouncementBanner :announcements="announcements" @dismiss="dismissAnnouncement" />
-
-
-        <!-- ── Booting — /api/bootstrap in flight ── -->
-        <!-- UX (Aug 2026): shown instead of the empty state so a slow first
-             load never reads as "you have no firings". NOTE: `booting` is
-             cleared BEFORE selectFiring runs (see loadBootstrap) — the chart
-             canvas lives in the v-else branch below and must be mounted
-             before the chart paints into it. -->
+        <!-- Booting: shown instead of the empty state so a slow first load
+             never reads as "you have no firings". -->
         <div v-if="booting" class="flex-1 flex flex-col items-center justify-center gap-3 text-ink-muted px-6">
           <span class="w-7 h-7 border-2 border-parchment-3 border-t-celadon rounded-full animate-spin"/>
           <p class="text-sm font-semibold">Loading your firings…</p>
         </div>
 
-        <!-- ── Empty state — nothing selected ── -->
         <FiringEmptyState
           v-else-if="!selectedFiring"
           :recent-firing="pastFirings[0] ?? null"
@@ -86,10 +65,8 @@
           @select-recent="selectFiring"
         />
 
-        <!-- ── A firing is selected ── -->
         <template v-else>
 
-          <!-- Console (live) or Review (ended) -->
           <div class="shrink-0 px-3 pb-3 pt-2 sm:px-5 sm:pb-0 sm:pt-2.5 min-w-0">
             <FiringConsole
               v-if="!selectedFiring.ended_at"
@@ -101,6 +78,8 @@
               :rate-c="rateC"
               :target-rate-c="targetRateC"
               :target-temp-c="targetTempC"
+              :next-cone="nextCone"
+              :atmosphere="atmosphere"
               :reading-count="readingCount"
               :is-live="isLive"
               :is-paused="isPaused"
@@ -131,7 +110,6 @@
             />
           </div>
 
-          <!-- G6: auto-ended banner -->
           <div v-if="selectedFiring.auto_ended && selectedFiring.ended_at" class="px-3 sm:px-5 pt-2 min-w-0">
             <AutoEndedBanner :firing="selectedFiring" @restart="restartFiring(selectedFiring)" />
           </div>
@@ -152,58 +130,26 @@
       </main>
     </div>
 
-    <!-- ── Recalibrate modal ─────────────────────────────────────────────────── -->
-    <!-- SAFE AREA (Aug 2026): every bottom sheet below pads past the iPhone's
-         home indicator. Without it the last button sits under the gesture bar
-         and is genuinely hard to hit. -->
-    <Teleport to="body">
-      <div v-if="showRecalibrateInfo" class="fixed inset-0 z-[70] flex items-end sm:items-center justify-center" style="background:rgba(26,18,8,0.55)" @click.self="showRecalibrateInfo = false">
-        <div class="bg-parchment sm:bg-white w-full sm:w-80 sm:rounded-2xl rounded-t-2xl p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-5 sm:border sm:border-parchment-3" style="box-shadow:0 -8px 40px rgba(26,18,8,0.15)">
-          <p class="text-sm font-bold text-ink mb-1.5">When to recalibrate</p>
-          <p class="text-sm text-ink-muted leading-relaxed">Use this when your kiln has fallen behind the planned curve — a weak burner, a stall, or after a gas-out. It slides the rest of your schedule to start from your <strong>current temperature</strong>, keeping every ramp rate intact. Your firing just finishes later.</p>
-          <div class="flex gap-2 mt-4">
-            <button class="flex-1 py-2.5 bg-celadon hover:bg-celadon-dark text-white text-sm font-bold rounded-lg transition-colors" @click="recalibrate">Recalibrate now</button>
-            <button class="px-4 py-2.5 border border-parchment-3 text-ink-muted text-sm font-semibold rounded-lg hover:bg-parchment-2 transition-colors" @click="showRecalibrateInfo = false">Cancel</button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+    <!-- ── Sheets and modals ─────────────────────────────────────────────────── -->
+    <RecalibrateModal
+      :open="showRecalibrateInfo"
+      @close="showRecalibrateInfo = false"
+      @confirm="recalibrate"
+    />
 
-    <!-- ── Notes modal ───────────────────────────────────────────────────────── -->
-    <!-- Triggered from FiringConsole's overflow menu (@notes). firings.notes
-         already existed server-side (POST /api/firings + PUT /api/firings/:id
-         both accept it); this is the UI that was missing. -->
-    <Teleport to="body">
-      <div v-if="showNotesModal" class="fixed inset-0 z-[70] flex items-end sm:items-center justify-center" style="background:rgba(26,18,8,0.6)" @click.self="showNotesModal = false">
-        <div class="bg-parchment w-full sm:w-[440px] sm:rounded-2xl rounded-t-2xl p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:p-6 flex flex-col gap-3 border border-parchment-3" style="box-shadow:0 -8px 40px rgba(26,18,8,0.15)">
-          <div class="flex flex-col gap-0.5">
-            <h2 class="text-base font-bold text-ink">Notes</h2>
-            <p class="text-xs text-ink-muted truncate">{{ selectedFiring?.name }}</p>
-          </div>
-          <textarea
-            v-model="notesDraft"
-            rows="7"
-            maxlength="5000"
-            class="input !py-2 resize-y leading-relaxed"
-            placeholder="Load, atmosphere, glaze tests, anything worth remembering…"
-          />
-          <div class="flex items-center justify-between gap-2">
-            <span class="text-[11px] text-ink-faint tabular-nums shrink-0">{{ notesDraft.length }}/5000</span>
-            <div class="flex gap-2 shrink-0">
-              <button class="btn-ghost !py-2" :disabled="notesSaving" @click="showNotesModal = false">Cancel</button>
-              <button class="btn-primary !py-2" :disabled="notesSaving" @click="saveNotes">
-                {{ notesSaving ? 'Saving…' : 'Save notes' }}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+    <FiringNotesModal
+      :open="showNotesModal"
+      :firing-name="selectedFiring?.name ?? ''"
+      :notes="selectedFiring?.notes ?? ''"
+      :saving="notesSaving"
+      @close="showNotesModal = false"
+      @save="saveNotes"
+    />
 
-    <!-- CONE DROPS: one-tap witness-cone logging -->
-    <ConeDropSheet
+      <ConeDropSheet
       :open="showConeSheet"
       :cones="coneList"
+      :pack="selectedFiring?.cone_pack ?? []"
       :drops="selectedFiring?.cone_drops ?? []"
       :started-at="selectedFiring?.started_at ?? 0"
       :busy="coneBusy"
@@ -212,9 +158,7 @@
       @remove="removeConeDrop"
     />
 
-    <!-- READINGS TABLE (Aug 2026): the dependable way to fix a mistyped
-         reading. The chart's tap-a-point path still works but is unreliable on
-         a phone, which is what prompted this. Stays open across edits. -->
+    <!-- Stays open across edits: fixing readings is usually a run, not one. -->
     <ReadingsTableModal
       :open="showReadingsTable"
       :readings="selectedFiring?.readings ?? []"
@@ -225,25 +169,6 @@
       @delete="deleteReadingFromTable"
     />
 
-    <!-- ── End firing confirm modal ──────────────────────────────────────────── -->
-    <Teleport to="body">
-      <div v-if="showEndConfirm" class="fixed inset-0 z-[70] flex items-end sm:items-center justify-center" style="background:rgba(26,18,8,0.6)" @click.self="showEndConfirm = false">
-        <div class="bg-parchment w-full sm:w-[400px] sm:rounded-2xl rounded-t-2xl p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:pb-6 flex flex-col gap-4 border border-parchment-3" style="box-shadow:0 -8px 40px rgba(26,18,8,0.15)">
-          <div class="flex flex-col gap-1.5">
-            <h2 class="text-base font-bold text-ink">End this firing?</h2>
-            <p class="text-sm text-ink-muted leading-relaxed">
-              This marks <strong>{{ selectedFiring?.name }}</strong> as finished and stops logging. You can restart it later if you need to keep going.
-            </p>
-          </div>
-          <div class="flex justify-end gap-2">
-            <button class="px-4 py-2 border border-parchment-3 text-ink-muted hover:bg-parchment-2 text-sm font-semibold rounded-lg transition-colors" @click="showEndConfirm = false">Cancel</button>
-            <button class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-bold rounded-lg transition-colors" @click="confirmEndFiring">End firing</button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
-
-    <!-- ── Mobile firing sidebar (sheet) ─────────────────────────────────────── -->
     <FiringSidebarMobile
       :open="showFiringSheet"
       :selected-id="selectedFiring?.id ?? null"
@@ -259,8 +184,6 @@
       @load-more="loadOlderFirings"
     />
 
-
-    <!-- ── Modals ────────────────────────────────────────────────────────────── -->
     <KilnTempModal
       :open="showTempModal"
       :temp="currentTemp"
@@ -271,7 +194,7 @@
       @close="showTempModal = false"
     />
 
-    <!-- D1/D2: preselect prop wired; cleared on close so next open starts fresh -->
+    <!-- D1/D2: preselect cleared on close so the next open starts fresh. -->
     <StartFiringModal
       :open="showStartModal"
       :library="library"
@@ -292,18 +215,24 @@
       @delete="deleteReading"
     />
 
-    <!-- G4: delete-firing confirm (desktop path) -->
+    <ConfirmDialog
+      :open="showEndConfirm"
+      :title="`End ${selectedFiring?.name ?? 'this firing'}?`"
+      message="This marks the firing as finished and stops logging. You can restart it later if you need to keep going."
+      confirm-label="End firing"
+      @confirm="confirmEndFiring"
+      @cancel="showEndConfirm = false"
+    />
+
     <ConfirmDialog
       :open="!!pendingDeleteFiring"
       :title="`Delete ${pendingDeleteFiring?.name ?? 'firing'}?`"
-      message="This permanently removes the firing, its schedule, and every logged reading. This cannot be undone."
+      message="This permanently removes the firing, its plan, and every logged reading. This cannot be undone."
       confirm-label="Delete firing"
       @confirm="performDeleteFiring(pendingDeleteFiring)"
       @cancel="pendingDeleteFiring = null"
     />
 
-    <!-- Rename firing — triggered per-row from the sidebar (renamingFiring holds
-         the target). -->
     <RenameFiringModal
       :open="!!renamingFiring"
       :firing="renamingFiring"
@@ -337,39 +266,34 @@ import { useKilnChart } from '~/composables/useKilnChart'
 
 definePageMeta({ middleware: ['auth'] })
 
-// ARCH (Aug 2026): role arrives in the /api/bootstrap payload (server-verified
-// via useServerUser) and is shared with UserMenu through this state — the
-// browser→Supabase profiles queries in middleware + UserMenu are deleted.
+// Role arrives in the bootstrap payload (server-verified) and is shared with
+// UserMenu through this state.
 const userRole = useState('user-role', () => null)
 
 const toast  = useToast()
 const router = useRouter()
-const route  = useRoute()          // D2: needed for ?startSchedule param
+const route  = useRoute()
 
-const { exportFiring } = useFiringExport()   // Package 6
-
-// G1: hydrate the shared unit from the server on load (now via /api/bootstrap).
-// The toggle UI lives in TempUnitToggle; app.vue only seeds the initial value
-// and repaints the chart when the toggle emits `change`.
+const { exportFiring } = useFiringExport()
 const { setUnit: setUnitState } = useTempUnit()
 
 const chartCanvas          = ref(null)
 const consoleRef           = ref(null)
 const editingReading       = ref(null)
 const showReadingModal     = ref(false)
-const showReadingsTable    = ref(false)  // tabular reading editor
+const showReadingsTable    = ref(false)
 const readingBusyId        = ref(null)   // reading id with a save/delete in flight
 const showFiringSheet      = ref(false)
-const sheetDeletingId      = ref(null)   // firing id with a delete request in flight
+const sheetDeletingId      = ref(null)
 const showStartModal       = ref(false)
-const preselect            = ref(null) // D1/D2: points + name to pre-load into modal
+const preselect            = ref(null)   // D1/D2: points + name for the modal
 const showTempModal        = ref(false)
 const showEndConfirm       = ref(false)
-const pendingDeleteFiring  = ref(null) // G4: firing awaiting delete confirmation
-const renamingFiring       = ref(null) // firing being renamed (sidebar-triggered); open when non-null
+const pendingDeleteFiring  = ref(null)
+const renamingFiring       = ref(null)
 const allFirings           = ref([])
-// LAZY LIST (Aug 2026): the firings list is paged. MUST match
-// FIRINGS_PAGE_SIZE in server/utils/firingList.js — `hasMoreFirings` is
+
+// MUST match FIRINGS_PAGE_SIZE in server/utils/firingList.js — hasMore is
 // inferred from "the last page came back full", so a mismatch makes the
 // "Load older" button appear or vanish one page early.
 const FIRINGS_PAGE         = 30
@@ -377,7 +301,7 @@ const hasMoreFirings       = ref(false)
 const loadingOlderFirings  = ref(false)
 const firingsOffset        = ref(0)
 const selectedFiring       = ref(null)
-const currentTemp          = ref(null)  // raw °C
+const currentTemp          = ref(null)   // raw °C
 const isSaving             = ref(false)
 const isLive               = ref(false)
 const isPaused             = ref(false)
@@ -388,58 +312,42 @@ const sidebarWidth         = ref(280)
 const MIN_WIDTH            = 180
 const isDragging           = ref(false)
 const nowUnix              = ref(Math.floor(Date.now() / 1000))
-const winW                 = ref(1024)   // CONE DROPS: viewport width, kept fresh by onWindowResize
+const winW                 = ref(1024)
 
-// CONE DROPS: is there room to break the Cone-down button out of the ⋮ menu in
-// the compact (below-lg) console tier? lg+ always shows it; in between, only
-// when the sidebar isn't eating the width (iPad portrait with sidebar closed).
+// Room to break the Cone-down button out of the compact tier's menu?
 const coneButtonRoomy = computed(() => !sidebarOpen.value || winW.value >= 1024)
 
-// Notes modal (firings.notes — CRUD already exists on the API)
 const showNotesModal = ref(false)
-const notesDraft     = ref('')
 const notesSaving    = ref(false)
 
-// CONE DROPS (Aug 2026)
+// Cones carry temp_c: the chart's ruler, the next-cone ETA, and the cone-drop
+// sheet all read this one list. Seeded from bootstrap.
 const showConeSheet = ref(false)
-const coneList      = ref([])     // fetched once from /api/cones
+const coneList      = ref([])
 const coneBusy      = ref(false)
 
-// ANNOUNCEMENTS (Aug 2026): live banners from bootstrap; dismiss is optimistic.
-const announcements = ref([])
-
-// G8 (Aug 2026): past_due grace deadline (ISO string) from bootstrap; null
-// unless the user is past_due. Feeds PastDueBanner, which no longer does its
-// own auth.getUser() + profiles query.
+const announcements      = ref([])
 const pastDueGraceEndsAt = ref(null)
 
-// UX (Aug 2026): true until /api/bootstrap resolves. Without this the page
-// renders FiringEmptyState during the wait, which actively lies to the user
-// ("no firings yet") while their firings are still loading — worse than a
-// spinner. Gates the main column only; header/sidebar chrome renders straight
-// away so the app feels present.
-// IMPORTANT: clear this BEFORE calling selectFiring — the chart canvas only
-// exists in the non-booting branch, and selectFiring paints into it.
+// True until bootstrap resolves. Cleared BEFORE selectFiring — the chart canvas
+// only exists in the non-booting branch and selectFiring paints into it.
 const booting = ref(true)
 
 async function dismissAnnouncement(id) {
   announcements.value = announcements.value.filter(a => a.id !== id)
   try {
     await $fetch(`/api/announcements/${id}/dismiss`, { method: 'POST' })
-  } catch {
-    // Non-fatal: worst case the banner reappears next load.
-  }
+  } catch { /* worst case the banner reappears next load */ }
 }
 
 let elapsedTickInterval = null
 
-// NOW-LINE + G1: setUnit pulled from the chart composable to repaint on toggle.
-const { init, setSchedule, setReadings, setReductions, setConeDrops, setNowLine, clearNowLine, setUnit: setChartUnit, resetZoom, resize, destroy } = useKilnChart(chartCanvas, {
+const { init, setSchedule, setReadings, setReductions, setConeLines, setConeDrops, setNowLine, clearNowLine, setUnit: setChartUnit, resetZoom, resize, destroy } = useKilnChart(chartCanvas, {
   enableZoom: true,
   showLabels: true,
   onPointClick: (point) => {
     if (!isLive.value) return
-    // point.y is the °C data value; keep it as tempC for the modal to convert.
+    // point.y is °C; keep it as tempC for the modal to convert.
     editingReading.value = { id: point.raw?.id ?? point.id, ts: point.raw?.ts ?? point.ts, tempC: point.y, x: point.x }
     showReadingModal.value = true
   },
@@ -448,10 +356,10 @@ const { init, setSchedule, setReadings, setReductions, setConeDrops, setNowLine,
 const activeFiring = computed(() => allFirings.value.find(f => f.started_at && !f.ended_at) ?? null)
 const pastFirings  = computed(() => allFirings.value.filter(f => f.ended_at).sort((a, b) => b.created_at - a.created_at))
 
-// G1: stats now also return raw °C values (rateC/targetRateC/targetTempC) for
-// FiringConsole's colour + delta logic, plus display strings/numbers.
-const { duration, readingCount, elapsed, rateOfChange, targetRate, targetTemp, rateC, targetRateC, targetTempC }
-  = useFiringStats(selectedFiring, nowUnix)
+// Stats return display strings plus raw °C for the console's colour and delta
+// logic; coneList feeds nextCone and the atmosphere readout.
+const { duration, readingCount, elapsed, rateOfChange, targetRate, targetTemp, rateC, targetRateC, targetTempC, nextCone, atmosphere }
+  = useFiringStats(selectedFiring, nowUnix, coneList)
 
 const peakTemp = computed(() => {
   const rs = selectedFiring.value?.readings
@@ -459,30 +367,45 @@ const peakTemp = computed(() => {
   return rs.reduce((max, r) => r.temperature > max ? r.temperature : max, rs[0].temperature)
 })
 
-// G11: the open (in-progress) reduction period, if any
 const openReduction = computed(() =>
   (selectedFiring.value?.reductions ?? []).find(r => r.end_temp === null || r.end_temp === undefined) ?? null
 )
 
 const scheduleOffset = computed(() => selectedFiring.value?.schedule_offset ?? 0)
 
+// The ruler is the firing's planned cone pack (or a peak-anchored fallback), so
+// it recomputes whenever the plan or the selection changes.
+function coneLineOpts() {
+  return { pack: selectedFiring.value?.cone_pack ?? [] }
+}
+
 function applySchedule(scheduleRows) {
   const rows = scheduleRows ?? selectedFiring.value?.schedule ?? []
   setSchedule(rows, scheduleOffset.value)
+  setConeLines(coneList.value, coneLineOpts())
 }
 
-// NOW-LINE: advance the clock and the line together each second.
 function tickNow() {
   nowUnix.value = Math.floor(Date.now() / 1000)
   if (selectedFiring.value?.started_at) setNowLine(selectedFiring.value.started_at)
 }
 
-// ARCH (Aug 2026): 402 = the server's useServerUser says access lapsed. This
-// is now the ONLY access gate — the middleware's client-side profiles check
-// was deleted — so the mount path must recognise it and redirect instead of
-// treating it as a load failure.
+// 402 = the server says access lapsed. This is the only access gate.
 function isAccessLapsed(err) {
   return (err?.statusCode ?? err?.status ?? err?.response?.status) === 402
+}
+
+// Fallback for the serial load path and for a bootstrap that failed. Safe to
+// call repeatedly.
+async function ensureCones() {
+  if (coneList.value.length) return true
+  try {
+    coneList.value = await $fetch('/api/cones')
+    setConeLines(coneList.value, coneLineOpts())
+    return true
+  } catch {
+    return false
+  }
 }
 
 async function loadBootstrap() {
@@ -492,28 +415,24 @@ async function loadBootstrap() {
   setUnitState(boot.temp_unit === 'F' ? 'F' : 'C')
   setChartUnit()
 
-  // LAZY LIST (Aug 2026): boot.firings is now the FIRST PAGE, not everything.
-  // hasMore is inferred from "the page came back full" — no COUNT(*) needed.
-  // firingsOffset tracks rows CONSUMED from the server list; it must be set
-  // before ensureFiringInList, which can prepend a row that was never part of
-  // a page and would otherwise inflate the next offset.
+  // Before selectFiring: it calls setConeLines with this list.
+  coneList.value = boot.cones ?? []
+
+  // boot.firings is the FIRST PAGE. firingsOffset tracks rows consumed from the
+  // server list, so it must be set before ensureFiringInList, which can prepend
+  // a row that was never part of a page.
   allFirings.value = boot.firings ?? []
   firingsOffset.value = (boot.firings ?? []).length
   hasMoreFirings.value = (boot.firings ?? []).length === FIRINGS_PAGE
-  // The active firing can be older than page 1 (restarting an old firing makes
-  // it active without touching created_at), so merge its row in explicitly —
-  // otherwise the `activeFiring` computed finds nothing and the app believes
-  // no firing is running.
+  // The active firing can be older than page 1 (restarting doesn't touch
+  // created_at), so merge its row in explicitly.
   ensureFiringInList(boot.activeFiring)
 
-  announcements.value = boot.announcements ?? []   // ANNOUNCEMENTS
-  // UX (Aug 2026): drop the skeleton BEFORE selectFiring so the chart canvas
-  // is mounted by the time the chart paints into it.
-  booting.value = false
+  announcements.value = boot.announcements ?? []
+  booting.value = false   // canvas must be mounted before selectFiring paints
   if (boot.activeFiring) await selectFiring(boot.activeFiring, boot.activeFiring)
 }
 
-// Legacy fallback — kept intentionally; also used by other error paths.
 async function loadUnit() {
   try {
     const { temp_unit } = await $fetch('/api/preferences')
@@ -523,39 +442,37 @@ async function loadUnit() {
 }
 
 onMounted(async () => {
-  winW.value = window.innerWidth   // CONE DROPS: seed before first paint decisions
+  winW.value = window.innerWidth
   await init()
 
   try {
     await loadBootstrap()
   } catch (err) {
-    // ARCH (Aug 2026): access lapsed → redirect, don't fall back (the serial
-    // path would just 402 again on /api/firings and blank the page). The
-    // skeleton stays up through the redirect — no flash of empty app.
+    // Access lapsed: redirect rather than fall back, since the serial path
+    // would just 402 again and blank the page.
     if (isAccessLapsed(err)) {
       return navigateTo('/early-access')  // BETA-TEMP (was /subscribe)
     }
     console.error('Bootstrap failed, falling back to serial load:', err)
     try {
       await loadUnit()
+      await ensureCones()
       await refreshFirings()
-      booting.value = false   // as above: canvas must exist before selectFiring
+      booting.value = false
       if (activeFiring.value) await selectFiring(activeFiring.value)
     } catch (err2) {
       if (isAccessLapsed(err2)) {
         return navigateTo('/early-access') // BETA-TEMP (was /subscribe)
       }
-      booting.value = false   // real failure: drop the skeleton, show the page
+      booting.value = false
       throw err2
     }
   }
 
-  // Belt and braces — every success path has already cleared this.
   booting.value = false
 
-  // D2: ?startSchedule=id from the schedules page — start the firing
-  // immediately. The schedule was already chosen there; don't make the user
-  // pick again via the modal. Carries the schedule's points + planned reductions.
+  // D2: ?startSchedule=id from /schedules — the plan was already chosen there,
+  // so start immediately rather than reopening the modal.
   if (route.query.startSchedule) {
     const schedId = route.query.startSchedule
     router.replace('/app')
@@ -569,7 +486,8 @@ onMounted(async () => {
           name:           sched.name,
           notes:          '',
           schedulePoints: (sched.points ?? []).map(p => ({ offsetMinutes: p.offset_minutes, targetTemp: p.target_temp })),
-          reductions:     (sched.reductions ?? []).map(r => ({ startTemp: r.start_temp, endTemp: r.end_temp ?? null })),
+          reductions:     (sched.reductions ?? []).map(r => ({ startTemp: r.start_temp, endTemp: r.end_temp ?? null, kind: r.kind })),
+          conePack:       sched.cone_pack ?? [],
           saveToLibrary:  false,
         })
       } catch (err) {
@@ -592,11 +510,10 @@ onUnmounted(() => {
 
 let resizeRaf = null
 function onWindowResize() {
-  winW.value = window.innerWidth   // CONE DROPS
+  winW.value = window.innerWidth
   if (resizeRaf) cancelAnimationFrame(resizeRaf)
   resizeRaf = requestAnimationFrame(() => resize())
 }
-
 
 function stopAllIntervals() {
   if (elapsedTickInterval) { clearInterval(elapsedTickInterval); elapsedTickInterval = null }
@@ -623,15 +540,12 @@ async function onVisibilityChange() {
   }
 }
 
-// Resets to page 1. Any older pages the user had loaded are dropped — they're
-// one click away again, and the alternative (re-fetching every loaded page on
-// each mutation) costs more than it saves.
+// Resets to page 1; older pages the user had loaded are dropped.
 async function refreshFirings() {
   const page = await $fetch('/api/firings', { query: { limit: FIRINGS_PAGE, offset: 0 } })
   allFirings.value = page
   firingsOffset.value = page.length
   hasMoreFirings.value = page.length === FIRINGS_PAGE
-  // A restarted old firing can be active but off page 1 — keep its row.
   const sel = selectedFiring.value
   if (sel?.started_at && !sel?.ended_at) ensureFiringInList(sel)
 }
@@ -644,8 +558,8 @@ async function loadOlderFirings() {
       query: { limit: FIRINGS_PAGE, offset: firingsOffset.value },
     })
     firingsOffset.value += page.length
-    // Offset paging can still repeat a row if one was inserted above
-    // mid-session. Dedupe by id rather than trusting the offset.
+    // Offset paging can repeat a row if one was inserted above mid-session, so
+    // dedupe by id rather than trusting the offset.
     const seen = new Set(allFirings.value.map(f => f.id))
     allFirings.value = [...allFirings.value, ...page.filter(f => !seen.has(f.id))]
     hasMoreFirings.value = page.length === FIRINGS_PAGE
@@ -656,11 +570,10 @@ async function loadOlderFirings() {
   }
 }
 
+// A LIST row carries none of the heavy nested arrays or notes. New heavy
+// fields must join this strip list.
 function ensureFiringInList(row) {
   if (!row?.id) return
-  // Strip the heavy nested arrays and `notes` — a LIST row carries neither, and
-  // holding a full firing's readings in the sidebar list is exactly what this
-  // refactor set out to stop.
   const listRow = { ...row }
   for (const k of ['schedule', 'readings', 'reductions', 'cone_drops', 'notes']) delete listRow[k]
 
@@ -676,15 +589,14 @@ async function selectFiring(f, preloaded = null) {
   currentTemp.value = null
   consoleRef.value?.closeMenu?.()
   clearNowLine()
-  // The table is bound to selectedFiring.readings; leaving it open across a
-  // firing switch would silently repoint it at a different firing's data.
+  // The table binds to selectedFiring.readings; leaving it open across a switch
+  // would silently repoint it at another firing's data.
   showReadingsTable.value = false
 
   let data = preloaded
-  // LAZY LIST: a list row now has NO `notes` column, so a row passed straight
-  // in as `preloaded` (restartFiring does this) looks complete by the old
-  // schedule/readings test while missing notes entirely — the notes modal
-  // would then open empty and saving would blank real notes.
+  // A list row has no `notes` column, so a row passed straight in as preloaded
+  // (restartFiring does this) passes the schedule/readings test while missing
+  // notes — the notes modal would open empty and saving would blank them.
   if (!data || data.schedule === undefined || data.readings === undefined || data.notes === undefined) {
     data = await $fetch(`/api/firings/${f.id}`)
   }
@@ -692,6 +604,9 @@ async function selectFiring(f, preloaded = null) {
   selectedFiring.value = data
   await nextTick()
   setSchedule(data.schedule ?? [], data.schedule_offset ?? 0)
+  // Before setConeDrops: a drop's connector needs its reference line to exist,
+  // and the ruler's range comes from the plan just set.
+  setConeLines(coneList.value, { pack: data.cone_pack ?? [] })
   setReadings(data.readings ?? [], data.started_at)
   setReductions(data.reductions ?? [], data.started_at)
   setConeDrops(data.cone_drops ?? [], data.started_at)
@@ -717,7 +632,7 @@ async function selectFiring(f, preloaded = null) {
   }
 }
 
-// payload: { name, notes, schedulePoints, reductions, saveToLibrary }
+// payload: { name, notes, schedulePoints, reductions, conePack, saveToLibrary }
 async function createFiring(payload) {
   try {
     const firing = await $fetch('/api/firings', {
@@ -726,12 +641,12 @@ async function createFiring(payload) {
         name: payload.name,
         notes: payload.notes,
         schedulePoints: payload.schedulePoints,
-        reductions: payload.reductions,        // [{ startTemp, endTemp|null }] °C
+        reductions: payload.reductions,        // [{ startTemp, endTemp|null, kind }] °C
+        conePack: payload.conePack ?? [],      // planned witness cones
         startedAt: Math.floor(Date.now() / 1000),
       },
     })
 
-    // Optional: also persist the plan as a reusable library schedule.
     if (payload.saveToLibrary) {
       try {
         await $fetch('/api/schedules', {
@@ -741,7 +656,8 @@ async function createFiring(payload) {
             type: 'glaze',
             source: 'custom',
             points: payload.schedulePoints,
-            reductions: payload.reductions,    // [{ startTemp, endTemp|null }] °C
+            reductions: payload.reductions,
+            conePack: payload.conePack ?? [],
           },
         })
         library.value = []   // force refetch on next modal open
@@ -760,24 +676,14 @@ async function createFiring(payload) {
 }
 
 // ── Notes ────────────────────────────────────────────────────────────────────
-// Opened from FiringConsole's overflow menu. The draft is seeded from the
-// selected firing each time the modal opens, so cancelling discards cleanly.
-function openNotes() {
-  notesDraft.value = selectedFiring.value?.notes ?? ''
-  showNotesModal.value = true
-}
+function openNotes() { showNotesModal.value = true }
 
-async function saveNotes() {
+async function saveNotes(text) {
   const f = selectedFiring.value
   if (!f) return
   notesSaving.value = true
   try {
-    // Empty string → null so the DB doesn't hold blank strings (the server
-    // does the same coercion; sending null is just explicit).
-    const updated = await $fetch(`/api/firings/${f.id}`, {
-      method: 'PUT',
-      body: { notes: notesDraft.value.trim() || null },
-    })
+    const updated = await $fetch(`/api/firings/${f.id}`, { method: 'PUT', body: { notes: text } })
     selectedFiring.value = { ...f, notes: updated.notes }
     const i = allFirings.value.findIndex(x => x.id === f.id)
     if (i !== -1) allFirings.value[i] = { ...allFirings.value[i], notes: updated.notes }
@@ -792,11 +698,9 @@ async function saveNotes() {
 
 // ── Readings table ───────────────────────────────────────────────────────────
 // Both handlers route through reloadReadings so the chart, currentTemp and the
-// stats all follow the edit. The table stays OPEN throughout: correcting
-// readings is usually a run of edits, not one, and closing it after each would
-// repeat the sidebar-delete mistake.
+// stats follow the edit. The table stays open throughout.
 async function updateReadingFromTable({ id, temperature }) {
-  if (readingBusyId.value) return   // ignore taps while one is in flight
+  if (readingBusyId.value) return
   readingBusyId.value = id
   try {
     await $fetch(`/api/readings/${id}`, { method: 'PUT', body: { temperature } })
@@ -822,13 +726,11 @@ async function deleteReadingFromTable(id) {
 }
 
 // ── Cone drops ───────────────────────────────────────────────────────────────
-// One-tap logging via ConeDropSheet. Timestamp + temp snapshot happen
-// server-side; the returned row is merged into selectedFiring and the chart
-// marker set is refreshed.
+// Timestamp and temp snapshot happen server-side; the returned row merges in.
 async function openConeSheet() {
-  if (!coneList.value.length) {
-    try { coneList.value = await $fetch('/api/cones') }
-    catch { toast.show('Couldn\u2019t load the cone list.'); return }
+  if (!(await ensureCones())) {
+    toast.show('Couldn\u2019t load the cone list.')
+    return
   }
   showConeSheet.value = true
 }
@@ -867,6 +769,7 @@ async function removeConeDrop(id) {
   }
 }
 
+// ── Firing lifecycle ─────────────────────────────────────────────────────────
 async function confirmEndFiring() {
   showEndConfirm.value = false
   if (!activeFiring.value) return
@@ -900,19 +803,17 @@ async function restartFiring(f) {
   }
 }
 
-// D1: populate preselect from the firing's saved schedule, then open modal
 function fireAgain(f) {
   const points = (f.schedule ?? []).map(p => ({
     offsetMinutes: p.offset_minutes,
     targetTemp:    p.target_temp,
   }))
-  preselect.value = { name: f.name, schedulePoints: points }
+  preselect.value = { name: f.name, schedulePoints: points, conePack: f.cone_pack ?? [] }
   openStartModal()
 }
 
 function saveAsSchedule(f) { router.push(`/schedules/new?fromFiring=${f.id}`) }
 
-// Package 6: CSV export (unit handled inside useFiringExport).
 function onExportFiring(f) {
   const firing = f ?? selectedFiring.value
   if (!firing) return
@@ -923,7 +824,7 @@ function onExportFiring(f) {
   toast.show('Firing exported.', 'success')
 }
 
-// G11: start/end a reduction period at the current temperature (°C).
+// Start/end an atmosphere period at the current temperature (°C).
 async function onToggleReduction() {
   const f = selectedFiring.value
   if (!f || !isLive.value) return
@@ -946,7 +847,7 @@ async function onToggleReduction() {
     } else {
       const created = await $fetch(`/api/firings/${f.id}/reductions`, {
         method: 'POST',
-        body: { startTemp: temp },
+        body: { startTemp: temp, kind: 'reduction' },
       })
       selectedFiring.value = { ...f, reductions: [...(f.reductions ?? []), created] }
       toast.show('Reduction started.', 'success')
@@ -980,11 +881,13 @@ async function resumeFiring() {
   applySchedule()
   setNowLine(f.started_at)
   elapsedTickInterval = setInterval(tickNow, 1000)
-  toast.show(`Resumed — schedule shifted ${gapMins} min to match.`, 'success')
+  toast.show(`Resumed — plan shifted ${gapMins} min to match.`, 'success')
 }
 
 function openRecalibrate() { showRecalibrateInfo.value = true }
 
+// Slides the plan so it starts from the current temperature, keeping ramp
+// rates intact.
 async function recalibrate() {
   const f = selectedFiring.value
   if (!f || !isLive.value || currentTemp.value == null || !f.schedule?.length) return
@@ -1009,10 +912,11 @@ async function recalibrate() {
   applySchedule()
   setNowLine(f.started_at)
   showRecalibrateInfo.value = false
-  toast.show('Schedule recalibrated to current temperature.', 'success')
+  toast.show('Plan recalibrated to current temperature.', 'success')
 }
 
-// G4: desktop delete now confirms first (mobile sheet keeps its own two-tap)
+// Desktop delete confirms via ConfirmDialog; the mobile sheet has its own
+// two-tap and calls sheetDeleteFiring instead.
 function deleteFiring(f) {
   pendingDeleteFiring.value = f
 }
@@ -1035,7 +939,17 @@ async function performDeleteFiring(f) {
   }
 }
 
-// Apply a rename returned by RenameFiringModal (firing may not be the selected one)
+// The sheet stays open so a run of deletes doesn't mean reopening it each time.
+async function sheetDeleteFiring(f) {
+  if (sheetDeletingId.value) return
+  sheetDeletingId.value = f.id
+  try {
+    await performDeleteFiring(f)
+  } finally {
+    sheetDeletingId.value = null
+  }
+}
+
 function onFiringRenamed(updated) {
   renamingFiring.value = null
   if (selectedFiring.value?.id === updated.id) {
@@ -1046,18 +960,18 @@ function onFiringRenamed(updated) {
 }
 
 async function openStartModal() {
-  // G5: one firing at a time. The server enforces this (partial unique index
-  // → 409), but guard the button so the user never fills out the modal only to
-  // be rejected. Surface the active firing instead of opening a doomed form.
+  // The server enforces one active firing (409), but guard the button so the
+  // user never fills out the modal only to be rejected.
   if (activeFiring.value) {
     toast.show(`"${activeFiring.value.name}" is still firing — only one firing at a time. End it first.`)
     selectFiring(activeFiring.value)
     return
   }
-  if (!library.value.length) library.value = await $fetch('/api/schedules')  // G9: unified endpoint (was /api/library)
+  if (!library.value.length) library.value = await $fetch('/api/schedules')
   showStartModal.value = true
 }
 
+// ── Readings ─────────────────────────────────────────────────────────────────
 function openLogReading()    { editingReading.value = null; showReadingModal.value = true }
 function closeReadingModal() { showReadingModal.value = false; editingReading.value = null }
 
@@ -1097,20 +1011,23 @@ async function deleteReading() {
   }
 }
 
+// Does NOT re-read started_at, fuel or cone_pack — a hard reload is still
+// needed after any server-side change to firing metadata.
 async function reloadReadings() {
   if (!selectedFiring.value) return
   try {
     const data = await $fetch(`/api/firings/${selectedFiring.value.id}`)
 
-    // The firing may have been ended server-side (pg_cron auto-end, or another
-    // device) while this tab was asleep. Adopt the full server state, not just
-    // the readings — otherwise the UI shows Live forever.
+    // The firing may have been ended server-side (auto-end, another device)
+    // while this tab slept. Adopt the full server state or the UI shows Live
+    // forever.
     if (data.ended_at && !selectedFiring.value.ended_at) {
       stopAllIntervals()
       clearNowLine()
       isLive.value = isPaused.value = false
       selectedFiring.value = data
       setSchedule(data.schedule ?? [], data.schedule_offset ?? 0)
+      setConeLines(coneList.value, { pack: data.cone_pack ?? [] })
       setReadings(data.readings ?? [], data.started_at)
       setReductions(data.reductions ?? [], data.started_at)
       setConeDrops(data.cone_drops ?? [], data.started_at)
@@ -1118,11 +1035,12 @@ async function reloadReadings() {
       return
     }
 
-    selectedFiring.value.readings = data.readings
-    selectedFiring.value.schedule = data.schedule
+    selectedFiring.value.readings   = data.readings
+    selectedFiring.value.schedule   = data.schedule
     selectedFiring.value.reductions = data.reductions ?? selectedFiring.value.reductions
     selectedFiring.value.cone_drops = data.cone_drops ?? selectedFiring.value.cone_drops
     setReadings(data.readings, selectedFiring.value.started_at)
+    setConeLines(coneList.value, coneLineOpts())
     setReductions(selectedFiring.value.reductions ?? [], selectedFiring.value.started_at)
     setConeDrops(selectedFiring.value.cone_drops ?? [], selectedFiring.value.started_at)
     if (isLive.value && !isPaused.value && selectedFiring.value.started_at) {
@@ -1135,33 +1053,13 @@ async function reloadReadings() {
     console.error('Failed to reload readings:', err)
   }
 }
-
-// G4: the sheet has its own two-tap confirm, so this skips the desktop
-// ConfirmDialog and deletes directly. The sheet stays OPEN so a run of
-// deletes doesn't mean reopening it between each one.
-async function sheetDeleteFiring(f) {
-  if (sheetDeletingId.value) return   // ignore taps while one is in flight
-  sheetDeletingId.value = f.id
-  try {
-    await performDeleteFiring(f)
-  } finally {
-    sheetDeletingId.value = null
-  }
-}
 </script>
 
 <style>
-/* SHARED CONTROLS MOVED (Aug 2026): .btn-primary, .btn-danger, .btn-ghost,
-   .input and .label used to be defined here. Because this is a page-level
-   <style> block, they only existed while /app was mounted — which is why the
-   same class names did nothing on /account, /schedules and the admin pages.
-   They now live in app/assets/css/tailwind.css under @layer components.
-
-   NOTE: the definitions there must use the CELADON variants to match what this
-   page rendered before the move (.btn-primary → bg-celadon, .input focus ring
-   → celadon), not flame.
-
-   Only the toast transition is page-specific, so only it stays. */
+/* Shared controls (.btn-primary, .input, etc.) live in
+   app/assets/css/tailwind.css under @layer components — defining them in this
+   page-level block meant they only existed while /app was mounted. Only the
+   toast transition is page-specific. */
 .toast-enter-active, .toast-leave-active { transition: all 0.2s ease; }
 .toast-enter-from, .toast-leave-to       { opacity: 0; transform: translate(-50%, 1rem); }
 </style>

@@ -1,13 +1,8 @@
 <!-- File: app/pages/schedules/new.vue -->
 <!--
-  PASTE (removed Aug 2026): this page used to offer "Paste a schedule" beside
-  the library select. Dropped at the owner's request. Gone with it: the
-  PasteScheduleModal mount, onPasteImport, the showPaste ref, and the
-  suppressLibraryWatch flag — that flag existed ONLY to stop the
-  selectedLibraryId watcher wiping a fresh import when the select was cleared,
-  so with paste gone it has no job. app/components/PasteScheduleModal.vue and
-  composables/useSchedulePaste.js can be deleted once StartFiringModal.vue is
-  updated too (it is, in this batch).
+  Two modes in one page: plain create (seeded from the library) and
+  from-firing (?fromFiring=id), where a real firing's readings are simplified
+  into a reusable curve via the detail slider.
 -->
 <template>
   <div class="min-h-screen bg-parchment font-serif">
@@ -49,8 +44,8 @@
           <span class="min-w-0 break-words">Generated from <strong>{{ firingData?.name }}</strong></span>
         </div>
         <div class="flex flex-col gap-2">
-          <!-- MOBILE (Aug 2026): flex-wrap — "All 412 readings" plus the label
-               plus Reset is wider than 320px on one line. -->
+          <!-- flex-wrap: "All 412 readings" plus the label plus Reset is wider
+               than 320px on one line. -->
           <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
             <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Detail level</label>
             <div class="flex items-center gap-3 min-w-0">
@@ -69,6 +64,8 @@
               @input="slider = Number($event.target.value)" />
             <span class="text-[10px] text-ink-faint w-10 shrink-0 text-right">Detail</span>
           </div>
+          <!-- The slider REGENERATES from the raw readings, so it necessarily
+               discards manual point edits made after sliding. -->
           <p v-if="hasManualEdits" class="text-[11px] text-amber-600 flex items-start gap-1.5">
             <svg class="w-3 h-3 shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
@@ -83,12 +80,6 @@
         <div class="flex flex-col gap-1.5">
           <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Start from</label>
           <div class="relative">
-            <!-- MOBILE (Aug 2026): was text-sm (14px). Any control under 16px
-                 makes iOS Safari zoom the whole page in on focus and never zoom
-                 back out — the single biggest cause of the "everything is huge
-                 and won't fit" report. The shared .input is text-base on
-                 phones, text-sm from sm up; the utilities after it keep this
-                 page's roomier xl/px-4 shape and flame focus. -->
             <select v-model="selectedLibraryId"
               class="input rounded-xl px-4 py-2.5 pr-9 appearance-none focus:border-flame focus:ring-flame/10">
               <option value="">Blank curve</option>
@@ -104,7 +95,6 @@
             </svg>
           </div>
         </div>
-
       </template>
 
       <!-- ── SHARED: name ──────────────────────────────────────────────── -->
@@ -122,7 +112,7 @@
         <ConeSelect v-model="form.cone" />
       </div>
 
-      <!-- ── SHARED: description (G10) ──────────────────────────────────── -->
+      <!-- ── SHARED: description ───────────────────────────────────────── -->
       <div class="flex flex-col gap-1.5">
         <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Description <span class="text-ink-faint/60 normal-case font-normal tracking-normal">(optional)</span></label>
         <textarea v-model="form.description" rows="2" maxlength="500"
@@ -132,24 +122,19 @@
 
       <!-- ── SHARED: curve ─────────────────────────────────────────────── -->
       <div class="flex flex-col gap-2">
-        <!-- MOBILE (Aug 2026): this row carried label + type badge + spacer +
-             unit toggle + a button whose label can read "Edit reduction (3)".
-             The flex-1 spacer forced it all onto one line, so it ran off the
-             screen. Two groups with justify-between wrap cleanly instead. -->
+        <!-- Two groups with justify-between: a flex-1 spacer forced label +
+             badge + unit toggle + reduction button onto one line, which ran off
+             the screen. -->
         <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
           <div class="flex items-center gap-2 min-w-0">
             <label class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Curve</label>
             <span v-if="form.type" class="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0" :class="theme.badgeText">{{ form.type }}</span>
           </div>
           <div class="flex items-center gap-3 shrink-0">
-            <!-- G1: the unit toggle lives here as well as in StartFiringModal.
-                 The Steps table asks for a RATE (°C/hr vs °F/hr), so a user who
-                 pasted a Fahrenheit schedule needs to be able to flip back and
-                 check the numbers against their source without leaving the page. -->
+            <!-- The Steps table asks for a RATE (°C/hr vs °F/hr), so a user
+                 working from a Fahrenheit source needs to flip and check
+                 without leaving the page. -->
             <TempUnitToggle />
-            <!-- REDUCTIONS (Aug 2026): planner trigger — this page never had one,
-                 so new schedules couldn't carry planned reductions (only
-                 duplicate/edit could). Mirrors [id].vue; cobalt per the palette. -->
             <button
               class="flex items-center gap-1.5 py-1 text-xs font-semibold text-cobalt-dark hover:text-cobalt transition-colors"
               @click="showReductionPlanner = true"
@@ -173,6 +158,9 @@
           @update:model-value="onEditorChange"
         />
         <ScheduleCurveEditor v-else v-model="editPoints" :reductions="editReductions" :stroke="theme.stroke" :fill="theme.fill" />
+        <div class="pt-3 border-t border-parchment-3">
+          <ConePackEditor v-model="editConePack" :target-cone="form.cone" />
+        </div>
       </div>
 
       <!-- ── SHARED: save ──────────────────────────────────────────────── -->
@@ -251,10 +239,8 @@ const form       = reactive({ name: '', type: 'bisque', cone: '', description: '
 const editPoints = ref(BISQUE_DEFAULT.map(p => ({ ...p })))
 const theme      = computed(() => themeForType(form.type))
 
-// REDUCTIONS (Aug 2026): planned reductions for this schedule, [{ startTemp,
-// endTemp|null }] °C — same shape as [id].vue. Sent on save; POST already
-// accepted them (the duplicate flow proves it), this page just never sent any.
-const editReductions       = ref([])
+const editReductions       = ref([])   // [{ startTemp, endTemp|null, kind }] °C
+const editConePack         = ref([])   // planned witness cones — names
 const showReductionPlanner = ref(false)
 
 function onReductionsSaved(list) {
@@ -302,11 +288,12 @@ onMounted(async () => {
     form.name = `${data.name} (from ${formatFiringDate(data.started_at ?? data.created_at)})`
     form.type = guessType(data.name)
 
-    // REDUCTIONS: carry the firing's LIVE reduction periods into the plan —
-    // "save this firing as a schedule" should keep where you actually reduced.
+    // "Save this firing as a schedule" should keep where you actually reduced,
+    // and which cones you had in the kiln.
     editReductions.value = (data.reductions ?? [])
       .filter(r => r.start_temp != null)
-      .map(r => ({ startTemp: r.start_temp, endTemp: r.end_temp ?? null }))
+      .map(r => ({ startTemp: r.start_temp, endTemp: r.end_temp ?? null, kind: r.kind }))
+    editConePack.value = [...(data.cone_pack ?? [])]
   } catch (err) {
     flash(`Couldn't load firing: ${err?.data?.message ?? err.message ?? 'error'}`)
   }
@@ -331,8 +318,9 @@ function flash(msg) {
 // ── Seed from library ─────────────────────────────────────────────────────────
 watch(selectedLibraryId, (val) => {
   if (!val) {
-    editPoints.value = BISQUE_DEFAULT.map(p => ({ ...p }))
-    editReductions.value = []   // REDUCTIONS: blank slate, no leak from last pick
+    editPoints.value     = BISQUE_DEFAULT.map(p => ({ ...p }))
+    editReductions.value = []   // blank slate, no leak from the last pick
+    editConePack.value   = []
     form.name = ''; form.type = 'glaze'; form.cone = ''
     return
   }
@@ -341,10 +329,11 @@ watch(selectedLibraryId, (val) => {
   editPoints.value = (sched.points ?? [])
     .sort((a, b) => a.offset_minutes - b.offset_minutes)
     .map(p => ({ offsetMinutes: p.offset_minutes, targetTemp: p.target_temp }))
-  // REDUCTIONS: the source schedule's planned reductions come along too.
+  // The source schedule's planned atmosphere and cone pack come along too.
   editReductions.value = (sched.reductions ?? [])
     .filter(r => r.start_temp != null)
-    .map(r => ({ startTemp: r.start_temp, endTemp: r.end_temp ?? null }))
+    .map(r => ({ startTemp: r.start_temp, endTemp: r.end_temp ?? null, kind: r.kind }))
+  editConePack.value = [...(sched.cone_pack ?? [])]
   form.name = ''
   form.type = sched.type ?? 'glaze'
   form.cone = sched.cone ?? ''
@@ -387,7 +376,8 @@ async function save() {
         description: form.description?.trim() || null,
         source:      isFromFiring.value ? 'from_firing' : 'custom',
         points:      editPoints.value,
-        reductions:  editReductions.value,   // [{ startTemp, endTemp|null }] °C
+        reductions:  editReductions.value,   // [{ startTemp, endTemp|null, kind }] °C
+        conePack:    editConePack.value,
       },
     })
     router.replace(`/schedules/${result.id}`)

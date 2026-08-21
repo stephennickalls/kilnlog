@@ -29,6 +29,46 @@ const NO_CONE_GUTTER = 8
 const MAX_CONE_LINES = 6
 const MIN_CONE_GAP_C = 25
 
+// PLANNED vs ACTUAL atmosphere (Aug 2026). Both states already existed but
+// differed only by fill opacity, so "I intended to reduce here" and "I actually
+// reduced here" looked the same at a glance. Planned bands now carry a diagonal
+// hatch and a dashed edge, matching the dashed-plan / solid-actual grammar the
+// rest of the chart already uses for the two curves.
+//
+// The tile is built per canvas context and cached: createPattern on every frame
+// of a live firing is a new canvas every second.
+const hatchCache = new WeakMap()
+
+function plannedHatch(ctx, colour) {
+  let byColour = hatchCache.get(ctx)
+  if (!byColour) {
+    byColour = new Map()
+    hatchCache.set(ctx, byColour)
+  }
+  if (byColour.has(colour)) return byColour.get(colour)
+
+  const tile = document.createElement('canvas')
+  tile.width = 6
+  tile.height = 6
+  const t = tile.getContext('2d')
+  t.strokeStyle = colour
+  t.lineWidth = 1
+  // Three strokes so the diagonal is seamless across tile edges.
+  t.beginPath()
+  t.moveTo(0, 6); t.lineTo(6, 0)
+  t.moveTo(-1, 1); t.lineTo(1, -1)
+  t.moveTo(5, 7); t.lineTo(7, 5)
+  t.stroke()
+
+  const pattern = ctx.createPattern(tile, 'repeat')
+  byColour.set(colour, pattern)
+  return pattern
+}
+
+// Minimum width before a zero-width preset band (end_temp = start_temp, the
+// current workaround for reduction_one_open_per_firing) becomes invisible.
+const MIN_BAND_PX = 1.5
+
 export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showLabels = false } = {}) {
   const { unitLabel, isF } = useTempUnit()
   const cToDisplay = (c) => (isF.value ? c * 9 / 5 + 32 : c)
@@ -268,16 +308,18 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
 
   const BAND_STYLE = {
     reduction: {
-      fill:   { planned: 'rgba(58,90,120,0.06)',  open: 'rgba(58,90,120,0.10)',  closed: 'rgba(58,90,120,0.14)' },
-      stroke: { planned: 'rgba(58,90,120,0.35)',  open: 'rgba(58,90,120,0.55)',  closed: 'rgba(58,90,120,0.45)' },
-      text:   { planned: 'rgba(40,64,87,0.55)',   open: 'rgba(40,64,87,0.9)',    closed: 'rgba(40,64,87,0.75)' },
+      fill:   { planned: 'rgba(58,90,120,0.05)',  open: 'rgba(58,90,120,0.10)',  closed: 'rgba(58,90,120,0.14)' },
+      stroke: { planned: 'rgba(58,90,120,0.45)',  open: 'rgba(58,90,120,0.55)',  closed: 'rgba(58,90,120,0.45)' },
+      text:   { planned: 'rgba(40,64,87,0.6)',    open: 'rgba(40,64,87,0.9)',    closed: 'rgba(40,64,87,0.75)' },
       label:  { planned: 'Planned reduction',     open: 'Reduction…',            closed: 'Reduction' },
+      hatch:  'rgba(58,90,120,0.28)',
     },
     oxidation: {
-      fill:   { planned: 'rgba(202,138,4,0.06)',  open: 'rgba(202,138,4,0.10)',  closed: 'rgba(202,138,4,0.13)' },
-      stroke: { planned: 'rgba(180,120,20,0.35)', open: 'rgba(180,120,20,0.55)', closed: 'rgba(180,120,20,0.45)' },
-      text:   { planned: 'rgba(146,94,10,0.6)',   open: 'rgba(146,94,10,0.95)',  closed: 'rgba(146,94,10,0.8)' },
+      fill:   { planned: 'rgba(202,138,4,0.05)',  open: 'rgba(202,138,4,0.10)',  closed: 'rgba(202,138,4,0.13)' },
+      stroke: { planned: 'rgba(180,120,20,0.45)', open: 'rgba(180,120,20,0.55)', closed: 'rgba(180,120,20,0.45)' },
+      text:   { planned: 'rgba(146,94,10,0.65)',  open: 'rgba(146,94,10,0.95)',  closed: 'rgba(146,94,10,0.8)' },
       label:  { planned: 'Planned oxidation',     open: 'Oxidation…',            closed: 'Oxidation' },
+      hatch:  'rgba(180,120,20,0.30)',
     },
   }
 
@@ -287,6 +329,10 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
       if (!reductionBands.length) return
       const { ctx, chartArea, scales } = chart
       if (!chartArea || !scales?.x) return
+
+      const top    = chartArea.top
+      const height = chartArea.bottom - chartArea.top
+
       ctx.save()
       for (const band of reductionBands) {
         const style = BAND_STYLE[band.kind] ?? BAND_STYLE.reduction
@@ -296,22 +342,34 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
         const xPix2 = scales.x.getPixelForValue(band.endX)
         const left  = Math.max(Math.min(xPix1, xPix2), chartArea.left)
         const right = Math.min(Math.max(xPix1, xPix2), chartArea.right)
-        const width = Math.max(right - left, 1.5)
+        const width = Math.max(right - left, MIN_BAND_PX)
 
         ctx.fillStyle = style.fill[state]
-        ctx.fillRect(left, chartArea.top, width, chartArea.bottom - chartArea.top)
+        ctx.fillRect(left, top, width, height)
+
+        // Planned bands get the hatch on top of the flat wash. Live bands stay
+        // solid: the plan is a drawing, the firing is a fact.
+        if (band.planned) {
+          const pattern = plannedHatch(ctx, style.hatch)
+          if (pattern) {
+            ctx.fillStyle = pattern
+            ctx.fillRect(left, top, width, height)
+          }
+        }
 
         ctx.strokeStyle = style.stroke[state]
         ctx.lineWidth = 1
-        ctx.setLineDash([3, 3])
+        ctx.setLineDash(band.planned ? [4, 4] : [])
+
         ctx.beginPath()
-        ctx.moveTo(left, chartArea.top)
+        ctx.moveTo(left, top)
         ctx.lineTo(left, chartArea.bottom)
         ctx.stroke()
+
         // Open live bands get no right edge: their edge is the advancing NOW.
         if (band.planned || !band.open) {
           ctx.beginPath()
-          ctx.moveTo(right, chartArea.top)
+          ctx.moveTo(right, top)
           ctx.lineTo(right, chartArea.bottom)
           ctx.stroke()
         }
@@ -320,11 +378,16 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
         if (width > 30) {
           ctx.font = 'bold 9px sans-serif'
           ctx.fillStyle = style.text[state]
-          ctx.textAlign = 'left'
           ctx.textBaseline = 'alphabetic'
-          // Planned label sits a line lower so a live band over the same span
-          // doesn't collide with it.
-          ctx.fillText(style.label[state], left + 4, chartArea.top + (band.planned ? 24 : 12))
+          if (band.planned) {
+            // Right-aligned: the live band that shadows this one starts a few
+            // minutes later and would otherwise print on top of this label.
+            ctx.textAlign = 'right'
+            ctx.fillText(style.label[state], right - 4, top + 12)
+          } else {
+            ctx.textAlign = 'left'
+            ctx.fillText(style.label[state], left + 4, top + 12)
+          }
         }
       }
       ctx.restore()

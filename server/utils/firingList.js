@@ -23,13 +23,17 @@ export const FIRINGS_PAGE_SIZE = 30
 // auto_end_hours (AutoEndedNotice states the real threshold rather than a
 // hardcoded string) joined the list row.
 //
+// DEMO (Aug 2026): is_demo, so the sidebar can badge a demo firing without a
+// detail fetch. A user who cannot tell the demo from their real work will not
+// trust either.
+//
 // OMITTED - and why:
 //   notes    - up to 5000 chars of prose per firing, and never read from a
 //              list row. The notes modal reads selectedFiring, which comes
 //              from /api/firings/:id in full.
 //   user_id  - already the filter predicate; the client never looks at it.
 export const FIRING_LIST_COLUMNS =
-  'id, name, created_at, started_at, ended_at, paused_at, restarted_at, auto_ended, schedule_offset, fuel, auto_end_hours'
+  'id, name, created_at, started_at, ended_at, paused_at, restarted_at, auto_ended, schedule_offset, fuel, auto_end_hours, is_demo'
 
 // readings has 5 columns; the chart needs 3.
 // OMITTED: firing_id (implied by the parent row) and created_at (the row's

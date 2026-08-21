@@ -56,16 +56,34 @@
           <p class="text-sm font-semibold">Loading your firings…</p>
         </div>
 
-        <FiringEmptyState
-          v-else-if="!selectedFiring"
-          :recent-firing="pastFirings[0] ?? null"
-          :active-firing="activeFiring"
-          @start="openStartModal"
-          @browse-schedules="goToSchedules"
-          @select-recent="selectFiring"
-        />
+        <!-- DEMO (Aug 2026): the empty state now scrolls, because it carries a
+             second card. A brand-new account has nothing to look at — chart,
+             cone ruler, console and drop sheet are all invisible until a firing
+             exists — so the first thing a potter sees is an argument they can't
+             evaluate. DemoFiringCard fixes that; FiringEmptyState keeps the
+             real paths (start a firing, browse schedules) above it. -->
+        <div v-else-if="!selectedFiring" class="flex-1 min-h-0 overflow-y-auto flex flex-col">
+          <FiringEmptyState
+            :recent-firing="pastFirings[0] ?? null"
+            :active-firing="activeFiring"
+            @start="openStartModal"
+            @browse-schedules="goToSchedules"
+            @select-recent="selectFiring"
+          />
+          <div class="px-4 pb-6 sm:px-6 sm:pb-8">
+            <DemoFiringPrompt @created="onDemoCreated" />
+          </div>
+        </div>
 
         <template v-else>
+
+          <!-- Demo data must never be mistakable for a real firing: a potter
+               who later finds "Demo firing" in their history and can't remember
+               whether they fired it has lost trust in the whole log. Deliberately
+               not dismissible. -->
+          <div v-if="selectedFiring.is_demo" class="shrink-0 px-3 pt-2 sm:px-5 sm:pt-2.5 min-w-0">
+            <DemoFiringBanner :busy="demoBusy" @delete="deleteDemo" />
+          </div>
 
           <div class="shrink-0 px-3 pb-3 pt-2 sm:px-5 sm:pb-0 sm:pt-2.5 min-w-0">
             <FiringConsole
@@ -233,6 +251,15 @@
       @cancel="pendingDeleteFiring = null"
     />
 
+    <ConfirmDialog
+      :open="showDemoDeleteConfirm"
+      title="Delete the demo firing?"
+      message="This removes the demo and everything logged against it. Your own firings are untouched, and you can load a new demo any time."
+      confirm-label="Delete demo"
+      @confirm="confirmDeleteDemo"
+      @cancel="showDemoDeleteConfirm = false"
+    />
+
     <RenameFiringModal
       :open="!!renamingFiring"
       :firing="renamingFiring"
@@ -313,6 +340,14 @@ const MIN_WIDTH            = 180
 const isDragging           = ref(false)
 const nowUnix              = ref(Math.floor(Date.now() / 1000))
 const winW                 = ref(1024)
+
+// DEMO (Aug 2026): a demo firing is real rows in the real tables flagged
+// is_demo, so every screen behaves exactly as it will for a real firing. It
+// occupies the one-active-firing slot deliberately: deleting it before the
+// first real firing is the rule we want people to learn on fake data rather
+// than at the kiln.
+const demoBusy             = ref(false)
+const showDemoDeleteConfirm = ref(false)
 
 // Room to break the Cone-down button out of the compact tier's menu?
 const coneButtonRoomy = computed(() => !sidebarOpen.value || winW.value >= 1024)
@@ -675,6 +710,31 @@ async function createFiring(payload) {
   }
 }
 
+// ── Demo firing ──────────────────────────────────────────────────────────────
+// Both paths hard-navigate rather than patching state. reloadReadings does not
+// re-read started_at, fuel or cone_pack, and a demo's whole point is that its
+// elapsed clock and backdated history are right — getting that wrong on
+// someone's first look at the app is worse than a page load.
+function onDemoCreated() {
+  window.location.assign('/app')
+}
+
+function deleteDemo() {
+  showDemoDeleteConfirm.value = true
+}
+
+async function confirmDeleteDemo() {
+  showDemoDeleteConfirm.value = false
+  demoBusy.value = true
+  try {
+    await $fetch('/api/demo-firing', { method: 'DELETE' })
+    window.location.assign('/app')
+  } catch (err) {
+    toast.show(err?.data?.statusMessage ?? err?.data?.message ?? 'Could not delete the demo.')
+    demoBusy.value = false
+  }
+}
+
 // ── Notes ────────────────────────────────────────────────────────────────────
 function openNotes() { showNotesModal.value = true }
 
@@ -961,9 +1021,15 @@ function onFiringRenamed(updated) {
 
 async function openStartModal() {
   // The server enforces one active firing (409), but guard the button so the
-  // user never fills out the modal only to be rejected.
+  // user never fills out the modal only to be rejected. A demo occupies that
+  // same slot, so it gets its own message: "end it" is wrong advice for
+  // something that should be deleted.
   if (activeFiring.value) {
-    toast.show(`"${activeFiring.value.name}" is still firing — only one firing at a time. End it first.`)
+    if (activeFiring.value.is_demo) {
+      toast.show('Delete the demo firing first — it\u2019s taking the active slot.')
+    } else {
+      toast.show(`"${activeFiring.value.name}" is still firing — only one firing at a time. End it first.`)
+    }
     selectFiring(activeFiring.value)
     return
   }

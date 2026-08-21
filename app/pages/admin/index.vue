@@ -16,6 +16,12 @@
   cards. The user count EXCLUDES admins — staff are not customers and should
   not pad the number. Counts are cosmetic: the fetch is deliberately allowed
   to fail silently, because a stats outage must not take the console with it.
+
+  DEMO FIRINGS: a "Demo firings" card briefly lived here, seeding demo data
+  into any account. It was replaced by a self-serve version every user gets in
+  the /app empty state (POST /api/demo-firing), which needs no admin and no
+  cross-account writes. Do not reintroduce the admin route without a reason the
+  user-facing one can't cover.
 -->
 <template>
   <div class="min-h-screen bg-parchment font-serif">

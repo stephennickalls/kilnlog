@@ -1,6 +1,16 @@
 // File: server/api/schedules/index.post.js
 // Creates a library schedule with points, planned atmosphere periods, and a
 // cone pack (the witness cones planned for firings run from this schedule).
+//
+// ZERO WIDTH (Aug 2026): sanitizeReductions no longer drops a row whose end
+// equals its start. Equal means "a marker at one temperature"; NULL means
+// "open-ended, run it to the finish". Both are legitimate. The old rule silently
+// destroyed the oxidation band whenever a gas reduction preset was duplicated.
+// See sql/fix_zero_width_oxidation.sql and the matching note in [id].put.js.
+//
+// ORIGIN (Aug 2026): library rows are written origin='planned' rather than
+// falling to the 'live' default. A row that claims it was logged live but has
+// no firing attached is a lie waiting to be read by something less careful.
 const MIN_TEMP = -200
 const MAX_TEMP = 1400
 const MAX_REDUCTIONS = 50
@@ -16,7 +26,6 @@ function sanitizeReductions(input) {
     if (r?.endTemp !== null && r?.endTemp !== undefined && r?.endTemp !== '') {
       const e = Number(r.endTemp)
       if (!Number.isFinite(e) || e < MIN_TEMP || e > MAX_TEMP) continue
-      if (Math.round(e) === Math.round(start)) continue
       end = Math.round(e)
     }
     const kind = KINDS.includes(r?.kind) ? r.kind : 'reduction'
@@ -65,7 +74,13 @@ export default defineEventHandler(async (event) => {
 
   const reductions = sanitizeReductions(body.reductions)
   if (reductions.length) {
-    const rows = reductions.map(r => ({ library_id: schedule.id, start_temp: r.start_temp, end_temp: r.end_temp, kind: r.kind }))
+    const rows = reductions.map(r => ({
+      library_id: schedule.id,
+      start_temp: r.start_temp,
+      end_temp:   r.end_temp,
+      kind:       r.kind,
+      origin:     'planned',
+    }))
     const { error: redErr } = await db.from('reduction_periods').insert(rows)
     if (redErr) throw await serverError('schedules.create.reductions_failed', redErr, { userId: user.id, scheduleId: schedule.id })
   }

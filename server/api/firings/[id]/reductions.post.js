@@ -3,8 +3,11 @@
 // Body: { startTemp: number, kind?: 'reduction' | 'oxidation' }
 //
 // Opens a period with end_temp = null. The partial unique index
-// reduction_one_open_per_firing guarantees only one open period at a time;
-// a second start while one is open returns 409.
+// reduction_one_open_live_per_firing guarantees only one open LIVE period at a
+// time; a second start while one is open returns 409. It is scoped to
+// origin='live' (Aug 2026) so an open-ended PLANNED band copied in from a
+// schedule no longer consumes the slot - that collision is why preset oxidation
+// bands were once stored zero-width. See sql/fix_zero_width_oxidation.sql.
 //
 // REDUCTION-TIME (Aug 2026): created_at is the band's time anchor on the
 // chart; ended_at (null while open) is returned so the client-side row shape

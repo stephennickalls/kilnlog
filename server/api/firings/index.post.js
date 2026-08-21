@@ -18,6 +18,18 @@
 //   from the schedule like the curve. Validated against the cones table via
 //   sanitizeConePack (server/utils/conePack.js); unknown names drop silently -
 //   the pack is presentation priority, never a gate on logging.
+//
+// ZERO WIDTH (Aug 2026): the "end must differ from start" rule is gone. It
+// existed to stop a band collapsing to nothing under temperature anchoring, and
+// it made the gas reduction presets unstartable once their oxidation band was
+// stored honestly. A plan's end temperature is an intention with four valid
+// shapes: above start (climbing), below start (cooling), equal to start (a
+// marker at one temperature), and absent (open-ended, run it to the finish).
+// None of those is the API's business to refuse.
+//
+// A planned OPEN band no longer collides with the live one-open-period index:
+// reduction_one_open_live_per_firing is scoped to origin='live'. See
+// sql/fix_zero_width_oxidation.sql.
 
 const MAX_NAME       = 120
 const MAX_NOTES      = 5000
@@ -46,7 +58,6 @@ function sanitizeReductions(input) {
     if (r?.endTemp !== null && r?.endTemp !== undefined && r?.endTemp !== '') {
       const e = Number(r.endTemp)
       if (!Number.isFinite(e) || e < MIN_TEMP || e > MAX_TEMP) throw bad('Invalid reduction end temperature')
-      if (Math.round(e) === Math.round(start)) throw bad('Reduction end must differ from start')
       end = Math.round(e)
     }
     // Unknown/absent kind falls back to 'reduction' - the pre-cone-first
@@ -168,6 +179,10 @@ export default defineEventHandler(async (event) => {
     // chart temp-anchors them; live tapped rows (origin='live', the default)
     // time-anchor by created_at. Without this, a planned reduction's
     // created_at ~ started_at made it render from minute ~0.
+    //
+    // origin='planned' now also keeps an open-ended planned band out of the
+    // live one-open-period index, which is what made the zero-width workaround
+    // necessary in the first place.
     const rows = reductions.map(r => ({
       firing_id:  firing.id,
       start_temp: r.start_temp,

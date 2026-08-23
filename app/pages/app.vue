@@ -60,7 +60,7 @@
              second card. A brand-new account has nothing to look at — chart,
              cone ruler, console and drop sheet are all invisible until a firing
              exists — so the first thing a potter sees is an argument they can't
-             evaluate. DemoFiringCard fixes that; FiringEmptyState keeps the
+             evaluate. DemoFiringPrompt fixes that; FiringEmptyState keeps the
              real paths (start a firing, browse schedules) above it. -->
         <div v-else-if="!selectedFiring" class="flex-1 min-h-0 overflow-y-auto flex flex-col">
           <FiringEmptyState
@@ -80,11 +80,21 @@
           <!-- Demo data must never be mistakable for a real firing: a potter
                who later finds "Demo firing" in their history and can't remember
                whether they fired it has lost trust in the whole log. Deliberately
-               not dismissible. -->
+               not dismissible. Renders nothing below sm — see the component. -->
           <div v-if="selectedFiring.is_demo" class="shrink-0 px-3 pt-2 sm:px-5 sm:pt-2.5 min-w-0">
             <DemoFiringBanner :busy="demoBusy" @delete="deleteDemo" />
           </div>
 
+          <!-- CONSOLE WIDTH (Aug 2026): no width props are passed any more.
+               FiringConsole picks its own tier from a ResizeObserver on itself,
+               because the thing that decides its layout is how wide THIS column
+               is, and this column is the viewport minus a sidebar the user can
+               open, close and drag. Tailwind breakpoints only see the viewport,
+               so at 1280px with the sidebar open the console rendered its wide
+               row into a ~960px column and got clipped by main's
+               overflow-hidden. min-w-0 here is what lets the column shrink at
+               all; without it the flex parent sizes to the console's content
+               and pushes the whole layout wide. -->
           <div class="shrink-0 px-3 pb-3 pt-2 sm:px-5 sm:pb-0 sm:pt-2.5 min-w-0">
             <FiringConsole
               v-if="!selectedFiring.ended_at"
@@ -102,7 +112,6 @@
               :is-live="isLive"
               :is-paused="isPaused"
               :reduction-open="!!openReduction"
-              :show-cone-button="coneButtonRoomy"
               @open-temp="showTempModal = true"
               @log-reading="openLogReading"
               @pause="pauseFiring"
@@ -339,7 +348,6 @@ const sidebarWidth         = ref(280)
 const MIN_WIDTH            = 180
 const isDragging           = ref(false)
 const nowUnix              = ref(Math.floor(Date.now() / 1000))
-const winW                 = ref(1024)
 
 // DEMO (Aug 2026): a demo firing is real rows in the real tables flagged
 // is_demo, so every screen behaves exactly as it will for a real firing. It
@@ -349,14 +357,11 @@ const winW                 = ref(1024)
 const demoBusy             = ref(false)
 const showDemoDeleteConfirm = ref(false)
 
-// Room to break the Cone-down button out of the compact tier's menu?
-const coneButtonRoomy = computed(() => !sidebarOpen.value || winW.value >= 1024)
-
 const showNotesModal = ref(false)
 const notesSaving    = ref(false)
 
-// Cones carry temp_c: the chart's ruler, the next-cone ETA, and the cone-drop
-// sheet all read this one list. Seeded from bootstrap.
+// Cones carry temp_c: the chart's ruler, the next-cone readout, and the
+// cone-drop sheet all read this one list. Seeded from bootstrap.
 const showConeSheet = ref(false)
 const coneList      = ref([])
 const coneBusy      = ref(false)
@@ -477,7 +482,6 @@ async function loadUnit() {
 }
 
 onMounted(async () => {
-  winW.value = window.innerWidth
   await init()
 
   try {
@@ -543,9 +547,10 @@ onUnmounted(() => {
   window.removeEventListener('resize', onWindowResize)
 })
 
+// Chart.js needs telling; the console watches its own box and needs nothing
+// from here.
 let resizeRaf = null
 function onWindowResize() {
-  winW.value = window.innerWidth
   if (resizeRaf) cancelAnimationFrame(resizeRaf)
   resizeRaf = requestAnimationFrame(() => resize())
 }
@@ -555,6 +560,12 @@ function stopAllIntervals() {
 }
 
 function goToSchedules() { router.push('/schedules') }
+
+// Toggling or dragging the sidebar changes the chart's box as well as the
+// console's, and Chart.js does not observe its canvas.
+watch([sidebarOpen, sidebarWidth], () => {
+  requestAnimationFrame(() => resize())
+})
 
 function startDrag(e) {
   isDragging.value = true

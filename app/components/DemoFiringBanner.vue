@@ -9,37 +9,27 @@
   which is exactly what someone needs to do before their first real firing, so
   the action lives here rather than buried in Account.
 
-  MOBILE (Aug 2026): the desktop banner is a full block — badge, two lines of
-  explanation, separate button — and on a phone it pushed the console and chart
-  down far enough to matter. The chart is the thing people came to look at.
-  Below sm this collapses to ONE tappable strip: the whole row is the button, so
-  the 44px target is met without a separate control competing for width. Tapping
-  it opens the same ConfirmDialog the desktop button does, so an accidental tap
-  costs nothing.
+  MOBILE: NOTHING RENDERS (Aug 2026). This went through two rounds. First the
+  desktop block was shown at every width, and on a phone it pushed the console
+  and chart down far enough to matter. Then it collapsed below sm to a single
+  tappable strip, which was smaller but still spent a whole row of the one
+  screen where rows are scarcest. It is now desktop-only.
 
-  Deliberately NOT dismissible on either breakpoint: it must be present for the
-  whole life of the demo, not just the first look. A dismissed warning is how
-  fake data ends up mistaken for real.
+  That is a deliberate trade, not a tidy-up, and it costs something real: on a
+  phone there is now NO on-screen warning that the data is fake, and no way to
+  delete the demo without going to a desktop. If you want the warning back
+  without the row, the cheap version is a small "DEMO" chip beside the firing
+  name in the header — a chip inside an existing line costs no vertical space at
+  all — and a "Delete demo" entry in the console's ⋮ sheet, which is where every
+  other firing-level action already lives.
+
+  Deliberately NOT dismissible: for as long as it renders it must be present for
+  the whole life of the demo, not just the first look. A dismissed warning is
+  how fake data ends up mistaken for real.
 
   Emits @delete. The parent owns the request and the navigation afterwards.
 -->
 <template>
-  <!-- ── Mobile: one tappable strip ──────────────────────────────────────── -->
-  <button
-    class="sm:hidden w-full flex items-center gap-2 px-3 py-2.5 min-h-[44px] rounded-xl border border-flame/30 bg-flame-bg text-left transition-colors active:bg-flame/15 disabled:opacity-50"
-    :disabled="busy"
-    @click="$emit('delete')"
-  >
-    <span class="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide bg-flame text-parchment">
-      Demo
-    </span>
-    <span class="flex-1 min-w-0 text-[11px] text-ink leading-snug truncate">
-      {{ busy ? 'Deleting…' : 'Not a real firing. Tap to delete.' }}
-    </span>
-    <svg class="w-4 h-4 shrink-0 text-flame" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
-  </button>
-
-  <!-- ── Desktop: full banner ────────────────────────────────────────────── -->
   <div class="hidden sm:flex flex-wrap items-center gap-2.5 px-3.5 py-2.5 rounded-xl border border-flame/30 bg-flame-bg">
     <span class="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-flame text-parchment">
       Demo

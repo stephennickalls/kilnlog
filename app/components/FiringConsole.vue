@@ -2,11 +2,33 @@
 <!--
   Live firing console. Desktop (lg+): compact row. Below lg: tight strip.
 
-  Cone-first ranking on the mobile pill:
-    line 1  hero temp + live rate
-    line 2  next cone, its rating, ETA at this rate
-    line 3  target + delta chip (demoted, not removed)
+  MOBILE PILL, RANKED (Aug 2026):
+    line 1  current temp, big
+    line 2  target temp + the ahead/behind chip
+    line 3  actual rate against target rate
     line 4  atmosphere state and next transition (only when the plan has bands)
+
+  That order is the whole question a potter asks at the kiln: where am I, where
+  should I be, and am I closing the gap or opening it. Everything below is what
+  used to sit in those four lines and no longer does:
+
+    NEXT CONE + ETA — gone from the pill. The ETA ("~11 min at this rate") is a
+    projection off a rate that changes the moment you touch a damper, so it is
+    the first number on the pill to be wrong. It survives at lg+, where there is
+    a column to spare and it costs nothing to ignore; on a phone it was pushing
+    the rate off the pill entirely. The cone itself is on the chart's ruler,
+    with a mark where it actually dropped — a record rather than a guess.
+
+    "LIVE" beside the delta chip — gone. It meant "a reduction is open", but it
+    sat next to the on-track tick where it read as "the firing is live", which
+    is never in question on a screen showing a rising temperature. Below md the
+    open band on the chart is now the only on-screen sign of an open reduction;
+    at md+ the Reduce button still carries its pulsing dot.
+
+    RATE, promoted off line 1. It used to be one number tucked beside the hero
+    temp with nothing to compare it against, and a rate alone says nothing —
+    +1°C/m is quick for a bisque and slow for the last push to cone 10. It now
+    sits on its own line against target, with the colour carrying the comparison.
 
   BRAND: the hero card is ink with a flame radial glow, so state colours use
   their LIGHT variants there; the delta chip keeps light state-pill styling.
@@ -19,6 +41,12 @@
   padded past the home indicator, capped in dvh. On-track renders as a bare tick
   at every mobile width (delta.iconOnly) since it has no shorter form; ahead and
   behind fall back to delta.short below 380px.
+
+  NO DESKTOP ATMOSPHERE BAR (Aug 2026). A full-width strip used to sit between
+  this console and the chart, showing the atmosphere state or the word
+  "Neutral". Most of a firing IS neutral, so the bar spent most of its life
+  announcing the absence of anything, in the band of pixels directly above the
+  chart. When a band IS open the chart says so in colour, behind the curve.
 -->
 <template>
   <div class="flex flex-col gap-2">
@@ -49,6 +77,9 @@
             </div>
           </template>
 
+          <!-- lg+ ONLY. See the header note: the ETA is a projection off a rate
+               that moves, so it earns its place only where it costs nothing.
+               Delete this block and the coneInfo computed to drop it here too. -->
           <div v-if="coneInfo" class="pl-4 border-l border-white/10">
             <div class="text-[10px] font-semibold uppercase tracking-widest text-parchment-4/70">Next cone</div>
             <div class="flex items-baseline gap-1.5">
@@ -144,20 +175,15 @@
         style="box-shadow:0 2px 12px rgba(34,23,8,0.25); background-image: radial-gradient(ellipse at 18% 40%, rgba(184,85,28,0.35) 0%, transparent 60%)"
       >
         <button class="flex-1 min-w-0 overflow-hidden px-3.5 py-3 text-left flex flex-col justify-center gap-1" @click="$emit('open-temp')">
+
+          <!-- 1. Where am I -->
           <div class="flex items-baseline gap-1 min-w-0">
             <span class="text-[9px] font-semibold uppercase tracking-wide text-parchment-4/70 mr-0.5">Now</span>
             <span class="text-4xl font-bold tabular-nums leading-none transition-colors" :class="currentColorClass">{{ currentDisplay ?? '—' }}</span>
             <span class="text-sm font-medium" :class="currentTemp !== null ? currentColorClass : 'text-parchment-4/50'">{{ unitLabel }}</span>
-            <span class="text-[11px] font-semibold tabular-nums ml-1.5 truncate" :class="rateColorClassDark">{{ rateShort }}</span>
           </div>
 
-          <div v-if="coneInfo" class="flex items-center gap-1.5 min-w-0">
-            <svg class="w-3 h-3 shrink-0 text-celadon-light" viewBox="0 0 24 24" fill="currentColor"><path d="M4 6 h16 L12 20 Z" stroke-linejoin="round"/></svg>
-            <span class="text-xs font-bold text-parchment-3 whitespace-nowrap">cone {{ coneInfo.name }}</span>
-            <span class="text-xs text-parchment-4/80 tabular-nums whitespace-nowrap">· {{ coneInfo.tempLabel }}</span>
-            <span v-if="coneInfo.eta" class="text-xs font-semibold text-celadon-light tabular-nums truncate min-w-0">· {{ coneInfo.eta }}</span>
-          </div>
-
+          <!-- 2. Where should I be -->
           <div v-if="targetTemp !== null" class="flex items-center gap-1.5 min-w-0">
             <span class="text-xs text-parchment-4/80 whitespace-nowrap truncate min-w-0">target <b class="font-bold text-parchment-3 tabular-nums">{{ targetTemp }}{{ unitLabel }}</b></span>
             <span v-if="delta" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[11px] font-bold shrink-0 whitespace-nowrap" :class="delta.class">
@@ -167,9 +193,18 @@
                 <span class="hidden min-[380px]:inline">{{ delta.label }}</span>
               </template>
             </span>
-            <span v-if="reductionOpen" class="inline-flex items-center gap-1 text-[11px] font-bold text-cobalt-light shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-cobalt-light animate-pulse"/>Live</span>
           </div>
 
+          <!-- 3. Am I closing the gap. A rate on its own means nothing, so the
+               target sits beside it and the colour carries the comparison. -->
+          <div class="flex items-baseline gap-1.5 min-w-0">
+            <span class="text-[9px] font-semibold uppercase tracking-wide text-parchment-4/70 shrink-0">Rate</span>
+            <span class="text-xs font-bold tabular-nums shrink-0" :class="rateColorClassDark">{{ rateOfChange }}</span>
+            <span class="text-[11px] text-parchment-4/70 tabular-nums truncate min-w-0">tgt {{ targetRate }}</span>
+          </div>
+
+          <!-- 4. Atmosphere. nextLabel is why this survives: "reduce from cone
+               010 · 894°" is an instruction, not a status. -->
           <div v-if="atmosphereInfo" class="flex items-center gap-1.5 min-w-0 mt-0.5">
             <span v-if="atmosphereInfo.stateLabel" class="px-1.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide shrink-0" :class="atmosphereInfo.stateClass">{{ atmosphereInfo.stateLabel }}</span>
             <span v-if="atmosphereInfo.nextLabel" class="text-[11px] text-parchment-4/80 truncate min-w-0">{{ atmosphereInfo.nextLabel }}</span>
@@ -238,12 +273,6 @@
       </div>
     </Teleport>
 
-    <div v-if="atmosphereInfo" class="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white border border-parchment-3 text-xs">
-      <span v-if="atmosphereInfo.stateLabel" class="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide" :class="atmosphereInfo.stateClassLight">{{ atmosphereInfo.stateLabel }}</span>
-      <span v-else class="text-[10px] font-bold uppercase tracking-wide text-ink-faint">Neutral</span>
-      <span v-if="atmosphereInfo.nextLabel" class="text-ink-muted">{{ atmosphereInfo.nextLabel }}</span>
-    </div>
-
     <div v-if="isPaused" class="flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg bg-amber-100 text-amber-800 border border-amber-200 text-xs font-bold">
       ⏸ Paused — resume when your kiln is firing again
     </div>
@@ -282,8 +311,8 @@ const currentDisplay = computed(() =>
   props.currentTemp === null ? null : displayTemp(props.currentTemp)
 )
 
-// The ETA is an estimate against the cone's ~60C/hr rating, never authoritative
-// over the witness cone, hence the "~" and "at this rate".
+// lg+ ONLY now. The ETA is an estimate against the cone's ~60C/hr rating and is
+// never authoritative over the witness cone, hence the "~" and "at this rate".
 const coneInfo = computed(() => {
   const c = props.nextCone
   if (!c) return null
@@ -294,6 +323,9 @@ const coneInfo = computed(() => {
   }
 })
 
+// Read only by the mobile pill now that the desktop bar is gone, so there is no
+// light-background variant. stateLabel is null when neutral, which is most of a
+// firing — the pill shows nothing rather than announcing it.
 const atmosphereInfo = computed(() => {
   const a = props.atmosphere
   if (!a) return null
@@ -301,7 +333,6 @@ const atmosphereInfo = computed(() => {
   return {
     stateLabel: a.state ? a.state.toUpperCase() : null,
     stateClass: a.state === 'oxidation' ? 'bg-amber-400/20 text-amber-300' : 'bg-cobalt/40 text-cobalt-light',
-    stateClassLight: a.state === 'oxidation' ? 'bg-amber-50 text-amber-700' : 'bg-cobalt-bg text-cobalt-dark',
     nextLabel: a.next
       ? `${verb} from ${a.next.cone ? `cone ${a.next.cone} · ` : ''}${displayTemp(a.next.tempC)}°`
       : null,
@@ -328,8 +359,6 @@ const rateColorClassDark = computed(() => {
   if (diff < -1.5) return 'text-blue-400'
   return 'text-celadon-light'
 })
-
-const rateShort = computed(() => props.rateOfChange ?? '—')
 
 const currentColorClass = computed(() => {
   if (props.currentTemp === null) return 'text-parchment-4/50'

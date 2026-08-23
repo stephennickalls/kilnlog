@@ -12,6 +12,21 @@
   rather than opening a sheet that can only refuse. Deleting the demo before
   the first real firing is the rule we want learned on fake data.
 
+  THE TRIGGER IS NEVER DISABLED BY LOADING (Aug 2026). It used to carry
+  `:disabled="loading || blocked"`, so the first thing a new user saw in the
+  empty state was a greyed-out button — for however long /api/demo-firing took,
+  which on a cold function is seconds. Opening a sheet needs no data and can
+  hurt nothing, so there is nothing to protect against; the wait belongs inside
+  the sheet, where a spinner explains itself. `blocked` still disables it, but
+  that is a real answer about the user's account rather than a network state.
+
+  STATE IS RE-READ ON OPEN. Loading once on mount meant the component only ever
+  knew what was true when the page rendered: end a demo and come back, and a
+  finished firing was still blocking the button. Opening the sheet refetches, so
+  the form is built from current state rather than from history. The mount fetch
+  stays only so the "still running" hint under the button can appear without
+  anyone tapping anything.
+
   Sheet follows the house pattern: bottom sheet on phones, centred on desktop,
   dvh cap, safe-area padding, 44px targets.
 
@@ -24,8 +39,8 @@
 
     <button
       class="w-full flex items-center justify-center gap-2.5 px-5 py-3.5 rounded-xl border border-flame/35 bg-flame-bg text-flame text-sm font-bold hover:bg-flame hover:text-parchment transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-flame-bg disabled:hover:text-flame"
-      :disabled="loading || blocked"
-      @click="open = true"
+      :disabled="blocked"
+      @click="openSheet"
     >
       <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22c4.4 0 8-3.6 8-8 0-5-4-8-5.5-11C13 6 10 7 10 10c-1.5-1-2-2.5-2-4-2.5 2-4 5-4 8 0 4.4 3.6 8 8 8z"/></svg>
       Try a demo firing
@@ -35,30 +50,24 @@
       <strong class="text-ink-muted">{{ activeFiring.name }}</strong> is still running.
       A demo takes the same slot, so end that one first.
     </p>
-    <p v-else class="text-[11px] text-ink-faint text-center leading-snug px-2">
-      See a firing already underway and try everything safely. Delete it any time.
-    </p>
 
-    <!-- ── Sheet ─────────────────────────────────────────────────────────── -->
     <Teleport to="body">
       <div
         v-if="open"
-        class="fixed inset-0 z-[70] flex flex-col justify-end sm:justify-center sm:items-center font-serif"
-        style="background:rgba(26,18,8,0.6)"
+        class="fixed inset-0 z-50 flex items-end sm:items-center justify-center font-serif"
+        style="background: rgba(26,18,8,0.6)"
         @click.self="close"
       >
         <div
-          class="bg-parchment w-full sm:w-[440px] sm:rounded-2xl rounded-t-2xl flex flex-col border border-parchment-3"
-          style="max-height:85vh; max-height:min(85vh, 85dvh); box-shadow:0 -8px 40px rgba(26,18,8,0.15)"
+          class="bg-parchment w-full sm:w-[440px] sm:rounded-2xl rounded-t-2xl flex flex-col border border-parchment-3 overflow-hidden"
+          style="max-height:92vh; max-height:min(92vh, 88dvh); box-shadow: 0 -8px 40px rgba(26,18,8,0.15)"
         >
 
-          <div class="flex justify-center pt-3 pb-1 sm:hidden shrink-0"><div class="w-10 h-1 bg-parchment-3 rounded-full"/></div>
-
-          <div class="flex items-start justify-between gap-3 px-5 py-3.5 border-b border-parchment-3 shrink-0">
+          <div class="flex items-start justify-between gap-3 px-5 pt-5 pb-3.5 border-b border-parchment-3 shrink-0">
             <div class="min-w-0">
               <h2 class="text-base font-bold text-ink">Try a demo firing</h2>
-              <p class="text-xs text-ink-muted mt-0.5 leading-relaxed">
-                A firing that's already a few hours in, with readings logged and a cone about to fall.
+              <p class="text-[11px] text-ink-muted leading-snug mt-0.5">
+                A firing already part-way through, so every screen has something in it.
               </p>
             </div>
             <button class="p-2 -mr-1 -mt-1 text-ink-muted hover:text-ink shrink-0" aria-label="Close" @click="close">
@@ -70,6 +79,22 @@
 
             <div v-if="loading" class="py-8 flex justify-center">
               <div class="w-6 h-6 border-[3px] border-parchment-3 border-t-flame rounded-full animate-spin"/>
+            </div>
+
+            <!-- A firing started between the page loading and this sheet
+                 opening. The trigger can no longer catch that case on its own,
+                 because it is deliberately enabled before state arrives — so
+                 the refusal has to live here too, rather than letting someone
+                 fill the form in and collect a 409. -->
+            <div v-else-if="blocked" class="flex flex-col gap-3 py-2">
+              <p class="text-sm text-ink leading-relaxed">
+                <strong class="font-semibold">{{ activeFiring.name }}</strong> is still running, and a
+                demo takes the same slot. End that firing first.
+              </p>
+              <button
+                class="w-full min-h-[44px] py-3 border border-parchment-3 text-ink-muted hover:bg-parchment-2 text-sm font-semibold rounded-xl transition-colors"
+                @click="close"
+              >Close</button>
             </div>
 
             <template v-else>
@@ -131,6 +156,8 @@ const error        = ref('')
 const blocked = computed(() => !!activeFiring.value)
 const chosen  = computed(() => presets.value.find(p => p.id === presetId.value) ?? null)
 
+// Only so the "still running" hint under the button can appear unprompted. The
+// button itself does not wait for this.
 onMounted(load)
 
 async function load() {
@@ -150,6 +177,14 @@ async function load() {
   }
 }
 
+// Open FIRST, then fetch. The sheet appearing is the acknowledgement of the
+// tap; making it wait on a request is how the old version felt broken.
+function openSheet() {
+  open.value  = true
+  error.value = ''
+  load()
+}
+
 function close() {
   if (busy.value) return
   open.value = false
@@ -167,7 +202,7 @@ async function create() {
     emit('created', result.firing)
   } catch (err) {
     error.value = err?.data?.statusMessage ?? err?.data?.message ?? 'Could not load the demo.'
-    // A 409 means the state moved under us; refresh so the button matches
+    // A 409 means the state moved under us; refresh so the sheet matches
     // reality rather than offering something the server will refuse again.
     if ((err?.statusCode ?? err?.status) === 409) load()
     busy.value = false

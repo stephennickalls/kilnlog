@@ -556,13 +556,15 @@ const pricingItems = [
 //
 // The video must be Public or Unlisted on YouTube. Private videos refuse to
 // play in an embed, and the failure looks like a broken player.
+// app/pages/index.vue  (script setup — replace the demoVideos block)
+
 const demoVideos = [
   {
-    id:       'GPC4HaF41gg',
-    title:    'Getting started',
-    duration: '3:25',
+    id:       'kK29iaZVsPE',
+    title:    'How to get started',
+    duration: '8:46',
     poster:   '/video-poster-getting-started.png',
-    blurb:    'Watch the whole setup: pick a firing type, load a preset or draw your own curve, plan a reduction, then start logging at the kiln.',
+    blurb:    'The whole thing end to end: try a demo firing, start one from the library, build or modify your own curve, then log temperatures, cone drops and a reduction period at the kiln.',
   },
 ]
 

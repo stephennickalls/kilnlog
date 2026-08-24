@@ -21,6 +21,13 @@
   regardless of subscription_status, so their status is inert — the row says
   so, and the footer counts them separately from the customer total.
 
+  DEMO FIRINGS (Aug 2026): "FIRING NOW" was true for a demo firing as well as
+  a real one, so a tester who loaded a demo and never deleted it looked like an
+  active potter forever. The badge now distinguishes them: flame and static for
+  a demo (nothing is actually in a kiln), pulsing green for a real firing.
+  live_firing_is_demo comes from /api/admin/users, which merges it in from the
+  firings table.
+
   Notices are a local banner rather than useToast: the toast host lives in
   app.vue and is not mounted on admin pages, so a toast here would be
   silently swallowed.
@@ -107,8 +114,25 @@
                 <p class="text-sm font-bold text-ink truncate">{{ u.full_name || '—' }}</p>
                 <span v-if="u.role === 'admin'" class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-ink text-parchment">ADMIN</span>
                 <span v-if="u.id === selfId" class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-parchment-2 text-ink-faint border border-parchment-3">YOU</span>
-                <span v-if="u.live_firing" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-celadon-bg text-celadon-dark border border-celadon/30">
-                  <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"/>FIRING NOW
+
+                <!-- A demo holds the active slot exactly like a real firing, so
+                     it must not read as one: flame, and no pulse, because
+                     nothing is actually happening in a kiln. -->
+                <span
+                  v-if="u.live_firing"
+                  class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border"
+                  :class="u.live_firing_is_demo
+                    ? 'bg-flame-bg text-flame border-flame/30'
+                    : 'bg-celadon-bg text-celadon-dark border-celadon/30'"
+                  :title="u.live_firing_is_demo
+                    ? 'Demo firing left running - it holds the active slot until deleted'
+                    : 'Real firing in progress'"
+                >
+                  <span
+                    class="w-1.5 h-1.5 rounded-full"
+                    :class="u.live_firing_is_demo ? 'bg-flame' : 'bg-green-500 animate-pulse'"
+                  />
+                  {{ u.live_firing_is_demo ? 'DEMO FIRING' : 'FIRING NOW' }}
                 </span>
               </div>
               <p class="text-xs text-ink-muted truncate">{{ u.email }}</p>
@@ -186,6 +210,7 @@
 
       <p v-if="!loading && !loadError" class="text-xs text-ink-faint mt-3">
         {{ filtered.length }} shown · {{ userCount }} users · {{ adminCount }} admin
+        <template v-if="demoFiringCount"> · {{ demoFiringCount }} demo firing{{ demoFiringCount === 1 ? '' : 's' }} still running</template>
       </p>
     </div>
   </div>
@@ -338,6 +363,12 @@ function ago(iso) {
 // matches /api/admin/stats (and public.beta_slots_used) by construction.
 const adminCount = computed(() => users.value.filter(u => u.role === 'admin').length)
 const userCount  = computed(() => users.value.length - adminCount.value)
+
+// Worth a footer number: an abandoned demo blocks that person from starting a
+// real firing, so a rising count is a support signal, not trivia.
+const demoFiringCount = computed(() =>
+  users.value.filter(u => u.live_firing && u.live_firing_is_demo).length
+)
 
 const filtered = computed(() => {
   let list = users.value

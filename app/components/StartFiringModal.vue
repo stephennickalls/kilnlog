@@ -20,6 +20,16 @@
   saved and preset schedule and found nothing — so it comes after those lists,
   not before them.
 
+  PRESETS GROUP BY BODY (Sep 2026). They used to group by `type`, which was
+  fine at six presets and useless at twenty: fifteen of them are type='glaze',
+  so the whole list arrived as one undifferentiated heap. The rule now lives in
+  useScheduleSections — bisque and raku by type, everything else by clay body —
+  because /schedules groups the same rows and two copies of that rule would
+  drift within a week. Sections are individually collapsible and ALL CLOSED on
+  open: an expander that reveals twenty rows is the same wall of text the
+  grouping exists to prevent, so the sections themselves have to be the thing
+  you toggle.
+
   STARTERS COME FROM THE DB (Aug 2026). The two big cards used to be
   BISQUE_POINTS / GLAZE_POINTS declared right here — a second source of curves
   alongside schedule_library, free to drift from it, and carrying a 2h
@@ -96,7 +106,10 @@
             <div v-for="n in 2" :key="'sk'+n" class="h-[136px] rounded-xl border border-parchment-3 bg-white/60 animate-pulse" />
           </div>
 
-          <!-- Your schedules (collapsed) -->
+          <!-- Your schedules (collapsed). NOT sectioned: a user with three
+               saved plans knows what each one is, and sections would add a tap
+               to reach them. This only groups the presets, where the count is
+               the problem. -->
           <section v-if="myLibrary.length" class="space-y-1.5">
             <button class="w-full flex items-center justify-between px-1 py-1.5 text-left" @click="showMine = !showMine">
               <span class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Your schedules ({{ myLibrary.length }})</span>
@@ -107,17 +120,30 @@
             </template>
           </section>
 
-          <!-- Presets (collapsed). Starters are excluded — they are already
-               the two cards above, and listing them twice reads as clutter. -->
+          <!-- Presets, grouped by what you are firing. Starters are excluded —
+               they are already the two cards above, and listing them twice
+               reads as clutter. -->
           <section v-if="presetLibrary.length" class="space-y-1.5">
             <button class="w-full flex items-center justify-between px-1 py-1.5 text-left" @click="showPresets = !showPresets">
               <span class="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">Preset schedules ({{ presetLibrary.length }})</span>
               <svg class="w-4 h-4 text-ink-faint transition-transform" :class="showPresets ? 'rotate-180' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
             </button>
             <template v-if="showPresets">
-              <div v-for="type in presetTypes" :key="'pt'+type" class="space-y-1.5">
-                <p class="text-[11px] font-semibold text-ink-muted px-1 pt-1">{{ labelForType(type) }}</p>
-                <ScheduleRow v-for="lib in presetsOfType(type)" :key="'pr'+lib.id" :schedule="lib" @pick="pick('lib:' + lib.id)" />
+              <div v-for="sec in presetSections" :key="'sec' + sec.key" class="space-y-1.5">
+                <!-- Section headers are BUTTONS with a border, not the bare
+                     uppercase labels used one level up. Two collapsible tiers
+                     that look identical is a maze; this tier reads as a row you
+                     press, which is what it is. -->
+                <button
+                  class="w-full flex items-center justify-between px-2.5 py-2 rounded-lg bg-white border border-parchment-3 text-left hover:border-parchment-4 transition-colors"
+                  @click="toggleSection(sec.key)"
+                >
+                  <span class="text-xs font-bold text-ink">{{ sec.label }} <span class="text-ink-faint font-normal">({{ sec.schedules.length }})</span></span>
+                  <svg class="w-3.5 h-3.5 text-ink-faint transition-transform" :class="openSections.has(sec.key) ? 'rotate-180' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+                </button>
+                <template v-if="openSections.has(sec.key)">
+                  <ScheduleRow v-for="lib in sec.schedules" :key="'pr'+lib.id" :schedule="lib" @pick="pick('lib:' + lib.id)" />
+                </template>
               </div>
             </template>
           </section>
@@ -260,7 +286,7 @@
 <script setup>
 // app/components/StartFiringModal.vue
 import { h } from 'vue'
-import { themeForType, labelForType } from '~/composables/useScheduleTheme'
+import { themeForType } from '~/composables/useScheduleTheme'
 
 const props = defineProps({
   open:        Boolean,
@@ -272,6 +298,8 @@ const props = defineProps({
 const emit = defineEmits(['close', 'create'])
 
 const router = useRouter()
+
+const { sectionsFor } = useScheduleSections()
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const step                 = ref('pick')            // 'pick' | 'confirm'
@@ -287,6 +315,17 @@ const showPresets          = ref(false)
 const showPast             = ref(false)
 const showAdvanced         = ref(false)
 const showNotes            = ref(false)
+
+// Which preset sections are expanded. A Set replaced wholesale on every toggle
+// rather than mutated in place, because Vue does not track Set membership
+// changes.
+const openSections = ref(new Set())
+function toggleSection(key) {
+  const next = new Set(openSections.value)
+  if (next.has(key)) next.delete(key)
+  else next.add(key)
+  openSections.value = next
+}
 
 // The witness cones planned for this firing, copied from the chosen schedule.
 // targetCone drives ConePackEditor's guide/target/guard suggestion.
@@ -325,10 +364,9 @@ const starters = computed(() =>
     }))
 )
 
-const myLibrary     = computed(() => props.library.filter(l => l.user_id !== null))
-const presetLibrary = computed(() => props.library.filter(l => l.user_id === null && l.starter_rank == null))
-const presetTypes   = computed(() => [...new Set(presetLibrary.value.map(l => l.type))].sort())
-function presetsOfType(type) { return presetLibrary.value.filter(l => l.type === type) }
+const myLibrary      = computed(() => props.library.filter(l => l.user_id !== null))
+const presetLibrary  = computed(() => props.library.filter(l => l.user_id === null && l.starter_rank == null))
+const presetSections = computed(() => sectionsFor(presetLibrary.value))
 
 // No starters flagged (fresh db, or the flag was cleared) — open the presets
 // list so step 1 is never a dead end. Deliberately NOT a hardcoded curve.
@@ -481,6 +519,7 @@ watch(() => props.open, (val) => {
   showPast.value             = false
   showAdvanced.value         = false
   showNotes.value            = false
+  openSections.value         = new Set()
   form.notes                 = ''
 
   if (props.preselect) {

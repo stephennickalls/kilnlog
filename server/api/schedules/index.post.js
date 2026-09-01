@@ -11,10 +11,34 @@
 // ORIGIN (Aug 2026): library rows are written origin='planned' rather than
 // falling to the 'live' default. A row that claims it was logged live but has
 // no firing attached is a lie waiting to be read by something less careful.
+//
+// CLAY BODY (Sep 2026): `body` files the schedule into a section on /schedules
+// and in the Start firing modal. NULL is valid and means "any body" — a bisque
+// or a raku genuinely applies to every clay, so this is optional and stays
+// optional. An unknown value is REJECTED rather than coerced to null: the
+// column carries a CHECK constraint, and silently discarding a typo would let
+// the client believe it saved something it did not.
+//
+// NAMING TRAP: `body` is already the request body in this handler. The clay
+// body is read as `body.body` and held as `clayBody`. Destructuring it
+// alongside name/type/cone would shadow the request and break everything below.
 const MIN_TEMP = -200
 const MAX_TEMP = 1400
 const MAX_REDUCTIONS = 50
 const KINDS = ['reduction', 'oxidation']
+
+// Must match the schedule_library_body_check constraint
+// (migrations/20260902_body_presets.sql) and CLAY_BODIES in
+// app/composables/useScheduleSections.js.
+const BODIES = ['earthenware', 'midfire', 'stoneware', 'porcelain']
+
+function sanitizeBody(value) {
+  if (value === undefined || value === null || value === '') return null
+  if (!BODIES.includes(value)) {
+    throw createError({ statusCode: 400, statusMessage: 'Invalid clay body' })
+  }
+  return value
+}
 
 function sanitizeReductions(input) {
   if (!Array.isArray(input)) return []
@@ -44,6 +68,7 @@ export default defineEventHandler(async (event) => {
 
   const validSource = ['custom', 'from_firing', 'preset_copy'].includes(source) ? source : 'custom'
   const conePack = await sanitizeConePack(db, body.conePack)
+  const clayBody = sanitizeBody(body.body)
 
   const { data: schedule, error } = await db
     .from('schedule_library')
@@ -56,6 +81,7 @@ export default defineEventHandler(async (event) => {
       is_built_in: 0,
       user_id: user.id,
       cone_pack: conePack,
+      body: clayBody,
     })
     .select()
     .single()

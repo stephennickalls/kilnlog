@@ -2,8 +2,21 @@
 <!--
   Schedules library. Manages schedules; never starts a firing itself (Start opens
   the modal preselected). Two groups: "Your schedules" (browse-by-shape) and
-  "Presets" (search-by-attribute → filter chips). Primary card tap = Edit.
-  Card colour follows firing type via useScheduleTheme.
+  "Presets" (search-by-attribute). Primary card tap = Edit. Card colour follows
+  firing type via useScheduleTheme.
+
+  PRESETS ARE SECTIONED, NOT FILTERED (Sep 2026). They used to sit behind
+  All / Bisque / Glaze chips, which had two problems once the library passed
+  twenty. The chips are exclusive, so finding a porcelain schedule meant picking
+  "Glaze" and then reading fifteen cards; and "All" showed everything at once,
+  which is the state the chips existed to avoid. Sections show the shape of the
+  library at a glance — six headings with counts — and expand independently. The
+  rule lives in useScheduleSections, shared with StartFiringModal, because two
+  copies of "how is the library carved up" would drift within a week.
+
+  BISQUE OPENS BY DEFAULT, everything else closed. A page where nothing is open
+  reads as broken or empty, and bisque is both the first firing in the process
+  and the one a new potter is most likely to be looking for.
 
   MOBILE: the card grids cap their min track at 100%, because a 232px minimum
   plus 32px of page padding needs 264px and anything narrower made the track
@@ -40,7 +53,9 @@
 
       <template v-else>
 
-        <!-- Your schedules -->
+        <!-- Your schedules. NOT sectioned: someone with four saved plans knows
+             what each one is, and headings would only add clicks to reach them.
+             Sections solve a problem the presets have and this list does not. -->
         <section class="flex flex-col gap-3">
           <div class="flex items-baseline gap-2 px-0.5">
             <h2 class="text-sm font-bold text-ink">Your schedules</h2>
@@ -73,36 +88,39 @@
 
         <!-- Presets -->
         <section v-if="presets.length" class="flex flex-col gap-3">
-          <!-- Heading and hint are one group; the chips are a second that wraps
-               as a unit. With ml-auto they landed hard right on their own line
-               once the hint wrapped, orphaning the heading. -->
-          <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-2 px-0.5">
-            <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1 min-w-0">
-              <h2 class="text-sm font-bold text-ink">Presets</h2>
-              <span class="text-[11px] text-ink-faint">starting points — editing one makes your own copy</span>
-            </div>
-            <div class="flex gap-1 shrink-0">
-              <button
-                v-for="f in filters" :key="f.key"
-                class="px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors"
-                :class="activeFilter === f.key ? 'bg-flame text-parchment' : 'bg-white border border-parchment-3 text-ink-muted hover:bg-parchment-2'"
-                @click="activeFilter = f.key"
-              >{{ f.label }}</button>
-            </div>
+          <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1 px-0.5 min-w-0">
+            <h2 class="text-sm font-bold text-ink">Presets</h2>
+            <span class="text-[11px] text-ink-faint tabular-nums">{{ presets.length }}</span>
+            <span class="text-[11px] text-ink-faint">starting points — editing one makes your own copy</span>
           </div>
 
-          <div class="grid gap-3" style="grid-template-columns:repeat(auto-fill,minmax(min(232px,100%),1fr))">
-            <ScheduleCard
-              v-for="s in filteredPresets" :key="s.id"
-              :schedule="s"
-              :is-preset="true"
-              :start-disabled="!!activeFiring"
-              @edit="goEdit(s)"
-              @start="startFromSchedule(s)"
-              @duplicate="duplicate(s)"
-            />
+          <div v-for="sec in presetSections" :key="'sec' + sec.key" class="flex flex-col gap-3">
+            <!-- A full-width button rather than a bare heading. Anything that
+                 collapses content has to look pressable, or people stare at a
+                 closed section wondering where their schedules went. -->
+            <button
+              class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl bg-white border border-parchment-3 hover:border-parchment-4 transition-colors text-left"
+              @click="toggleSection(sec.key)"
+            >
+              <span class="flex items-baseline gap-2 min-w-0">
+                <span class="text-sm font-bold text-ink">{{ sec.label }}</span>
+                <span class="text-[11px] text-ink-faint tabular-nums">{{ sec.schedules.length }}</span>
+              </span>
+              <svg class="w-4 h-4 text-ink-faint shrink-0 transition-transform" :class="openSections.has(sec.key) ? 'rotate-180' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+
+            <div v-if="openSections.has(sec.key)" class="grid gap-3" style="grid-template-columns:repeat(auto-fill,minmax(min(232px,100%),1fr))">
+              <ScheduleCard
+                v-for="s in sec.schedules" :key="s.id"
+                :schedule="s"
+                :is-preset="true"
+                :start-disabled="!!activeFiring"
+                @edit="goEdit(s)"
+                @start="startFromSchedule(s)"
+                @duplicate="duplicate(s)"
+              />
+            </div>
           </div>
-          <p v-if="!filteredPresets.length" class="text-sm text-ink-muted px-0.5 py-4">No {{ activeFilter }} presets.</p>
         </section>
 
       </template>
@@ -132,24 +150,25 @@ const router = useRouter()
 
 // Know whether a firing is active so we can disable Start affordances.
 const { activeFiring, loadActiveFiring } = useActiveFiring()
+const { sectionsFor } = useScheduleSections()
 
-const schedules    = ref([])
-const loading      = ref(true)
-const status       = ref('')
-const activeFilter = ref('all')
+const schedules = ref([])
+const loading   = ref(true)
+const status    = ref('')
 
-// Bisque/glaze cover the bulk; others fall under whichever they match.
-const filters = [
-  { key: 'all',    label: 'All' },
-  { key: 'bisque', label: 'Bisque' },
-  { key: 'glaze',  label: 'Glaze' },
-]
+const mySchedules    = computed(() => schedules.value.filter(s => s.user_id !== null))
+const presets        = computed(() => schedules.value.filter(s => s.user_id === null))
+const presetSections = computed(() => sectionsFor(presets.value))
 
-const mySchedules = computed(() => schedules.value.filter(s => s.user_id !== null))
-const presets     = computed(() => schedules.value.filter(s => s.user_id === null))
-const filteredPresets = computed(() =>
-  activeFilter.value === 'all' ? presets.value : presets.value.filter(s => s.type === activeFilter.value)
-)
+// A Set replaced wholesale on every toggle rather than mutated in place,
+// because Vue does not track Set membership changes.
+const openSections = ref(new Set(['bisque']))
+function toggleSection(key) {
+  const next = new Set(openSections.value)
+  if (next.has(key)) next.delete(key)
+  else next.add(key)
+  openSections.value = next
+}
 
 onMounted(() => { load(); loadActiveFiring() })
 
@@ -185,8 +204,9 @@ async function duplicate(s) {
     const points = (s.points ?? s.schedule_library_points ?? []).map(p => ({
       offsetMinutes: p.offset_minutes, targetTemp: p.target_temp,
     }))
-    // A duplicate that loses the atmosphere plan, the cone pack or the
-    // description isn't a duplicate — the curve is only part of a schedule.
+    // A duplicate that loses the atmosphere plan, the cone pack, the clay body
+    // or the description isn't a duplicate — the curve is only part of a
+    // schedule.
     const reductions = (s.reductions ?? [])
       .filter(r => r.start_temp != null)
       .map(r => ({ startTemp: r.start_temp, endTemp: r.end_temp ?? null, kind: r.kind }))
@@ -196,6 +216,7 @@ async function duplicate(s) {
         name: `${s.name} (copy)`,
         type: s.type ?? null,
         cone: s.cone ?? null,
+        body: s.body ?? null,
         description: s.description ?? null,
         source: s.user_id === null ? 'preset_copy' : 'custom',
         points,

@@ -14,6 +14,13 @@
   be helpful. So the rebuild is OFFERED — CurveRebuildBar appears above the
   editor and does nothing until pressed. The rule and the curve profiles behind
   it live in useStarterCurve.js, shared with new.vue so the twins cannot drift.
+
+  CLAY BODY (Sep 2026): `body` files the schedule into a section on /schedules
+  and in the Start firing modal. It sits on its own row rather than in the
+  type+cone grid, because those two are a pair that drive the curve while body
+  is independent metadata. It also travels with the silent preset fork below —
+  a copy of a porcelain preset that lost its body would file itself under "Any
+  body" and the user would never know why.
 -->
 <template>
   <div class="min-h-screen bg-parchment font-serif">
@@ -64,6 +71,10 @@
         <FiringTypeSelect v-model="form.type" />
         <ConeSelect v-model="form.cone" />
       </div>
+
+      <!-- Clay body. Its own row: type and cone are a pair that rebuild the
+           curve, body only decides which section this schedule files under. -->
+      <ClayBodySelect v-model="form.body" />
 
       <!-- Description -->
       <div class="flex flex-col gap-1.5">
@@ -176,7 +187,8 @@ const router = useRouter()
 const loading              = ref(true)
 const saving               = ref(false)
 const status               = ref('')
-const form                 = reactive({ name: '', type: 'bisque', cone: '', description: '' })
+// `body` is the clay body (null = any); it never affects the curve.
+const form                 = reactive({ name: '', type: 'bisque', cone: '', body: null, description: '' })
 const editPoints           = ref([])
 const editReductions       = ref([])   // [{ startTemp, endTemp|null, kind }] °C
 const editConePack         = ref([])   // planned witness cones — names
@@ -188,6 +200,9 @@ const theme = computed(() => themeForType(form.type))
 // generated: FALSE from the outset. Everything on this page is a saved
 // schedule, so a type or cone change raises the offer rather than rebuilding.
 // It only flips true if the user actually presses Rebuild.
+//
+// form.body is not watched here at all: filing a schedule under a clay body
+// says nothing about what shape its curve should be.
 const {
   offer:        curveOffer,
   label:        curveRebuildLabel,
@@ -231,6 +246,8 @@ async function load() {
     const s = await $fetch(`/api/schedules/${id.value}`)
 
     // Presets are read-only: editing one silently forks it to the user first.
+    // The fork must carry EVERYTHING, body included — a copy that quietly lost
+    // its clay body would reappear under "Any body" with no explanation.
     if (s.user_id === null) {
       const pts = (s.points ?? []).map(p => ({ offsetMinutes: p.offset_minutes, targetTemp: p.target_temp }))
       const reds = (s.reductions ?? []).map(r => ({ startTemp: r.start_temp, endTemp: r.end_temp ?? null, kind: r.kind }))
@@ -240,6 +257,7 @@ async function load() {
           name: `${s.name} (copy)`,
           type: s.type ?? 'bisque',
           cone: s.cone ?? null,
+          body: s.body ?? null,
           description: s.description ?? null,
           source: 'preset_copy',
           points: pts,
@@ -258,6 +276,7 @@ async function load() {
     form.name            = s.name
     form.type            = s.type ?? 'bisque'
     form.cone            = s.cone ?? ''
+    form.body            = s.body ?? null
     form.description     = s.description ?? ''
     editPoints.value     = (s.points ?? []).map(p => ({ offsetMinutes: p.offset_minutes, targetTemp: p.target_temp }))
     editReductions.value = (s.reductions ?? []).map(r => ({ startTemp: r.start_temp, endTemp: r.end_temp ?? null, kind: r.kind }))
@@ -273,6 +292,7 @@ function saveBody() {
     name: form.name.trim(),
     type: form.type,
     cone: form.cone?.trim() || null,
+    body: form.body,                    // clay body; null = any
     description: form.description?.trim() || null,
     points: editPoints.value,
     reductions: editReductions.value,   // [{ startTemp, endTemp|null, kind }] °C

@@ -18,33 +18,16 @@
 // that says it was logged live but has no firing is a lie waiting to be read by
 // something less careful.
 //
-// CLAY BODY (Sep 2026): `body` files the schedule into a section on /schedules
-// and in the Start firing modal. NULL is valid and means "any body". Note the
-// `!== undefined` guard: NULL is a real value here, so a client clearing the
-// field back to "Any body" must write NULL rather than be treated as "field
-// omitted, leave it alone". An unknown string is REJECTED rather than coerced,
-// because the column carries a CHECK constraint and silently discarding a typo
-// would let the client believe it saved something it did not.
-//
-// NAMING TRAP: `body` is already the request body in this handler. The clay
-// body is read as `body.body` throughout. Do not destructure it.
+// NO `body` FIELD (Sep 2026). A clay-body column existed here briefly and was
+// dropped: its values mixed a material axis with a temperature axis, and the
+// temperature axis was already in the database as the cone and as the curve's
+// peak. The library sections derive from those instead. If a `body` key turns
+// up in a request it is ignored rather than rejected, so an old client tab left
+// open through the deploy still saves successfully.
 const MIN_TEMP = -200
 const MAX_TEMP = 1400
 const MAX_REDUCTIONS = 50
 const KINDS = ['reduction', 'oxidation']
-
-// Must match the schedule_library_body_check constraint
-// (migrations/20260902_body_presets.sql) and CLAY_BODIES in
-// app/composables/useScheduleSections.js.
-const BODIES = ['earthenware', 'midfire', 'stoneware', 'porcelain']
-
-function sanitizeBody(value) {
-  if (value === undefined || value === null || value === '') return null
-  if (!BODIES.includes(value)) {
-    throw createError({ statusCode: 400, statusMessage: 'Invalid clay body' })
-  }
-  return value
-}
 
 function sanitizeReductions(input) {
   if (!Array.isArray(input)) return []
@@ -84,7 +67,6 @@ export default defineEventHandler(async (event) => {
   if (body.name !== undefined) updates.name = body.name.trim()
   if (body.type !== undefined) updates.type = body.type.trim()
   if (body.cone !== undefined) updates.cone = body.cone?.trim() || null
-  if (body.body !== undefined) updates.body = sanitizeBody(body.body)
   if (body.description !== undefined) updates.description = body.description?.trim()?.slice(0, 500) || null
   if (body.conePack !== undefined) updates.cone_pack = await sanitizeConePack(db, body.conePack)
 

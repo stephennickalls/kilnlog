@@ -123,3 +123,104 @@
   .pb-safe { padding-bottom: max(0.75rem, env(safe-area-inset-bottom)); }
   .pt-safe { padding-top: max(0.75rem, env(safe-area-inset-top)); }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   PRINT (Sep 2026)
+
+   Asked for by a ceramics student: "printing would help too as will take
+   outside and jot down completed programme, and attach ramps and graphs into
+   my course work". Two different jobs in one sheet, which is why the printed
+   plan is not a screenshot of the page:
+
+     PAGE 1  the plan — curve with axes, the step table, cones, atmosphere,
+             notes. This is the thing that gets attached to coursework.
+     PAGE 2  a blank log sheet — 30 ruled rows for time / temp / note. This is
+             the thing that goes out to the kiln on a clipboard.
+
+   WHY 30 ROWS LIVE ON THEIR OWN PAGE. A4 minus margins is 267mm of height.
+   Header, curve and step table already spend about 150mm, and 30 writable rows
+   at 8mm each need 240mm plus a header. They cannot share a page, and cramming
+   them to 5mm makes rows nobody can write in with a pen at a hot kiln. Two
+   columns of 15 on page 2 come to ~130mm, which leaves room for a free-text
+   observations block underneath.
+
+   SCREEN AND PRINT ARE DIFFERENT DOCUMENTS, not one document restyled. The app
+   shell is a 100dvh flex layout with a resizable sidebar and overflow-hidden
+   panes; persuading that to paginate is a fight nobody wins. So .no-print
+   removes the interactive page and .print-only reveals a purpose-built one that
+   never renders on screen. Both trees are always in the DOM — a print-only tree
+   built with v-if would have nothing to print, since print media queries do not
+   trigger Vue reactivity.
+   ───────────────────────────────────────────────────────────────────────── */
+
+.print-only { display: none; }
+
+@media print {
+  @page {
+    size: A4 portrait;
+    /* 14mm all round: comfortably inside the unprintable margin of every
+       consumer inkjet and laser, and wide enough on the left for a ring
+       binder or a bulldog clip on a clipboard. */
+    margin: 14mm;
+  }
+
+  .print-only { display: block !important; }
+  .no-print   { display: none  !important; }
+
+  /* The app shell fights pagination: fixed heights, hidden overflow, sticky
+     headers. Neutralise all of it so the print tree flows normally down the
+     page instead of being clipped to one viewport. */
+  html, body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+  body {
+    /* The screen guard makes a clip container, which in print truncates
+       anything wider than the first page box. */
+    overflow-x: visible !important;
+    font-size: 10pt;
+    color: #000;
+  }
+
+  /* Ink costs money and a parchment wash prints as a grey smear on most
+     office printers. Kill every decorative fill, shadow and rounded edge —
+     the printed sheet earns its structure from rules and type, not colour. */
+  *, *::before, *::after {
+    background: transparent !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Links print as plain text. A printed page cannot be clicked, and
+     "(https://…)" appended to every link is noise on a log sheet. */
+  a, a:visited {
+    color: inherit !important;
+    text-decoration: none !important;
+  }
+
+  /* Keep a step row, a log row or a stat block from being split across the
+     page break. A half-row at the fold is unreadable and unwritable. */
+  tr, .print-avoid-break {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  thead { display: table-header-group; }
+
+  .print-page-break {
+    break-before: page;
+    page-break-before: always;
+  }
+
+  /* SVG curves must keep their strokes. The blanket transparent-background
+     rule above would otherwise strip the fill under the curve, and
+     print-color-adjust stops the browser "helpfully" dropping the rest. */
+  .print-curve, .print-curve * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .print-curve rect.print-band {
+    background: initial !important;
+  }
+}

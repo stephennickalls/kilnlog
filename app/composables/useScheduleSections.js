@@ -1,28 +1,25 @@
 // File: app/composables/useScheduleSections.js
 //
-// TWO THINGS THAT MUST AGREE: the list of clay bodies a schedule can be tagged
-// with, and the sections the library is browsed by. They live together because
-// adding a body without adding its section makes those schedules vanish into
-// the catch-all, and adding a section without the body makes an empty group.
+// TWO LEVELS, NOT ONE. Stage outside (Bisque, Glaze, Raku), clay body inside.
+// The old version was a flat first-match-wins list where 'bisque' matched
+// before any body could, so a bisque schedule could never show its body and a
+// glaze schedule could never show its stage. A potter picking a plan answers
+// two questions in that order: which firing is this, and what clay is in it.
 //
-// SECTIONS ARE NOT `type`. Type (bisque | glaze | raku | single_fire | other)
-// answers "what kind of firing is this" and was fine at six presets. At twenty
-// it puts fifteen rows under "glaze" and the list stops helping. A potter
-// picking a plan is answering "what am I firing?", which is body AND firing
-// type together: a bisque is a bisque whatever the clay, but once you are past
-// bisque the body is the whole question.
+// THREE BODIES, NOT FOUR. 'midfire' used to sit in this list beside
+// 'stoneware', which put a temperature range in a list of materials and is the
+// reason none of the groups made sense. Midfire stoneware is stoneware; the
+// `cone` column already carries how hot. This list must match the
+// schedule_library_body_check constraint in
+// migrations/20260903_schedule_body_and_fuel.sql and BODIES in
+// server/api/schedules/index.post.js and [id].put.js.
 //
-// ORDER IS TEMPERATURE, low to high, with bisque first because it comes first
-// in the process. Alphabetical would give Earthenware, Midfire, Porcelain,
-// Stoneware — a coincidence that reads as deliberate and breaks the moment
-// somebody adds Terracotta.
+// NULL body is a real answer meaning "any clay". A cone 06 bisque, a raku and
+// the thick-work schedule genuinely apply to every body, and forcing a tag on
+// them would file them somewhere nobody would look.
 
-// Must match the schedule_library_body_check constraint
-// (migrations/20260902_body_presets.sql). NULL is a valid stored value and
-// means "any body"; it is offered in the picker as the empty option.
 export const CLAY_BODIES = [
   { value: 'earthenware', label: 'Earthenware' },
-  { value: 'midfire',     label: 'Midfire stoneware' },
   { value: 'stoneware',   label: 'Stoneware' },
   { value: 'porcelain',   label: 'Porcelain' },
 ]
@@ -31,34 +28,78 @@ export function labelForBody(body) {
   return CLAY_BODIES.find(b => b.value === body)?.label ?? 'Any body'
 }
 
-const SECTIONS = [
+// Outer level, in process order. 'other' is the catch-all and is last, so a
+// schedule with an unrecognised type cannot fall through and vanish.
+const STAGES = [
   { key: 'bisque',      label: 'Bisque',      match: s => s.type === 'bisque' },
-  { key: 'earthenware', label: 'Earthenware', match: s => s.body === 'earthenware' },
-  { key: 'midfire',     label: 'Midfire',     match: s => s.body === 'midfire' },
-  { key: 'stoneware',   label: 'Stoneware',   match: s => s.body === 'stoneware' },
-  { key: 'porcelain',   label: 'Porcelain',   match: s => s.body === 'porcelain' },
+  { key: 'glaze',       label: 'Glaze',       match: s => s.type === 'glaze' },
+  { key: 'single_fire', label: 'Single fire', match: s => s.type === 'single_fire' },
   { key: 'raku',        label: 'Raku',        match: s => s.type === 'raku' },
-  { key: 'other',       label: 'Any body',    match: () => true },
+  { key: 'other',       label: 'Other',       match: () => true },
 ]
 
+// Inner level, low to high, with "Any body" last: it is the group you read
+// when the first three did not describe your clay.
+const BODY_GROUPS = [
+  { key: 'earthenware', label: 'Earthenware', match: s => s.body === 'earthenware' },
+  { key: 'stoneware',   label: 'Stoneware',   match: s => s.body === 'stoneware' },
+  { key: 'porcelain',   label: 'Porcelain',   match: s => s.body === 'porcelain' },
+  { key: 'any',         label: 'Any body',    match: () => true },
+]
+
+// Sort within a body group by peak temperature, so cone 04 sits above cone 6
+// sits above cone 10 without needing the cones table in here. Accepts both the
+// db shape (target_temp) and the editor shape (targetTemp).
+function peakOf(s) {
+  const pts = s.points ?? []
+  if (!pts.length) return 0
+  return Math.max(...pts.map(p => p.target_temp ?? p.targetTemp ?? 0))
+}
+
 export function useScheduleSections() {
-  // Returns [{ key, label, schedules }] with empty sections dropped. FIRST
-  // MATCH WINS, so a schedule appears exactly once, and the 'other' catch-all
-  // is last and matches everything remaining — which is why nothing can fall
-  // through the list and silently vanish.
+  // Returns [{ key, label, count, groups: [{ key, label, schedules }] }].
+  // Empty stages and empty body groups are dropped. A schedule appears exactly
+  // once: claimed at the stage level, then claimed again within it.
   function sectionsFor(schedules) {
     const list = schedules ?? []
-    const taken = new Set()
+    const takenStage = new Set()
     const out = []
 
-    for (const section of SECTIONS) {
-      const hits = list.filter(s => !taken.has(s.id) && section.match(s))
-      if (!hits.length) continue
-      hits.forEach(s => taken.add(s.id))
-      out.push({ key: section.key, label: section.label, schedules: hits })
+    for (const stage of STAGES) {
+      const inStage = list.filter(s => !takenStage.has(s.id) && stage.match(s))
+      if (!inStage.length) continue
+      inStage.forEach(s => takenStage.add(s.id))
+
+      const takenBody = new Set()
+      const groups = []
+
+      for (const group of BODY_GROUPS) {
+        const hits = inStage.filter(s => !takenBody.has(s.id) && group.match(s))
+        if (!hits.length) continue
+        hits.forEach(s => takenBody.add(s.id))
+        groups.push({
+          key: group.key,
+          label: group.label,
+          schedules: hits.sort((a, b) => peakOf(a) - peakOf(b)),
+        })
+      }
+
+      out.push({ key: stage.key, label: stage.label, count: inStage.length, groups })
     }
     return out
   }
 
-  return { sectionsFor, CLAY_BODIES, labelForBody }
+  // One flat level, for any caller with no room to nest. A stage with a single
+  // body group keeps its plain name; only a split stage gets a compound label.
+  function flatSectionsFor(schedules) {
+    return sectionsFor(schedules).flatMap(stage =>
+      stage.groups.map(g => ({
+        key: `${stage.key}:${g.key}`,
+        label: stage.groups.length > 1 ? `${stage.label}: ${g.label}` : stage.label,
+        schedules: g.schedules,
+      }))
+    )
+  }
+
+  return { sectionsFor, flatSectionsFor, CLAY_BODIES, labelForBody }
 }

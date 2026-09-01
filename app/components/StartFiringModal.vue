@@ -20,15 +20,21 @@
   saved and preset schedule and found nothing — so it comes after those lists,
   not before them.
 
-  PRESETS GROUP BY BODY (Sep 2026). They used to group by `type`, which was
-  fine at six presets and useless at twenty: fifteen of them are type='glaze',
-  so the whole list arrived as one undifferentiated heap. The rule now lives in
-  useScheduleSections — bisque and raku by type, everything else by clay body —
+  PRESETS GROUP BY STAGE, THEN BODY (Sep 2026). They used to group by `type`
+  alone, which was fine at six presets and useless at twenty: fifteen of them
+  are type='glaze', so the whole list arrived as one undifferentiated heap. The
+  rule now lives in useScheduleSections — stage outside, clay body inside —
   because /schedules groups the same rows and two copies of that rule would
-  drift within a week. Sections are individually collapsible and ALL CLOSED on
+  drift within a week. Stages are individually collapsible and ALL CLOSED on
   open: an expander that reveals twenty rows is the same wall of text the
-  grouping exists to prevent, so the sections themselves have to be the thing
+  grouping exists to prevent, so the stages themselves have to be the thing
   you toggle.
+
+  BODY IS A LABEL, NOT A THIRD TOGGLE. This sheet already has two collapse
+  tiers (Preset schedules, then each stage); a third would be a maze inside
+  88dvh. Inside an open stage the body groups are quiet sub-headings, and a
+  stage with only one group shows no sub-heading at all, because a lone "Any
+  body" caption distinguishes nothing.
 
   STARTERS COME FROM THE DB (Aug 2026). The two big cards used to be
   BISQUE_POINTS / GLAZE_POINTS declared right here — a second source of curves
@@ -138,11 +144,15 @@
                   class="w-full flex items-center justify-between px-2.5 py-2 rounded-lg bg-white border border-parchment-3 text-left hover:border-parchment-4 transition-colors"
                   @click="toggleSection(sec.key)"
                 >
-                  <span class="text-xs font-bold text-ink">{{ sec.label }} <span class="text-ink-faint font-normal">({{ sec.schedules.length }})</span></span>
+                  <span class="text-xs font-bold text-ink">{{ sec.label }} <span class="text-ink-faint font-normal">({{ sec.count }})</span></span>
                   <svg class="w-3.5 h-3.5 text-ink-faint transition-transform" :class="openSections.has(sec.key) ? 'rotate-180' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
                 </button>
                 <template v-if="openSections.has(sec.key)">
-                  <ScheduleRow v-for="lib in sec.schedules" :key="'pr'+lib.id" :schedule="lib" @pick="pick('lib:' + lib.id)" />
+                  <div v-for="g in sec.groups" :key="sec.key + ':' + g.key" class="space-y-1.5">
+                    <!-- Plain caption, not a button: see the header note. -->
+                    <p v-if="sec.groups.length > 1" class="px-1 pt-1 text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">{{ g.label }}</p>
+                    <ScheduleRow v-for="lib in g.schedules" :key="'pr'+lib.id" :schedule="lib" @pick="pick('lib:' + lib.id)" />
+                  </div>
                 </template>
               </div>
             </template>

@@ -10,9 +10,19 @@
   twenty. The chips are exclusive, so finding a porcelain schedule meant picking
   "Glaze" and then reading fifteen cards; and "All" showed everything at once,
   which is the state the chips existed to avoid. Sections show the shape of the
-  library at a glance — six headings with counts — and expand independently. The
-  rule lives in useScheduleSections, shared with StartFiringModal, because two
-  copies of "how is the library carved up" would drift within a week.
+  library at a glance and expand independently. The rule lives in
+  useScheduleSections, shared with StartFiringModal, because two copies of "how
+  is the library carved up" would drift within a week.
+
+  ONE COLLAPSE TIER, TWO LEVELS OF STRUCTURE (Sep 2026). Sections are stage
+  (Bisque, Glaze, Raku) and only stage; clay body is a quiet sub-heading inside
+  an open stage, not a second thing to press. Nested toggles that look the same
+  are a maze, and the body split is there to make a long grid scannable, which
+  a label does on its own.
+
+  A BODY SUB-HEADING IS SUPPRESSED when a stage has only one group. "Glaze"
+  above a single row reading "Any body" is a heading that tells you nothing,
+  and the composable already drops empty groups, so the check is on length.
 
   BISQUE OPENS BY DEFAULT, everything else closed. A page where nothing is open
   reads as broken or empty, and bisque is both the first firing in the process
@@ -104,21 +114,31 @@
             >
               <span class="flex items-baseline gap-2 min-w-0">
                 <span class="text-sm font-bold text-ink">{{ sec.label }}</span>
-                <span class="text-[11px] text-ink-faint tabular-nums">{{ sec.schedules.length }}</span>
+                <span class="text-[11px] text-ink-faint tabular-nums">{{ sec.count }}</span>
               </span>
               <svg class="w-4 h-4 text-ink-faint shrink-0 transition-transform" :class="openSections.has(sec.key) ? 'rotate-180' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
             </button>
 
-            <div v-if="openSections.has(sec.key)" class="grid gap-3" style="grid-template-columns:repeat(auto-fill,minmax(min(232px,100%),1fr))">
-              <ScheduleCard
-                v-for="s in sec.schedules" :key="s.id"
-                :schedule="s"
-                :is-preset="true"
-                :start-disabled="!!activeFiring"
-                @edit="goEdit(s)"
-                @start="startFromSchedule(s)"
-                @duplicate="duplicate(s)"
-              />
+            <div v-if="openSections.has(sec.key)" class="flex flex-col gap-5">
+              <div v-for="g in sec.groups" :key="sec.key + ':' + g.key" class="flex flex-col gap-2.5">
+                <!-- Suppressed when the stage has one group: a heading with
+                     nothing to distinguish it from is noise. -->
+                <h3 v-if="sec.groups.length > 1" class="px-1 text-[10px] font-bold uppercase tracking-[0.1em] text-ink-faint">
+                  {{ g.label }} <span class="tabular-nums font-normal">{{ g.schedules.length }}</span>
+                </h3>
+
+                <div class="grid gap-3" style="grid-template-columns:repeat(auto-fill,minmax(min(232px,100%),1fr))">
+                  <ScheduleCard
+                    v-for="s in g.schedules" :key="s.id"
+                    :schedule="s"
+                    :is-preset="true"
+                    :start-disabled="!!activeFiring"
+                    @edit="goEdit(s)"
+                    @start="startFromSchedule(s)"
+                    @duplicate="duplicate(s)"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </section>

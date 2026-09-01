@@ -10,21 +10,20 @@
   CURVE GENERATION (Aug 2026): the local BISQUE_DEFAULT constant is gone. Type
   and cone now drive the curve through useAutoCurve — pick either one in either
   order and the curve rebuilds from the pair. That rule and the profiles behind
-  it live in useStarterCurve.js, shared with /schedules/[id] and with the Steps
-  table's quick starts, because five copies of "a reasonable bisque" in five
-  files is how they all ended up different.
+  it live in useStarterCurve.js, shared with the Steps table's quick starts,
+  because five copies of "a reasonable bisque" in five files is how they all
+  ended up different.
 
   The rebuild is only silent while the curve is still machine-made. Once the
   points came from somewhere real — a library seed, a firing's readings, a drag
   in the editor — changing type or cone offers a rebuild instead of taking one.
 
-  CLAY BODY (Sep 2026): `body` files the schedule into a section on /schedules
-  and in the Start firing modal. It sits on its own row, NOT in the type+cone
-  grid, because those two are a pair that drive the curve together while body is
-  independent metadata — grouping them would imply it rebuilds the curve too.
-  A library seed copies the source schedule's body along with its curve,
-  reductions and cone pack, for the same reason those travel: a plan started
-  from a porcelain preset is still a porcelain plan.
+  THIS PAGE AND /schedules/[id] ARE NO LONGER TWINS (Sep 2026). Full
+  regeneration is right HERE and wrong there. On a blank new schedule the curve
+  on screen is machine output and replacing it costs nobody anything. On a saved
+  schedule it is somebody's work, so that page retargets the peak and keeps the
+  shape instead. Do not "restore consistency" by making one behave like the
+  other — the difference is the point.
 -->
 <template>
   <div class="min-h-screen bg-parchment font-serif">
@@ -142,11 +141,6 @@
         <FiringTypeSelect v-model="form.type" />
         <ConeSelect v-model="form.cone" />
       </div>
-
-      <!-- ── SHARED: clay body ─────────────────────────────────────────── -->
-      <!-- Its own row on purpose. Type and cone are a pair that rebuild the
-           curve; body only decides which section this schedule files under. -->
-      <ClayBodySelect v-model="form.body" />
 
       <!-- ── SHARED: description ───────────────────────────────────────── -->
       <div class="flex flex-col gap-1.5">
@@ -281,8 +275,8 @@ const initialSimplified = ref([])
 const hasManualEdits    = ref(false)
 const regenerating      = ref(false)
 
-// Shared. `body` is the clay body (null = any); it never affects the curve.
-const form       = reactive({ name: '', type: 'bisque', cone: '', body: null, description: '' })
+// Shared
+const form       = reactive({ name: '', type: 'bisque', cone: '', description: '' })
 const editPoints = ref([])
 const theme      = computed(() => themeForType(form.type))
 
@@ -295,11 +289,6 @@ const showReductionPlanner = ref(false)
 // not generated: changing the type there must never wipe the simplified curve.
 // A plain create starts generated and rebuilds freely until the user drags a
 // point or seeds from the library.
-//
-// form.body is deliberately NOT watched by useAutoCurve. Tagging a schedule as
-// porcelain says where it belongs in the library, not what shape it should be,
-// and regenerating someone's curve because they filed it would be the same
-// mistake the rebuild-offer exists to prevent.
 const {
   offer:        curveOffer,
   label:        curveRebuildLabel,
@@ -364,10 +353,6 @@ onMounted(async () => {
     form.name = `${data.name} (from ${formatFiringDate(data.started_at ?? data.created_at)})`
     form.type = guessType(data.name)
 
-    // Body is left unset. A firing records no clay body, and guessing one from
-    // the peak temperature would file the schedule somewhere the potter never
-    // chose — "Any body" is at least honest.
-
     // "Save this firing as a schedule" should keep where you actually reduced,
     // and which cones you had in the kiln.
     editReductions.value = (data.reductions ?? [])
@@ -406,7 +391,6 @@ watch(selectedLibraryId, (val) => {
     editReductions.value = []   // blank slate, no leak from the last pick
     editConePack.value   = []
     form.name = ''
-    form.body = null
     rebuildCurve()
     return
   }
@@ -427,7 +411,6 @@ watch(selectedLibraryId, (val) => {
   form.name = ''
   form.type = sched.type ?? 'glaze'
   form.cone = sched.cone ?? ''
-  form.body = sched.body ?? null
 })
 
 // ── Slider ────────────────────────────────────────────────────────────────────
@@ -467,7 +450,6 @@ async function save() {
         name:        form.name.trim(),
         type:        form.type,
         cone:        form.cone?.trim() || null,
-        body:        form.body,             // clay body; null = any
         description: form.description?.trim() || null,
         source:      isFromFiring.value ? 'from_firing' : 'custom',
         points:      editPoints.value,

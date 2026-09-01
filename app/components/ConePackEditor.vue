@@ -10,6 +10,15 @@
 
   v-model is an array of cone NAMES, unsorted on the way in; emitted sorted
   cold-to-hot so the stored order matches how the cones sit in the pack.
+
+  CHIPS ARE NAMES ONLY (Sep 2026). Each chip used to carry its temperature
+  beside the name, which turned the pack into a table of numbers rather than
+  the row of cones you look at through the peep hole. The cone name is the unit
+  a potter already works in, and the temperature is on the chart, the cone
+  ruler and the firing console anyway. It also cost width: a six-cone gas pack
+  wrapped to four rows on a phone and now fits two. Dropping it made
+  useTempUnit's displayTemp unused here, so the import went with it — the
+  picker grid below never showed temperatures.
 -->
 <template>
   <div class="flex flex-col gap-2">
@@ -32,11 +41,13 @@
       </div>
     </div>
 
-    <!-- Selected pack, cold to hot: the row you'd read through the peep hole. -->
+    <!-- Selected pack, cold to hot: the row you'd read through the peep hole.
+         px-3 rather than px-2.5, because a one or two character chip with no
+         temperature beside it collapses to a stub at the tighter padding. -->
     <div v-if="selected.length" class="flex flex-wrap gap-1.5">
       <button
         v-for="c in selected" :key="c.name"
-        class="px-2.5 py-1.5 min-h-[34px] rounded-lg text-sm font-bold tabular-nums border transition-colors"
+        class="px-3 py-1.5 min-h-[34px] rounded-lg text-sm font-bold tabular-nums border transition-colors"
         :class="c.name === targetCone
           ? 'bg-celadon text-white border-celadon'
           : 'bg-celadon-bg text-celadon-dark border-celadon/30'"
@@ -44,7 +55,6 @@
         @click="toggle(c.name)"
       >
         {{ c.name }}
-        <span class="font-normal opacity-70">{{ displayTemp(c.tempC) }}°</span>
       </button>
     </div>
     <p v-else class="text-[11px] text-ink-muted leading-snug">
@@ -81,8 +91,6 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:modelValue'])
 
-const { displayTemp } = useTempUnit()
-
 const cones = ref([])
 const open  = ref(false)
 
@@ -91,6 +99,8 @@ onMounted(async () => {
 })
 
 // Cold to hot, so both the chips and the stored array read in melting order.
+// tempC is still carried even though nothing renders it: it is what sorts the
+// pack and what the toggle order map is built from.
 const byTemp = computed(() =>
   [...cones.value]
     .filter(c => Number.isFinite(Number(c.temp_c)))

@@ -145,7 +145,52 @@
           <div class="flex-1 relative min-h-0 min-w-0 p-3 pt-2 sm:p-5 sm:pt-4 flex flex-col">
             <div class="flex-1 min-h-0 min-w-0 rounded-xl border border-parchment-3 relative" style="box-shadow:0 2px 12px rgba(58,30,8,0.06); background: linear-gradient(to right, rgba(95,138,120,0.07) 1px, transparent 1px) 0 0 / 12.5% 100%, linear-gradient(to bottom, rgba(95,138,120,0.07) 1px, transparent 1px) 0 0 / 100% 25%, #fcfdfc;">
               <canvas ref="chartCanvas" class="absolute inset-0 w-full h-full"/>
-              <button class="absolute bottom-2 right-2 sm:bottom-4 sm:right-4 px-2.5 py-1.5 text-xs font-medium border border-parchment-3 rounded-lg bg-white text-ink-muted hover:bg-parchment transition-colors" @click="resetZoom">Reset zoom</button>
+
+                            <!-- CHART CONTROLS (Sep 2026): Reset zoom used to sit here alone.
+                   Key temps joins it because both change how the chart is DRAWN
+                   without touching the firing — neither belongs on the console,
+                   which is for things you do to the kiln. Sitting over the
+                   canvas rather than in the console also means the toggle is
+                   there on a finished firing, where FiringConsole is replaced
+                   by FiringReview: turning the zones on while going back over
+                   last month's cooling curve is the point of the feature.
+
+                   WEIGHT (Sep 2026): the first pass gave the ON state
+                   bg-flame-bg with a 40%-opacity border, which on parchment was
+                   a faint peach ghost — a toggle you cannot tell the state of
+                   is worse than no toggle. It is now SOLID flame when on, and
+                   the OFF state carries a real parchment-4 border instead of
+                   parchment-3 so it reads as a control at rest rather than as
+                   disabled. Reset zoom stays deliberately quieter: it is a
+                   one-shot action, this is a mode, and a mode should look
+                   louder than a nudge.
+
+                   The glyph is three stacked bars — the zones themselves. It
+                   also means the button survives on a narrow phone where the
+                   words would be the first thing to crowd. -->
+              <div class="absolute bottom-2 right-2 sm:bottom-4 sm:right-4 flex items-center gap-1.5">
+                <button
+                  class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg border transition-colors"
+                  :class="zonesOn
+                    ? 'bg-flame border-flame text-parchment hover:bg-flame-dark hover:border-flame-dark'
+                    : 'bg-white border-parchment-4 text-ink-muted hover:border-flame hover:text-flame'"
+                  :aria-pressed="zonesOn"
+                  title="Show quartz inversion, the dunting zone, and other key temperatures"
+                  @click="toggleZones"
+                >
+                  <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                    <rect x="1" y="2.5" width="14" height="2.5" rx="1"/>
+                    <rect x="1" y="6.75" width="14" height="2" rx="1" opacity="0.55"/>
+                    <rect x="1" y="10.5" width="14" height="2.5" rx="1"/>
+                  </svg>
+                  Key temps
+                </button>
+                <button
+                  class="px-3 py-1.5 text-xs font-medium border border-parchment-3 rounded-lg bg-white text-ink-muted hover:bg-parchment hover:text-ink transition-colors"
+                  @click="resetZoom"
+                >Reset zoom</button>
+              </div>
+
               <div v-if="isLive && !selectedFiring?.readings?.length" class="absolute inset-0 flex flex-col items-center justify-center gap-2 text-ink-muted pointer-events-none px-6 text-center">
                 <p class="text-sm">Use <strong>Log Reading</strong> to record your first temperature</p>
               </div>
@@ -349,6 +394,23 @@ const MIN_WIDTH            = 180
 const isDragging           = ref(false)
 const nowUnix              = ref(Math.floor(Date.now() / 1000))
 
+// KEY TEMPS (Sep 2026): the reference-zone overlay — quartz inversion, water
+// smoking, the dunting zone. Requested by a ceramics student who was already
+// drawing these on paper alongside the firing curve.
+//
+// It is chart state, not firing data: nothing is stored server side, there is
+// no column, and switching firings does not change it. But it IS remembered
+// across reloads, because someone who wants the zones wants them on every
+// firing, and re-tapping a toggle every visit is exactly the small friction
+// that gets a feature quietly abandoned.
+//
+// localStorage rather than the preferences table: no round trip, no migration,
+// and the worst case of losing the value is one tap. Every access is wrapped
+// because Safari in private mode THROWS on localStorage rather than returning
+// null, which would take the whole onMounted chain down with it.
+const ZONES_KEY = 'kiln-zones-on'
+const zonesOn   = ref(false)
+
 // DEMO (Aug 2026): a demo firing is real rows in the real tables flagged
 // is_demo, so every screen behaves exactly as it will for a real firing. It
 // occupies the one-active-firing slot deliberately: deleting it before the
@@ -382,7 +444,7 @@ async function dismissAnnouncement(id) {
 
 let elapsedTickInterval = null
 
-const { init, setSchedule, setReadings, setReductions, setConeLines, setConeDrops, setNowLine, clearNowLine, setUnit: setChartUnit, resetZoom, resize, destroy } = useKilnChart(chartCanvas, {
+const { init, setSchedule, setReadings, setReductions, setConeLines, setConeDrops, setZones, setNowLine, clearNowLine, setUnit: setChartUnit, resetZoom, resize, destroy } = useKilnChart(chartCanvas, {
   enableZoom: true,
   showLabels: true,
   onPointClick: (point) => {
@@ -392,6 +454,16 @@ const { init, setSchedule, setReadings, setReductions, setConeLines, setConeDrop
     showReadingModal.value = true
   },
 })
+
+// Safe to call before the canvas exists: setZones stores the flag inside the
+// composable and bails out of the redraw, and rebuild() reapplies it when a
+// chart is eventually built. That matters here — on first mount the canvas is
+// behind `v-if="booting"` and does not exist yet.
+function toggleZones() {
+  zonesOn.value = !zonesOn.value
+  setZones(zonesOn.value)
+  try { localStorage.setItem(ZONES_KEY, zonesOn.value ? '1' : '0') } catch {}
+}
 
 const activeFiring = computed(() => allFirings.value.find(f => f.started_at && !f.ended_at) ?? null)
 const pastFirings  = computed(() => allFirings.value.filter(f => f.ended_at).sort((a, b) => b.created_at - a.created_at))
@@ -483,6 +555,11 @@ async function loadUnit() {
 
 onMounted(async () => {
   await init()
+
+  // Restore the overlay before anything paints, so the zones are simply there
+  // on the first frame rather than appearing a moment later.
+  try { zonesOn.value = localStorage.getItem(ZONES_KEY) === '1' } catch {}
+  if (zonesOn.value) setZones(true)
 
   try {
     await loadBootstrap()

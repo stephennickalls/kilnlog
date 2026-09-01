@@ -1,7 +1,8 @@
 // File: app/composables/useKilnChart.js
 //
-// Layers, bottom to top: cone ruler, atmosphere bands, datasets, now-line,
-// cone drops. All DATA is °C; only labels convert (useTempUnit).
+// Layers, bottom to top: reference zones, cone ruler, atmosphere bands,
+// datasets, now-line, cone drops. All DATA is °C; only labels convert
+// (useTempUnit).
 
 import { nextTick } from 'vue'
 import { Chart, registerables } from 'chart.js'
@@ -69,8 +70,60 @@ function plannedHatch(ctx, colour) {
 // current workaround for reduction_one_open_per_firing) becomes invisible.
 const MIN_BAND_PX = 1.5
 
+// REFERENCE ZONES (Sep 2026) — the "key events overlay". Horizontal
+// temperature bands: quartz inversion, the dunting zone, glaze seal.
+// Requested by a ceramics student who was already drawing these on paper.
+//
+// THEY ARE FILLS AND NOTHING ELSE. No borders, no dashes. The chart already
+// uses horizontal LINES for one thing — the cone ruler — and a second set of
+// horizontal lines meaning something different would make both unreadable.
+// Fill = a zone you pass through. Line = one temperature you care about.
+//
+// They draw at the very bottom of the stack, below even the cone ruler, and
+// their labels draw in the same pass so the curves paint over the text rather
+// than under it. Reference material belongs behind the firing, always.
+//
+// OPACITY (Sep 2026): the first pass ran these at 0.07 alpha and they were
+// effectively invisible against parchment — the tester's screenshot showed
+// four bands nobody would notice. 0.18 is the level at which a band reads as a
+// band without competing with the orange curve painted over it. If these ever
+// feel loud, the fix is fewer zones, not fainter ones: a band too quiet to see
+// is the same as no band, and costs the same screen space.
+//
+// TONE, NOT SEVERITY. Colour carries the CATEGORY of thing happening, and the
+// palette dodges everything else on the chart — orange is the actual curve,
+// cobalt is reduction, amber is oxidation and signal-lost, celadon is cones
+// and NOW. That leaves rose and violet, which is exactly as many as there are
+// categories worth distinguishing.
+//
+// Zones are 60–100°C wide now (see useFiringZones), so MIN_ZONE_PX is a floor
+// for a band clipped by the fitted axis rather than for a genuinely thin one.
+const MIN_ZONE_PX = 4
+
+// Label sits inside the zone when there is room, otherwise just above it.
+const ZONE_LABEL_MIN_PX = 14
+
+const ZONE_STYLE = {
+  // Where you lose work. Quartz and cristobalite inversion.
+  crack: {
+    fill: 'rgba(190,70,60,0.18)',
+    text: 'rgba(138,38,30,0.95)',
+  },
+  // Glaze behaviour rather than body behaviour.
+  glaze: {
+    fill: 'rgba(124,90,180,0.18)',
+    text: 'rgba(84,54,138,0.95)',
+  },
+  // Something is happening, nothing is at stake.
+  process: {
+    fill: 'rgba(120,113,108,0.16)',
+    text: 'rgba(80,76,72,0.95)',
+  },
+}
+
 export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showLabels = false } = {}) {
   const { unitLabel, isF } = useTempUnit()
+  const { zonesForPeak } = useFiringZones()
   const cToDisplay = (c) => (isF.value ? c * 9 / 5 + 32 : c)
 
   let chart = null
@@ -88,6 +141,9 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
   let coneLines      = []        // [{ name, tempC, target }]
   let reductionBands = []        // [{ startX, endX, open, planned, kind }]
   let nowLine        = null      // null | { minutes, targetTemp (°C) }
+
+  let zonesOn        = false     // reference-zone overlay toggle
+  let zoneBands      = []        // [{ label, min, max, tone }]
 
   const curveLabelsPlugin = {
     id: 'curveLabels',
@@ -125,6 +181,69 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
           ctx.restore()
         }
       }
+    },
+  }
+
+  // ── Reference zones ────────────────────────────────────────────────────────
+  // The SET is chosen from the plan's peak, not stored: a firing has no type
+  // column, and the curve is a better answer than anything the user could be
+  // asked to pick. Recomputed wherever the curves change, alongside
+  // computeConeLines, because editing the plan can move the peak across the
+  // bisque/glaze line.
+  function computeZoneBands() {
+    if (!zonesOn) { zoneBands = []; return }
+
+    const temps = [
+      ...(chart?.data?.datasets?.[0]?.data ?? []),
+      ...(chart?.data?.datasets?.[1]?.data ?? []),
+    ].map(p => p.y).filter(v => v != null && isFinite(v))
+
+    const peak = temps.length ? Math.max(...temps) : null
+    zoneBands = zonesForPeak(peak)
+  }
+
+  const zoneBandsPlugin = {
+    id: 'zoneBands',
+    beforeDatasetsDraw(chart) {
+      if (!zoneBands.length) return
+      const { ctx, chartArea, scales } = chart
+      if (!chartArea || !scales?.y) return
+
+      ctx.save()
+      for (const zone of zoneBands) {
+        // y is inverted: the higher temperature is the smaller pixel.
+        const yHot  = scales.y.getPixelForValue(zone.max)
+        const yCold = scales.y.getPixelForValue(zone.min)
+
+        // Entirely outside the fitted axis — a cooling zone on a chart scaled
+        // to the top of a cone 10 climb has nothing to say yet.
+        if (yCold < chartArea.top || yHot > chartArea.bottom) continue
+
+        const top    = Math.max(yHot, chartArea.top)
+        const bottom = Math.min(yCold, chartArea.bottom)
+        const height = Math.max(bottom - top, MIN_ZONE_PX)
+
+        const style = ZONE_STYLE[zone.tone] ?? ZONE_STYLE.process
+
+        ctx.fillStyle = style.fill
+        ctx.fillRect(chartArea.left, top, chartArea.right - chartArea.left, height)
+
+        // Left edge, because the cone ruler owns the right gutter. Inside the
+        // zone when it is tall enough to hold the text, otherwise perched on
+        // top of it — a 4px band cannot contain a 9px label.
+        ctx.font      = 'bold 9px sans-serif'
+        ctx.fillStyle = style.text
+        ctx.textAlign = 'left'
+        if (height >= ZONE_LABEL_MIN_PX) {
+          ctx.textBaseline = 'middle'
+          ctx.fillText(zone.label, chartArea.left + 6, top + height / 2)
+        } else {
+          ctx.textBaseline = 'alphabetic'
+          const y = Math.max(top - 3, chartArea.top + 8)
+          ctx.fillText(zone.label, chartArea.left + 6, y)
+        }
+      }
+      ctx.restore()
     },
   }
 
@@ -524,6 +643,9 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     if (lastReadings.rows.length)   setReadings(lastReadings.rows, lastReadings.startedAt)
     if (lastReductions.length)      setReductions(lastReductions, lastReductionsStartedAt)
     computeConeLines()
+    // zonesOn is module-level state and survives the rebuild; the bands
+    // themselves are derived, so recompute rather than restore.
+    computeZoneBands()
     // lastConeDrops is cached already-mapped; the plugin reads it directly.
   }
 
@@ -557,8 +679,10 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     if (!canvasRef.value) return
     if (chart) { try { chart.destroy() } catch {} }
 
+    // ORDER IS THE Z-ORDER for plugins sharing a hook. zoneBands goes FIRST so
+    // the reference wash sits under the cone ruler and everything else.
     const extraPlugins = [
-      coneLinesPlugin, reductionBandsPlugin, nowLinePlugin, coneDropsPlugin,
+      zoneBandsPlugin, coneLinesPlugin, reductionBandsPlugin, nowLinePlugin, coneDropsPlugin,
       ...(showLabels ? [curveLabelsPlugin] : []),
     ]
 
@@ -694,6 +818,7 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     }
     autoFitY()
     computeConeLines()
+    computeZoneBands()
     computeReductionBands()
     chart.update('none')
   }
@@ -709,6 +834,7 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     }))
     autoFitY()
     computeConeLines()
+    computeZoneBands()
     computeReductionBands()
     chart.update('none')
   }
@@ -718,6 +844,15 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     lastReductionsStartedAt = startedAt || 0
     if (!ensureAlive()) return
     computeReductionBands()
+    chart.update('none')
+  }
+
+  // The key-events overlay. Pure display state — nothing is persisted server
+  // side, and no firing data changes — so this is a toggle and a redraw.
+  function setZones(enabled) {
+    zonesOn = !!enabled
+    computeZoneBands()
+    if (!ensureAlive()) return
     chart.update('none')
   }
 
@@ -823,7 +958,7 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
 
   return {
     init, setSchedule, setReadings, setReductions,
-    setConeLines, setConeDrops,
+    setConeLines, setConeDrops, setZones,
     setNowLine, clearNowLine, setUnit,
     setManualMode, setSignalLost, clearSignalLost, resetZoom, resize, destroy,
   }

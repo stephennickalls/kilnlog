@@ -70,38 +70,101 @@ function plannedHatch(ctx, colour) {
 // current workaround for reduction_one_open_per_firing) becomes invisible.
 const MIN_BAND_PX = 1.5
 
-// REFERENCE ZONES (Sep 2026) — the "key events overlay". Horizontal
-// temperature bands: quartz inversion, the dunting zone, glaze seal.
-// Requested by a ceramics student who was already drawing these on paper.
+// REFERENCE ZONES (Sep 2026) - the "key events overlay". Quartz inversion, the
+// dunting zone, the two glaze events. Requested by a ceramics student who was
+// already drawing these on paper.
 //
-// THEY ARE FILLS AND NOTHING ELSE. No borders, no dashes. The chart already
-// uses horizontal LINES for one thing — the cone ruler — and a second set of
-// horizontal lines meaning something different would make both unreadable.
-// Fill = a zone you pass through. Line = one temperature you care about.
+// THEY ARE BOXES NOW, NOT STRIPES (Sep 2026). The first version drew each zone
+// as a full-width horizontal band, which said the zone applied for the whole
+// firing. That is wrong for most of them. Cristobalite contracts on the way
+// DOWN, and a stripe across the chart claimed it also mattered on the climb.
+// The glaze sets on the way down and seals on the way up, and one stripe
+// cannot say both - which is also why "Glaze seal" is now two zones with two
+// names (see useFiringZones).
+//
+// Every zone declares a `leg`, and spansIn() clips it to the stretches of the
+// PLAN travelling that way. Both axes of the resulting box carry meaning: the
+// height is the temperature range, the width is how long the ware spends in
+// it. Quartz inversion therefore draws TWICE on a schedule with a controlled
+// cool, which is correct and more useful than one stripe, because the second
+// box is where the 50°C/hr limit actually applies.
+//
+// FLIPPING THEM TO VERTICAL was considered and rejected. A vertical stripe
+// says "somewhere in here", which is exactly what the atmosphere bands say,
+// and the two would stop being distinguishable. It also throws away the
+// temperature, and the temperature is the whole content of the zone: "quartz
+// inversion" MEANS 573°C. Shape is the grammar on this chart -
+//   full-height vertical stripe = atmosphere, a state of the whole kiln
+//   box sitting on the curve    = a zone the ware passes through
+//
+// THEY CLIP AGAINST THE PLAN, NOT THE READINGS. Two reasons. The plan is
+// complete where the actual curve stops at NOW, so clipping to readings would
+// mean no warning until you were already inside the zone, backwards for the
+// one overlay whose job is "slow down before here". And readings are noisy: an
+// 87-reading firing wobbling either side of 573° would shatter one box into a
+// dozen slivers. A firing with no plan at all falls back to the readings,
+// where fragmentation is the lesser evil against drawing nothing.
+//
+// STILL FILLS AND NOTHING ELSE. No borders, no dashes. The chart already uses
+// horizontal LINES for one thing - the cone ruler - and a second set of lines
+// meaning something different would make both unreadable.
 //
 // They draw at the very bottom of the stack, below even the cone ruler, and
 // their labels draw in the same pass so the curves paint over the text rather
 // than under it. Reference material belongs behind the firing, always.
 //
 // OPACITY (Sep 2026): the first pass ran these at 0.07 alpha and they were
-// effectively invisible against parchment — the tester's screenshot showed
+// effectively invisible against parchment - the tester's screenshot showed
 // four bands nobody would notice. 0.18 is the level at which a band reads as a
 // band without competing with the orange curve painted over it. If these ever
 // feel loud, the fix is fewer zones, not fainter ones: a band too quiet to see
 // is the same as no band, and costs the same screen space.
 //
 // TONE, NOT SEVERITY. Colour carries the CATEGORY of thing happening, and the
-// palette dodges everything else on the chart — orange is the actual curve,
+// palette dodges everything else on the chart - orange is the actual curve,
 // cobalt is reduction, amber is oxidation and signal-lost, celadon is cones
 // and NOW. That leaves rose and violet, which is exactly as many as there are
 // categories worth distinguishing.
 //
-// Zones are 60–100°C wide now (see useFiringZones), so MIN_ZONE_PX is a floor
-// for a band clipped by the fitted axis rather than for a genuinely thin one.
+// Zones are 60-200°C wide (see useFiringZones), so MIN_ZONE_PX is a floor for
+// a band clipped by the fitted axis rather than for a genuinely thin one.
 const MIN_ZONE_PX = 4
 
-// Label sits inside the zone when there is room, otherwise just above it.
-const ZONE_LABEL_MIN_PX = 14
+// A steep ramp crosses a 70°C zone in minutes, which is a box a few pixels
+// wide and invisible. Below this it widens about its own centre: the box stops
+// being a measurement and becomes a marker, which is the right trade when the
+// alternative is nothing on the chart at all.
+const MIN_ZONE_W_PX = 16
+
+// LABELS ARE A SEPARATE LATE PASS (Sep 2026). They sit ABOVE their box now
+// rather than inside it - inside only ever worked because the old bands were
+// full width, and a box can be 16px wide. More importantly they draw in
+// afterDatasetsDraw rather than with the fills, because in the first pass the
+// curve, the waypoint numbers and the now-line's "target 1021°" all painted
+// straight over them and none of it was readable on a phone.
+//
+// That is not a contradiction of "reference material belongs behind the
+// firing". The FILL still does. A reference LABEL that cannot be read is not
+// reference material, it is noise, so it gets a white chip and the top of the
+// stack.
+const ZONE_LABEL_ROW  = 15    // push-up step when two chips collide
+const ZONE_LABEL_FONT = 'bold 10px sans-serif'
+const ZONE_CHIP_H     = 14
+const ZONE_CHIP_PAD   = 5
+
+// Below this the chart is a phone and the full zone names do not fit beside
+// each other. See `short` in useFiringZones.
+const ZONE_SHORT_LABEL_PX = 520
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath()
+  ctx.moveTo(x + r, y)
+  ctx.arcTo(x + w, y,     x + w, y + h, r)
+  ctx.arcTo(x + w, y + h, x,     y + h, r)
+  ctx.arcTo(x,     y + h, x,     y,     r)
+  ctx.arcTo(x,     y,     x + w, y,     r)
+  ctx.closePath()
+}
 
 const ZONE_STYLE = {
   // Where you lose work. Quartz and cristobalite inversion.
@@ -123,7 +186,7 @@ const ZONE_STYLE = {
 
 export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showLabels = false } = {}) {
   const { unitLabel, isF } = useTempUnit()
-  const { zonesForPeak } = useFiringZones()
+  const { zonesForPeak, zoneBoxesFor } = useFiringZones()
   const cToDisplay = (c) => (isF.value ? c * 9 / 5 + 32 : c)
 
   let chart = null
@@ -143,7 +206,8 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
   let nowLine        = null      // null | { minutes, targetTemp (°C) }
 
   let zonesOn        = false     // reference-zone overlay toggle
-  let zoneBands      = []        // [{ label, min, max, tone }]
+  // One entry PER CROSSING, not per zone: [{ ...zone, x0, x1, yLo, yHi, dir }]
+  let zoneBands      = []
 
   const curveLabelsPlugin = {
     id: 'curveLabels',
@@ -187,61 +251,164 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
   // ── Reference zones ────────────────────────────────────────────────────────
   // The SET is chosen from the plan's peak, not stored: a firing has no type
   // column, and the curve is a better answer than anything the user could be
-  // asked to pick. Recomputed wherever the curves change, alongside
-  // computeConeLines, because editing the plan can move the peak across the
-  // bisque/glaze line.
+  // asked to pick.
+  //
+  // Recomputed wherever the curves change, alongside computeConeLines, because
+  // editing the plan can move the peak across the bisque/glaze line - and now
+  // also because it moves WHERE the plan crosses each zone.
   function computeZoneBands() {
     if (!zonesOn) { zoneBands = []; return }
 
-    const temps = [
-      ...(chart?.data?.datasets?.[0]?.data ?? []),
-      ...(chart?.data?.datasets?.[1]?.data ?? []),
-    ].map(p => p.y).filter(v => v != null && isFinite(v))
+    const planned = (chart?.data?.datasets?.[0]?.data ?? [])
+      .filter(p => p && Number.isFinite(p.x) && Number.isFinite(p.y))
+    const actual = (chart?.data?.datasets?.[1]?.data ?? [])
+      .filter(p => p && Number.isFinite(p.x) && Number.isFinite(p.y))
 
-    const peak = temps.length ? Math.max(...temps) : null
-    zoneBands = zonesForPeak(peak)
+    // See the header note: the plan is the source, readings are the fallback.
+    const source = planned.length >= 2 ? planned : actual
+
+    const temps = [...planned, ...actual].map(p => p.y)
+    const peak  = temps.length ? Math.max(...temps) : null
+
+    zoneBands = source.length >= 2
+      ? zoneBoxesFor(source, zonesForPeak(peak))
+      : []
   }
 
+  // FILLS ONLY, at the bottom of the stack. The labels are a separate plugin
+  // so they can draw last; splitting them is the whole point.
   const zoneBandsPlugin = {
     id: 'zoneBands',
     beforeDatasetsDraw(chart) {
       if (!zoneBands.length) return
       const { ctx, chartArea, scales } = chart
-      if (!chartArea || !scales?.y) return
+      if (!chartArea || !scales?.x || !scales?.y) return
 
       ctx.save()
       for (const zone of zoneBands) {
-        // y is inverted: the higher temperature is the smaller pixel.
-        const yHot  = scales.y.getPixelForValue(zone.max)
-        const yCold = scales.y.getPixelForValue(zone.min)
+        const box = zoneBoxPx(zone, chartArea, scales)
+        if (!box) continue
+        ctx.fillStyle = (ZONE_STYLE[zone.tone] ?? ZONE_STYLE.process).fill
+        ctx.fillRect(box.left, box.top, box.width, box.height)
+      }
+      ctx.restore()
+    },
+  }
 
-        // Entirely outside the fitted axis — a cooling zone on a chart scaled
-        // to the top of a cone 10 climb has nothing to say yet.
-        if (yCold < chartArea.top || yHot > chartArea.bottom) continue
+  // Shared by both zone plugins so a chip can never drift from its box.
+  // Returns null when the box is off the fitted axis or scrolled out of view.
+  function zoneBoxPx(zone, chartArea, scales) {
+    // y is inverted: the higher temperature is the smaller pixel. yLo/yHi are
+    // the range the curve ACTUALLY covered on this crossing, so a plan that
+    // peaks mid-zone gets a box stopping at the peak rather than one floating
+    // above the curve.
+    const yHot  = scales.y.getPixelForValue(zone.yHi)
+    const yCold = scales.y.getPixelForValue(zone.yLo)
 
-        const top    = Math.max(yHot, chartArea.top)
-        const bottom = Math.min(yCold, chartArea.bottom)
-        const height = Math.max(bottom - top, MIN_ZONE_PX)
+    // Entirely outside the fitted axis - a cooling zone on a chart scaled to
+    // the top of a cone 10 climb has nothing to say yet.
+    if (yCold < chartArea.top || yHot > chartArea.bottom) return null
+
+    const top    = Math.max(yHot, chartArea.top)
+    const bottom = Math.min(yCold, chartArea.bottom)
+
+    // Zoom and pan move these every frame, which is why they are resolved here
+    // from data-unit minutes rather than cached in computeZoneBands.
+    let left  = scales.x.getPixelForValue(zone.x0)
+    let right = scales.x.getPixelForValue(zone.x1)
+    if (right < chartArea.left || left > chartArea.right) return null
+
+    left  = Math.max(left, chartArea.left)
+    right = Math.min(right, chartArea.right)
+    let width = right - left
+    if (width < MIN_ZONE_W_PX) {
+      left  = Math.max(chartArea.left, (left + right) / 2 - MIN_ZONE_W_PX / 2)
+      width = Math.min(MIN_ZONE_W_PX, chartArea.right - left)
+    }
+
+    return { left, top, width, height: Math.max(bottom - top, MIN_ZONE_PX), bottom }
+  }
+
+  // LABELS, drawn last. Each sits on a white chip so it survives whatever it
+  // lands on, with a hairline back to its box once it has been pushed clear.
+  const zoneLabelsPlugin = {
+    id: 'zoneLabels',
+    afterDatasetsDraw(chart) {
+      if (!zoneBands.length) return
+      const { ctx, chartArea, scales } = chart
+      if (!chartArea || !scales?.x || !scales?.y) return
+
+      const narrow = (chartArea.right - chartArea.left) < ZONE_SHORT_LABEL_PX
+
+      ctx.save()
+      ctx.font = ZONE_LABEL_FONT
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+
+      // Placed left to right, so each chip only ever has to dodge chips
+      // already placed to its left. That is what keeps this one pass.
+      const boxes  = [...zoneBands].sort((a, b) => a.x0 - b.x0)
+      const placed = []
+
+      for (const zone of boxes) {
+        const box = zoneBoxPx(zone, chartArea, scales)
+        if (!box) continue
 
         const style = ZONE_STYLE[zone.tone] ?? ZONE_STYLE.process
+        const text  = (narrow && zone.short) ? zone.short : zone.label
 
-        ctx.fillStyle = style.fill
-        ctx.fillRect(chartArea.left, top, chartArea.right - chartArea.left, height)
+        // MEASURED, not estimated. The per-character guess this replaced was
+        // wrong enough that chips overlapped while the collision test below
+        // reported they did not.
+        const w  = ctx.measureText(text).width + ZONE_CHIP_PAD * 2
+        const cx = Math.max(
+          chartArea.left + w / 2 + 2,
+          Math.min(box.left + box.width / 2, chartArea.right - w / 2 - 2),
+        )
 
-        // Left edge, because the cone ruler owns the right gutter. Inside the
-        // zone when it is tall enough to hold the text, otherwise perched on
-        // top of it — a 4px band cannot contain a 9px label.
-        ctx.font      = 'bold 9px sans-serif'
-        ctx.fillStyle = style.text
-        ctx.textAlign = 'left'
-        if (height >= ZONE_LABEL_MIN_PX) {
-          ctx.textBaseline = 'middle'
-          ctx.fillText(zone.label, chartArea.left + 6, top + height / 2)
-        } else {
-          ctx.textBaseline = 'alphabetic'
-          const y = Math.max(top - 3, chartArea.top + 8)
-          ctx.fillText(zone.label, chartArea.left + 6, y)
+        let cy = box.top - ZONE_CHIP_H / 2 - 3
+        let guard = 0
+        while (
+          guard++ < 12 &&
+          placed.some(p =>
+            Math.abs(p.cy - cy) < ZONE_LABEL_ROW &&
+            cx - w / 2 < p.cx + p.w / 2 + 4 &&
+            cx + w / 2 > p.cx - p.w / 2 - 4
+          )
+        ) cy -= ZONE_LABEL_ROW
+
+        // Out of headroom: sit it under the box instead.
+        if (cy - ZONE_CHIP_H / 2 < chartArea.top + 1) {
+          cy = Math.min(box.bottom + ZONE_CHIP_H / 2 + 3, chartArea.bottom - ZONE_CHIP_H / 2 - 1)
         }
+
+        // Once a chip has been pushed clear of its box, say which box it owns.
+        const above = cy < box.top
+        const gap   = above ? box.top - cy : cy - box.bottom
+        if (gap > ZONE_CHIP_H) {
+          ctx.strokeStyle = style.text
+          ctx.globalAlpha = 0.45
+          ctx.lineWidth = 1
+          ctx.beginPath()
+          ctx.moveTo(cx, above ? cy + ZONE_CHIP_H / 2 : cy - ZONE_CHIP_H / 2)
+          ctx.lineTo(box.left + box.width / 2, above ? box.top : box.bottom)
+          ctx.stroke()
+          ctx.globalAlpha = 1
+        }
+
+        roundRect(ctx, cx - w / 2, cy - ZONE_CHIP_H / 2, w, ZONE_CHIP_H, 3)
+        ctx.fillStyle = 'rgba(255,255,255,0.94)'
+        ctx.fill()
+        ctx.strokeStyle = style.text
+        ctx.globalAlpha = 0.3
+        ctx.lineWidth = 1
+        ctx.stroke()
+        ctx.globalAlpha = 1
+
+        ctx.fillStyle = style.text
+        ctx.fillText(text, cx, cy + 0.5)
+
+        placed.push({ cx, cy, w })
       }
       ctx.restore()
     },
@@ -679,11 +846,14 @@ export function useKilnChart(canvasRef, { onPointClick, enableZoom = true, showL
     if (!canvasRef.value) return
     if (chart) { try { chart.destroy() } catch {} }
 
-    // ORDER IS THE Z-ORDER for plugins sharing a hook. zoneBands goes FIRST so
-    // the reference wash sits under the cone ruler and everything else.
+    // ORDER IS THE Z-ORDER for plugins sharing a hook. zoneBandsPlugin goes
+    // FIRST so the reference wash sits under the cone ruler and everything
+    // else; zoneLabelsPlugin goes LAST so the chips sit on top of the curves,
+    // the waypoint numbers and the now-line target that used to bury them.
     const extraPlugins = [
       zoneBandsPlugin, coneLinesPlugin, reductionBandsPlugin, nowLinePlugin, coneDropsPlugin,
       ...(showLabels ? [curveLabelsPlugin] : []),
+      zoneLabelsPlugin,
     ]
 
     chart = new Chart(canvasRef.value, {

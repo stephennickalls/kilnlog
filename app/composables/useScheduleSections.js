@@ -1,10 +1,11 @@
 // File: app/composables/useScheduleSections.js
 //
-// TWO LEVELS, NOT ONE. Stage outside (Bisque, Glaze, Raku), clay body inside.
-// The old version was a flat first-match-wins list where 'bisque' matched
-// before any body could, so a bisque schedule could never show its body and a
-// glaze schedule could never show its stage. A potter picking a plan answers
-// two questions in that order: which firing is this, and what clay is in it.
+// TWO LEVELS, NOT ONE. Stage outside (Bisque, Glaze, Single fire, Raku), clay
+// body inside. The old version was a flat first-match-wins list where 'bisque'
+// matched before any body could, so a bisque schedule could never show its
+// body and a glaze schedule could never show its stage. A potter picking a
+// plan answers two questions in that order: which firing is this, and what
+// clay is in it.
 //
 // THREE BODIES, NOT FOUR. 'midfire' used to sit in this list beside
 // 'stoneware', which put a temperature range in a list of materials and is the
@@ -17,6 +18,11 @@
 // NULL body is a real answer meaning "any clay". A cone 06 bisque, a raku and
 // the thick-work schedule genuinely apply to every body, and forcing a tag on
 // them would file them somewhere nobody would look.
+//
+// EVERY STAGE HAS DATA (Sep 2026). 'single_fire' sat in STAGES for a while
+// with no preset behind it, so the heading was a promise the library did not
+// keep. migrations/20260903_preset_gaps.sql added one. If a stage is ever
+// added here, add a preset in the same change or the heading is a lie.
 
 export const CLAY_BODIES = [
   { value: 'earthenware', label: 'Earthenware' },

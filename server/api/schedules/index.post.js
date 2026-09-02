@@ -12,16 +12,42 @@
 // falling to the 'live' default. A row that claims it was logged live but has
 // no firing attached is a lie waiting to be read by something less careful.
 //
-// NO `body` FIELD (Sep 2026). A clay-body column existed here briefly and was
-// dropped: its values mixed a material axis with a temperature axis, and the
-// temperature axis was already in the database as the cone and as the curve's
-// peak. The library sections derive from those instead. If a `body` key turns
-// up in a request it is ignored rather than rejected, so an old client tab left
-// open through the deploy still saves successfully.
+// CLAY BODY IS BACK (Sep 2026). This handler dropped `body` for a while on the
+// argument that its values mixed a material axis with a temperature axis. That
+// was true of one value - 'midfire' is a cone range, not a clay - and the fix
+// was to remove that value, not the column. The column is live, every built-in
+// preset is tagged, and every client page sends it. While the server ignored
+// it, no user schedule could ever be tagged and a duplicate of the porcelain
+// preset filed itself under "Any body" with no way to tell why.
+//
+// The list here must match schedule_library_body_check
+// (migrations/20260903_schedule_body_and_fuel.sql) and CLAY_BODIES in
+// app/composables/useScheduleSections.js. NULL is valid and means "any body".
+//
+// 'midfire' is the one legacy value a stale client tab could still send, and
+// it has a known right answer, so it is mapped to 'stoneware' rather than
+// rejected. Anything else unknown is a 400: the column carries a CHECK, and
+// silently nulling a typo would let the client believe it saved something it
+// did not.
+//
+// NAMING TRAP: `body` is already the request body in this handler. The clay
+// body is read as `body.body` and held as `clayBody`. Do not destructure it
+// alongside name/type/cone or it shadows the request and everything below
+// breaks.
 const MIN_TEMP = -200
 const MAX_TEMP = 1400
 const MAX_REDUCTIONS = 50
-const KINDS = ['reduction', 'oxidation']
+const KINDS  = ['reduction', 'oxidation']
+const BODIES = ['earthenware', 'stoneware', 'porcelain']
+
+function sanitizeBody(value) {
+  if (value === undefined || value === null || value === '') return null
+  if (value === 'midfire') return 'stoneware'
+  if (!BODIES.includes(value)) {
+    throw createError({ statusCode: 400, statusMessage: 'Invalid clay body' })
+  }
+  return value
+}
 
 function sanitizeReductions(input) {
   if (!Array.isArray(input)) return []
@@ -50,7 +76,8 @@ export default defineEventHandler(async (event) => {
   if (!type?.trim()) throw createError({ statusCode: 400, statusMessage: 'Schedule type is required' })
 
   const validSource = ['custom', 'from_firing', 'preset_copy'].includes(source) ? source : 'custom'
-  const conePack = await sanitizeConePack(db, body.conePack)
+  const clayBody    = sanitizeBody(body.body)
+  const conePack    = await sanitizeConePack(db, body.conePack)
 
   const { data: schedule, error } = await db
     .from('schedule_library')
@@ -58,6 +85,7 @@ export default defineEventHandler(async (event) => {
       name: name.trim(),
       type: type.trim(),
       cone: cone?.trim() || null,
+      body: clayBody,
       description: description?.trim()?.slice(0, 500) || null,
       source: validSource,
       is_built_in: 0,

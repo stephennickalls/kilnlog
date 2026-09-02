@@ -31,6 +31,26 @@
   /schedules/new keeps useAutoCurve and full regeneration, which is right there:
   those points are machine-made and nobody minds them being replaced.
 
+  COPY ON SAVE, NOT ON OPEN (Sep 2026). This page used to fork a preset the
+  moment it loaded: open a built-in to LOOK at it and a copy was already in
+  "Your schedules" before the curve had drawn. Twenty looks, twenty copies,
+  none of them asked for. Opening a page is not an intent to own it.
+
+  Now a preset opens exactly as it is. Every control works, every edit is
+  local, and nothing is written until Save. Save on a preset creates the copy
+  (with whatever edits were made) and moves to it; Save on your own schedule
+  updates it. The button says which it is going to do. If the name was left as
+  the preset's, the copy gets today's date appended so the two can be told
+  apart in a list - a copy that later has its cone retargeted would make
+  "(copy)" a lie, and a date matches how firings are named everywhere else.
+
+  CLAY BODY (Sep 2026). `body` files the schedule into a section on /schedules
+  and in the Start firing modal. It sits on its own row, not in the type+cone
+  grid, because those two are a pair that drive the curve while body is
+  independent metadata. It rides along on the copy for the same reason the
+  cone pack and reductions do: a copy of the porcelain preset that lost its
+  body would file itself under "Any body" and the user would never know why.
+
   PRINTING (Sep 2026). Requested by a ceramics student: attach the ramps and
   the graph to coursework, and take a sheet out to the kiln to write readings
   on. The print output is a SEPARATE DOCUMENT, not this page restyled:
@@ -101,6 +121,9 @@
           <ConeSelect v-model="form.cone" />
         </div>
 
+        <!-- Own row: see the header note. -->
+        <ClayBodySelect v-model="form.body" />
+
         <!-- Confirmation that the cone change did something, and exactly what.
              A silent edit to the curve is only acceptable if the user can see
              it happened; this line and the moving graph together are that.
@@ -161,18 +184,25 @@
           </div>
         </div>
 
+        <!-- Preset notice. Only on a built-in, and only above the buttons,
+             where the decision it explains is about to be made. -->
+        <p v-if="isPreset" class="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-celadon-bg/60 border border-celadon/30 text-xs text-celadon-dark leading-snug">
+          <svg class="w-4 h-4 shrink-0 mt-px" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 8v4m0 4h.01M12 2a10 10 0 100 20 10 10 0 000-20z"/></svg>
+          <span>This is a built-in preset. Nothing is changed until you save, and saving makes your own copy under Your schedules.</span>
+        </p>
+
         <!-- Actions -->
         <div class="flex flex-col sm:flex-row gap-2 pt-2 border-t border-parchment-3">
           <button
             class="flex-1 min-h-[44px] py-2.5 bg-flame hover:bg-flame-dark text-parchment text-sm font-bold rounded-xl transition-colors disabled:opacity-40"
             :disabled="saving || !form.name.trim()"
             @click="save"
-          >{{ saving ? 'Saving…' : 'Save schedule' }}</button>
+          >{{ saving ? 'Saving…' : (isPreset ? 'Save as my copy' : 'Save schedule') }}</button>
           <button
             class="flex-1 min-h-[44px] py-2.5 border border-celadon/40 bg-celadon-bg/60 text-celadon-dark hover:bg-celadon-bg text-sm font-semibold rounded-xl transition-colors disabled:opacity-40"
             :disabled="saving || !form.name.trim()"
             @click="saveAndStart"
-          >Save &amp; start firing →</button>
+          >{{ isPreset ? 'Copy & start firing →' : 'Save & start firing →' }}</button>
         </div>
 
         <!-- Print. Below the save row and quieter than both, because it is a
@@ -190,7 +220,7 @@
             Print plan &amp; log sheet
           </button>
           <p class="text-[11px] text-ink-muted px-1 leading-snug">
-            Two pages: the plan with its curve and steps, then a blank 30-row sheet to write readings on at the kiln.
+            Two pages: the plan with its curve and steps, then a blank 40-row sheet to write readings on at the kiln.
             <span v-if="dirty" class="text-amber-600 font-semibold">Save first — printing uses the last saved version.</span>
           </p>
         </div>
@@ -318,7 +348,7 @@ const router = useRouter()
 const loading              = ref(true)
 const saving               = ref(false)
 const status               = ref('')
-const form                 = reactive({ name: '', type: 'bisque', cone: '', description: '' })
+const form                 = reactive({ name: '', type: 'bisque', cone: '', body: null, description: '' })
 const editPoints           = ref([])
 const editReductions       = ref([])   // [{ startTemp, endTemp|null, kind }] °C
 const editConePack         = ref([])   // planned witness cones — names
@@ -333,6 +363,9 @@ const saved = ref(null)
 
 const id    = computed(() => Number(route.params.id))
 const theme = computed(() => themeForType(form.type))
+
+// A built-in. Editable on screen, never written to: Save forks instead.
+const isPreset = computed(() => saved.value?.user_id === null)
 
 const { displayTemp, displayDelta, unitLabel } = useTempUnit()
 const { tempFor } = useCones()
@@ -369,33 +402,13 @@ async function load() {
   try {
     const s = await $fetch(`/api/schedules/${id.value}`)
 
-    // Presets are read-only: editing one silently forks it to the user first.
-    // The name gets a date rather than "(copy)" — a copy that later has its
-    // cone retargeted makes "(copy)" a lie, and a date matches how firings are
-    // named everywhere else in the app.
-    if (s.user_id === null) {
-      const pts = (s.points ?? []).map(p => ({ offsetMinutes: p.offset_minutes, targetTemp: p.target_temp }))
-      const reds = (s.reductions ?? []).map(r => ({ startTemp: r.start_temp, endTemp: r.end_temp ?? null, kind: r.kind }))
-      const copy = await $fetch('/api/schedules', {
-        method: 'POST',
-        body: {
-          name: `${s.name} — ${todayShort()}`,
-          type: s.type ?? 'bisque',
-          cone: s.cone ?? null,
-          description: s.description ?? null,
-          source: 'preset_copy',
-          points: pts,
-          reductions: reds,
-          conePack: s.cone_pack ?? [],
-        },
-      })
-      router.replace(`/schedules/${copy.id}?copyOf=${encodeURIComponent(s.name)}`)
-      return
-    }
-
+    // A preset loads exactly like anything else. It used to be forked to the
+    // user right here, before the page had even rendered - see the header note
+    // for why that was wrong. The fork now happens in save(), if it happens.
     form.name            = s.name
     form.type            = s.type ?? 'bisque'
     form.cone            = s.cone ?? ''
+    form.body            = s.body ?? null
     form.description     = s.description ?? ''
     editPoints.value     = (s.points ?? []).map(p => ({ offsetMinutes: p.offset_minutes, targetTemp: p.target_temp }))
     editReductions.value = (s.reductions ?? []).map(r => ({ startTemp: r.start_temp, endTemp: r.end_temp ?? null, kind: r.kind }))
@@ -606,6 +619,7 @@ function saveBody() {
     name: form.name.trim(),
     type: form.type,
     cone: form.cone?.trim() || null,
+    body: form.body ?? null,
     description: form.description?.trim() || null,
     points: editPoints.value,
     reductions: editReductions.value,   // [{ startTemp, endTemp|null, kind }] °C
@@ -622,6 +636,7 @@ function adoptSaved() {
     name:        form.name.trim(),
     type:        form.type,
     cone:        form.cone?.trim() || null,
+    body:        form.body ?? null,
     description: form.description?.trim() || null,
     cone_pack:   [...editConePack.value],
     points:      editPoints.value.map(p => ({
@@ -636,11 +651,44 @@ function adoptSaved() {
   }
 }
 
+// On a preset this CREATES; on your own schedule it UPDATES. Both paths send
+// the same saveBody(), so an edit made before saving a preset lands in the
+// copy rather than being thrown away by the fork.
+//
+// Returns the id to continue with: the new copy's, or the current one.
+async function persist() {
+  const payload = saveBody()
+
+  if (isPreset.value) {
+    // Name untouched? Date it, so the copy is not a second row with the
+    // preset's exact name.
+    if (payload.name === (saved.value?.name ?? '').trim()) {
+      payload.name = `${payload.name} — ${todayShort()}`
+    }
+    const copy = await $fetch('/api/schedules', {
+      method: 'POST',
+      body: { ...payload, source: 'preset_copy' },
+    })
+    return copy.id
+  }
+
+  await $fetch(`/api/schedules/${id.value}`, { method: 'PUT', body: payload })
+  return id.value
+}
+
 async function save() {
   if (!form.name.trim() || saving.value) return
   saving.value = true
   try {
-    await $fetch(`/api/schedules/${id.value}`, { method: 'PUT', body: saveBody() })
+    const wasPreset = isPreset.value
+    const targetId  = await persist()
+
+    if (wasPreset) {
+      // load() picks up ?copyOf and shows the flash; the id watcher reloads.
+      router.replace(`/schedules/${targetId}?copyOf=${encodeURIComponent(saved.value.name)}`)
+      return
+    }
+
     adoptSaved()
     flash('Saved')
   } catch (err) {
@@ -654,8 +702,8 @@ async function saveAndStart() {
   if (!form.name.trim() || saving.value) return
   saving.value = true
   try {
-    await $fetch(`/api/schedules/${id.value}`, { method: 'PUT', body: saveBody() })
-    router.push(`/app?startSchedule=${id.value}`)
+    const targetId = await persist()
+    router.push(`/app?startSchedule=${targetId}`)
   } catch (err) {
     flash(`Couldn't save: ${err?.data?.message ?? err.message ?? 'error'}`)
     saving.value = false

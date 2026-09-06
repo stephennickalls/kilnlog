@@ -73,9 +73,24 @@
   so a photocopy loses the colour and none of the meaning. Browsers strip print
   backgrounds by default, hence print-color-adjust in the style block.
 
-  GRID DENSITY is lower than on screen. A 190mm-wide print at 96dpi is about
-  720px, but the reader is holding it at arm's length rather than leaning into
-  a monitor, so lines that read fine on screen turn into hatching on paper.
+  LANDSCAPE (Sep 2026). The sheet prints A4 landscape, so this went from 720
+  units across to 1020: 270mm of content width instead of 190mm. Width is the
+  axis that matters for a firing curve, because the whole thing is a time
+  series - the same 14 hour plan now has 42% more room to separate its ramps,
+  and the zone boxes that were coming out as slivers on a steep climb are wide
+  enough to read without being forced to MIN_BOX_W.
+
+  IT IS GRAPH PAPER (Sep 2026). The tester wanted to plot readings onto the
+  printed sheet by hand, which changes what the grid is for. A chart you only
+  read needs few lines; a chart you WRITE ON needs enough that you can find
+  850C at 6h40m without a ruler. So there are now two grids: major lines,
+  labelled, at the same density as before, and minor lines at a quarter of
+  that, unlabelled and much fainter. Minor lines land on 50C and 15 minutes for
+  a typical glaze fire, which is the resolution people actually log at.
+
+  The faintness matters as much as the spacing. At the major line's weight this
+  would be hatching; at a quarter of it the eye reads one grid with a rhythm,
+  and a pencil mark still stands out against it.
 
   WAYPOINT LABELS THIN THEMSELVES OUT. A label is skipped when it would land on
   top of the last one drawn - the Program table underneath carries every value
@@ -112,6 +127,19 @@
       :width="PLOT_W" :height="PLOT_H"
       fill="#fff" stroke="#1a1208" stroke-width="1"
     />
+
+    <!-- Minor grid. Drawn first and at a fraction of the major weight: this is
+         the graph paper the readings get plotted on, not something to read. -->
+    <g stroke="#1a1208" stroke-width="0.3" stroke-opacity="0.07">
+      <line
+        v-for="t in tempMinorLines" :key="'tm' + t"
+        :x1="PAD_L" :y1="tempToY(t)" :x2="W - PAD_R" :y2="tempToY(t)"
+      />
+      <line
+        v-for="m in timeMinorLines" :key="'mm' + m"
+        :x1="minsToX(m)" :y1="PAD_T" :x2="minsToX(m)" :y2="H - PAD_B"
+      />
+    </g>
 
     <!-- Horizontal grid + temperature scale -->
     <g v-for="t in tempLines" :key="'t' + t">
@@ -223,13 +251,18 @@ const props = defineProps({
 const { displayTemp, unitLabel } = useTempUnit()
 const { zonesForPeak, zoneBoxesFor } = useFiringZones()
 
-// Sized for a 190mm content column on A4.
-const W = 720
-const H = 430
-const PAD_L = 48
-const PAD_R = 16
-const PAD_T = 18
-const PAD_B = 34
+// Sized for a 270mm content width on A4 LANDSCAPE. 500 units tall is about
+// 132mm, which is what is left of the 186mm page after the title, the
+// description and the log-header row. It was 566 for a day and pushed itself
+// onto a page of its own: print-avoid-break keeps the chart whole, and whole
+// did not fit, so the browser did the only thing it could. If the header ever
+// grows, this shrinks, not the other way round.
+const W = 1020
+const H = 500
+const PAD_L = 52
+const PAD_R = 18
+const PAD_T = 20
+const PAD_B = 36
 
 const PLOT_W = W - PAD_L - PAD_R
 const PLOT_H = H - PAD_T - PAD_B
@@ -273,20 +306,46 @@ const maxTemp = computed(() => Math.ceil((peakTemp.value + 60) / 100) * 100 || 1
 function minsToX(m) { return PAD_L + (m / maxMins.value) * PLOT_W }
 function tempToY(t) { return PAD_T + (1 - t / maxTemp.value) * PLOT_H }
 
-// Coarser than the screen editor on purpose - see the header note about
-// reading distance.
+// MAJOR lines carry the labels. MINOR lines are a quarter of the major
+// spacing, unlabelled, and exist so the sheet can be plotted on by hand.
+const MINOR_DIVISIONS = 4
+
+const tempStep = computed(() => (maxTemp.value <= 600 ? 100 : 200))
+
 const tempLines = computed(() => {
-  const step = maxTemp.value <= 600 ? 100 : 200
   const out = []
-  for (let t = 0; t <= maxTemp.value; t += step) out.push(t)
+  for (let t = 0; t <= maxTemp.value; t += tempStep.value) out.push(t)
   return out
 })
 
-const timeLines = computed(() => {
-  const hours = maxMins.value / 60
-  const stepH = hours <= 4 ? 1 : hours <= 10 ? 2 : hours <= 24 ? 4 : 12
+const tempMinorLines = computed(() => {
+  const minor = tempStep.value / MINOR_DIVISIONS
   const out = []
-  for (let m = 0; m <= maxMins.value; m += stepH * 60) out.push(m)
+  for (let t = minor; t <= maxTemp.value; t += minor) {
+    // Skip the ones a major line already draws.
+    if (Math.abs(t % tempStep.value) > 0.001) out.push(t)
+  }
+  return out
+})
+
+const timeStepMins = computed(() => {
+  const hours = maxMins.value / 60
+  const stepH = hours <= 4 ? 0.5 : hours <= 10 ? 1 : hours <= 24 ? 2 : 6
+  return stepH * 60
+})
+
+const timeLines = computed(() => {
+  const out = []
+  for (let m = 0; m <= maxMins.value; m += timeStepMins.value) out.push(m)
+  return out
+})
+
+const timeMinorLines = computed(() => {
+  const minor = timeStepMins.value / MINOR_DIVISIONS
+  const out = []
+  for (let m = minor; m <= maxMins.value; m += minor) {
+    if (Math.abs(m % timeStepMins.value) > 0.001) out.push(m)
+  }
   return out
 })
 

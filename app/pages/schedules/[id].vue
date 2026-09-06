@@ -51,13 +51,47 @@
   cone pack and reductions do: a copy of the porcelain preset that lost its
   body would file itself under "Any body" and the user would never know why.
 
+  LANDSCAPE (Sep 2026). The whole print job is A4 landscape, set by the @page
+  rule at the foot of this file. The tester wanted the curve bigger, and width
+  is the axis that matters for a time series: 270mm of content instead of
+  190mm. Both pages turn, not just this one - per-page orientation needs CSS
+  named pages, which is recent Chrome and Safari only and does nothing at all
+  in older browsers rather than failing loudly. One rule works everywhere, and
+  the log sheet is better landscape anyway.
+
+  PAGE ONE IS THE CURVE AND NOTHING ELSE (Sep 2026). The tester wants to plot
+  readings onto the printed sheet by hand, so the chart gets the whole page and
+  a two-level grid to write on.
+
+  NO PROGRAM TABLE ON THE PRINT (Sep 2026). It was on page one, then briefly on
+  the log sheet, and it is now on neither. Rate / target / hold / elapsed is
+  what you key into a CONTROLLER, and nobody programs a kiln from a sheet of
+  paper while standing at it - they do it beforehand, from the screen. On the
+  printed page every one of those numbers is already in the curve, drawn
+  against the axis you are plotting on, so the table was 25mm of paper
+  restating the picture above it in a form nobody was going to read. That 25mm
+  is now log rows.
+
+  THE LOG HEADER IS ON PAGE ONE (Sep 2026). The course's fields - Date,
+  Weather and ambient, Kiln, Load, Clay type, Work fired, Firing - sit in a
+  single row between the title and the curve, prefilled where the schedule
+  knows the answer and a rule to write on where it does not. They were on the
+  log sheet for a day and it was the wrong page: the person writing "Kiln" and
+  "Weather" is looking at the plan, and the log sheet is for numbers.
+
+  Atmosphere prose was dropped with the table. The reduction is already ON the
+  curve as a striped band with its own label, so a sentence saying the same
+  thing under it was a second copy. The cone pack stayed, as one field in the
+  row, because it is not in the curve and it is the one thing you read off
+  this sheet mid-firing.
+
   PRINTING (Sep 2026). Requested by a ceramics student: attach the ramps and
   the graph to coursework, and take a sheet out to the kiln to write readings
   on. The print output is a SEPARATE DOCUMENT, not this page restyled:
 
     PAGE 1  header, curve with real axes, the step table, cone pack,
             atmosphere plan, description
-    PAGE 2  a blank 30-row log sheet (PrintLogSheet)
+    PAGE 2  45 blank log rows (PrintLogSheet)
 
   Both trees live in the DOM at all times — .print-only is display:none until
   the print media query flips it. Building the print tree behind v-if would
@@ -220,7 +254,7 @@
             Print plan &amp; log sheet
           </button>
           <p class="text-[11px] text-ink-muted px-1 leading-snug">
-            Two pages: the plan with its curve and steps, then a blank 40-row sheet to write readings on at the kiln.
+            Two landscape pages: the curve on gridded paper you can plot on by hand, then 45 blank rows to log against.
             <span v-if="dirty" class="text-amber-600 font-semibold">Save first — printing uses the last saved version.</span>
           </p>
         </div>
@@ -234,71 +268,41 @@
     <div v-if="saved" class="print-only" style="color:#000">
 
       <!-- ── Page 1 header ── -->
-      <div class="flex items-end justify-between border-b-2 border-black pb-2 mb-4">
+      <!-- Budget: A4 landscape is 186mm inside 12mm margins. Header 16, the
+           description 6, the fields row 11, the curve 132. Anything added here
+           comes out of the curve, which is the only thing on the page that
+           benefits from being big. -->
+      <div class="flex items-end justify-between border-b-2 border-black pb-1 mb-1.5">
         <div class="min-w-0">
-          <p class="text-[8pt] uppercase tracking-[0.18em]">Firing plan</p>
-          <p class="text-[17pt] font-bold leading-tight">{{ saved.name }}</p>
-          <p class="text-[9.5pt] leading-tight">{{ printMeta }}</p>
+          <p class="text-[7pt] uppercase tracking-[0.18em] leading-none">Firing plan</p>
+          <p class="text-[14pt] font-bold leading-tight">{{ saved.name }}</p>
+          <p class="text-[9pt] leading-tight">{{ printMeta }}</p>
         </div>
-        <div class="text-right shrink-0 text-[8pt] leading-snug">
-          <p class="font-bold text-[10pt]">KilnMonitor</p>
-          <p>kilnlog.netlify.app</p>
-          <p>Printed {{ printedOn }}</p>
+        <div class="text-right shrink-0 text-[7.5pt] leading-tight">
+          <p class="font-bold text-[9pt]">KilnMonitor</p>
+          <p>kilnlog.netlify.app · printed {{ printedOn }}</p>
         </div>
       </div>
 
-      <p v-if="saved.description" class="text-[9.5pt] mb-3 leading-snug">{{ saved.description }}</p>
+      <p v-if="saved.description" class="text-[9pt] mb-1.5 leading-snug">{{ saved.description }}</p>
 
-      <!-- ── Curve ── -->
-      <div class="mb-4 print-avoid-break">
+      <!-- ── Log header, the course's fields in the course's order ──
+           One row across the width. Prefilled where the schedule knows; a rule
+           to write on where only the person at the kiln does. Clay type is a
+           RULE when the schedule is untagged - "Any body" is a filing label,
+           not something you write on a kiln log. -->
+      <div class="grid grid-cols-8 gap-x-3 mb-2">
+        <div v-for="f in printFields" :key="f.label">
+          <p class="text-[6.5pt] font-bold uppercase tracking-wider leading-none mb-0.5 whitespace-nowrap">{{ f.label }}</p>
+          <p v-if="f.value" class="text-[8.5pt] leading-tight border-b border-black/30" style="min-height:5.5mm">{{ f.value }}</p>
+          <div v-else class="border-b border-black/40" style="height:5.5mm" />
+        </div>
+      </div>
+
+      <!-- ── Curve. Fixed height, so a long Program table cannot squeeze it;
+           the strip below goes two columns instead. ── -->
+      <div class="print-avoid-break">
         <PrintCurve :points="savedPoints" :reductions="savedReductions" />
-      </div>
-
-      <!-- ── Steps ── -->
-      <!-- Rate / target / hold, the same shape a controller is programmed in,
-           so this table can be keyed straight into the kiln. Elapsed is derived
-           and shown as a running total, which is what tells you whether you
-           will still be here at midnight. -->
-      <div class="mb-4">
-        <p class="text-[8pt] font-bold uppercase tracking-wider mb-1">Program</p>
-        <table class="w-full border-collapse text-[9.5pt]">
-          <thead>
-            <tr>
-              <th class="text-left border-b border-black py-1 pr-2 w-[8%]">#</th>
-              <th class="text-left border-b border-black py-1 pr-2">Rate {{ unitLabel }}/hr</th>
-              <th class="text-left border-b border-black py-1 pr-2">To {{ unitLabel }}</th>
-              <th class="text-left border-b border-black py-1 pr-2">Hold</th>
-              <th class="text-left border-b border-black py-1">Elapsed</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(s, i) in printSteps" :key="'s' + i">
-              <td class="border-b border-black/25 py-1 pr-2">{{ i + 1 }}</td>
-              <td class="border-b border-black/25 py-1 pr-2 tabular-nums">{{ s.rate }}</td>
-              <td class="border-b border-black/25 py-1 pr-2 tabular-nums font-semibold">{{ s.target }}</td>
-              <td class="border-b border-black/25 py-1 pr-2 tabular-nums">{{ s.hold }}</td>
-              <td class="border-b border-black/25 py-1 tabular-nums">{{ s.elapsed }}</td>
-            </tr>
-          </tbody>
-        </table>
-        <p class="text-[8pt] mt-1">
-          Starts from {{ displayTemp(20) }}{{ unitLabel }} · total {{ totalTime }}
-        </p>
-      </div>
-
-      <!-- ── Atmosphere + cones. Side by side: both are short lists, and two
-           half-width blocks read better than two near-empty full-width ones. -->
-      <div class="grid grid-cols-2 gap-6 print-avoid-break">
-        <div v-if="savedReductions.length">
-          <p class="text-[8pt] font-bold uppercase tracking-wider mb-1">Atmosphere</p>
-          <ul class="text-[9.5pt] leading-relaxed">
-            <li v-for="(r, i) in printReductions" :key="'r' + i">{{ r }}</li>
-          </ul>
-        </div>
-        <div v-if="saved.cone_pack?.length">
-          <p class="text-[8pt] font-bold uppercase tracking-wider mb-1">Witness cones</p>
-          <p class="text-[9.5pt]">{{ saved.cone_pack.join(' · ') }}</p>
-        </div>
       </div>
 
       <!-- ── Page 2 ── -->
@@ -306,8 +310,10 @@
         :name="saved.name"
         :cone="saved.cone ?? ''"
         :type="typeLabel"
-        :rows="30"
+        :peak="printPeak"
+        :duration="totalTime"
       />
+
     </div>
 
     <!-- Reduction planner -->
@@ -338,7 +344,8 @@
 <script setup>
 // app/pages/schedules/[id].vue
 import { themeForType, labelForType } from '~/composables/useScheduleTheme'
-import { pointsToSegments, segmentsToPoints, segmentMinutes } from '~/composables/useCurveSegments'
+import { labelForBody } from '~/composables/useScheduleSections'
+import { pointsToSegments, segmentsToPoints } from '~/composables/useCurveSegments'
 
 definePageMeta({ middleware: ['auth'] })
 
@@ -563,24 +570,25 @@ const printMeta = computed(() => {
   return parts.join(' · ')
 })
 
-// RATES ARE A DELTA. displayDelta, not displayTemp — 100°C/hr is 180°F/hr, not
-// 212. Getting this backwards is invisible and wrong by 32 degrees every time,
-// which is exactly the kind of error that gets keyed into a kiln and ruins a
-// load. Same rule as ScheduleSegmentEditor.
-const printSteps = computed(() => {
-  const { ambient, segments } = pointsToSegments(savedPoints.value)
-  let running = ambient
-  let mins = 0
-  return segments.map(seg => {
-    mins += segmentMinutes(running, seg)
-    running = seg.target
-    return {
-      rate:    seg.rate >= 9999 ? 'full' : Math.round(displayDelta(seg.rate)),
-      target:  `${displayTemp(seg.target)}`,
-      hold:    seg.hold ? `${seg.hold} min` : '—',
-      elapsed: fmtMins(mins),
-    }
-  })
+// The course's seven, plus the cone pack, in that order. See the header note.
+const printFields = computed(() => [
+  { label: 'Date' },
+  { label: 'Weather' },
+  { label: 'Kiln' },
+  { label: 'Load' },
+  { label: 'Clay type',     value: saved.value?.body ? labelForBody(saved.value.body) : '' },
+  { label: 'Work fired' },
+  { label: 'Firing',        value: printMeta.value },
+  { label: 'Witness cones', value: (saved.value?.cone_pack ?? []).join(' · ') },
+])
+
+// The peak as the log sheet's meta line wants it. Page one shows this through
+// printMeta; page two has to say it again because the two get separated.
+const printPeak = computed(() => {
+  const hi = savedPoints.value.length
+    ? Math.max(...savedPoints.value.map(p => p.targetTemp))
+    : null
+  return hi === null ? '' : `${displayTemp(hi)}${unitLabel.value}`
 })
 
 const totalTime = computed(() => {
@@ -593,18 +601,6 @@ function fmtMins(m) {
   if (h === 0) return `${min}m`
   return min === 0 ? `${h}h` : `${h}h ${min}m`
 }
-
-// Prose rather than a table: three of these at most, and "Reduce from 894°C to
-// 1060°C" is read faster than three columns of numbers.
-const printReductions = computed(() =>
-  savedReductions.value.map(r => {
-    const verb = r.kind === 'oxidation' ? 'Oxidise' : 'Reduce'
-    const from = `${displayTemp(r.startTemp)}${unitLabel.value}`
-    if (r.endTemp === null || r.endTemp === undefined) return `${verb} from ${from} to the end`
-    if (r.endTemp === r.startTemp) return `${verb} at ${from}`
-    return `${verb} from ${from} to ${displayTemp(r.endTemp)}${unitLabel.value}`
-  })
-)
 
 function printPlan() {
   // nextTick so any pending reactive update to the print tree has flushed
@@ -710,3 +706,20 @@ async function saveAndStart() {
   }
 }
 </script>
+
+<style>
+/* LANDSCAPE, BOTH PAGES. Per-page orientation would need CSS named pages
+   (`@page plan { size: A4 landscape }` plus `page: plan`), which is Chrome 110
+   and Safari 18 upward and silently does nothing below that - the worst
+   failure mode for something you only find out about once it is on paper. One
+   rule turns the whole job and works everywhere.
+
+   NOT scoped: an at-rule with no selector passes through the scoped-style
+   transform untouched, but leaving the block unscoped says so out loud. If a
+   global stylesheet also declares @page, whichever loads later wins, so check
+   for one before assuming this file is the problem. */
+@page {
+  size: A4 landscape;
+  margin: 12mm;
+}
+</style>

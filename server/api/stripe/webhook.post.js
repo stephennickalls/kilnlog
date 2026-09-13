@@ -1,18 +1,20 @@
 // File: server/api/stripe/webhook.post.js
 //
-// PACKAGE 5 — Stripe webhook hardening.
-// Changes vs previous:
-//   1. Pinned API version via getStripe() — periodEnd()/trial_end shapes stable.
+// PACKAGE 5 Stripe webhook hardening.
+//   1. Pinned API version via getStripe() so periodEnd()/trial_end shapes are stable.
 //   2. serviceClient() instead of a raw createClient (one sanctioned bypass path).
 //   3. invoice.paid recovery: when a past_due customer's payment succeeds, we
 //      re-derive status from the live subscription instead of waiting for a
-//      customer.subscription.updated that may not arrive. Belt-and-braces.
-//   4. checkout.session.completed: logged (no-op for state, since the
-//      subscription.created event carries the real status) to aid support
-//      when tracing a signup.
-//   5. Returns 200 on unmapped/no-op events so Stripe doesn't retry forever.
+//      customer.subscription.updated that may not arrive.
+//   4. checkout.session.completed: logged (no-op for state) to aid support.
+//   5. Returns 200 on unmapped/no-op events so Stripe does not retry forever.
 //
-// Idempotency unchanged: last_stripe_event_at gate drops out-of-order events.
+// Idempotency: last_stripe_event_at gate drops out-of-order and replayed events.
+//
+// SEP 2026: every tracked log line now carries eventId + livemode so a Stripe
+// retry (same eventId) is distinguishable from distinct events, and test-mode
+// noise from live traffic. Prompted by 7 subscription_deleted rows in an hour
+// that turned out to be admin test cancels.
 
 import { getStripe } from '~~/server/utils/stripe'
 
@@ -29,6 +31,9 @@ export default defineEventHandler(async (event) => {
     await logger.tracked('error', 'stripe.webhook.signature_failed', { err })
     throw createError({ statusCode: 400, statusMessage: `Webhook error: ${err.message}` })
   }
+
+  // Tag for every log line in this request.
+  const tag = { eventId: stripeEvent.id, livemode: stripeEvent.livemode, type: stripeEvent.type }
 
   function mapStatus(s) {
     return ({
@@ -50,7 +55,7 @@ export default defineEventHandler(async (event) => {
 
   async function updateProfile(customerId, updates, eventTs) {
     if (!customerId) {
-      await logger.tracked('warn', 'stripe.webhook.no_customer', { type: stripeEvent.type })
+      await logger.tracked('warn', 'stripe.webhook.no_customer', tag)
       return
     }
     const eventIso = new Date(eventTs * 1000).toISOString()
@@ -64,22 +69,21 @@ export default defineEventHandler(async (event) => {
       .select('id')
 
     if (error) {
-      await logger.tracked('error', 'stripe.webhook.update_failed', { customerId, err: error })
+      await logger.tracked('error', 'stripe.webhook.update_failed', { customerId, err: error, ...tag })
       throw createError({ statusCode: 500, statusMessage: 'Profile update failed' })
     }
     if (!data?.length) {
       // Either no matching customer, or a newer event already applied (normal).
-      await logger.tracked('warn', 'stripe.webhook.no_row_updated', { customerId, type: stripeEvent.type })
+      await logger.tracked('warn', 'stripe.webhook.no_row_updated', { customerId, ...tag })
     }
   }
 
   // Re-fetch the customer's subscription and sync status from source of truth.
-  // Used by recovery paths where the event object isn't the subscription itself.
   async function syncFromSubscription(customerId, eventTs) {
     const subs = await stripe.subscriptions.list({ customer: customerId, status: 'all', limit: 1 })
     const sub  = subs.data?.[0]
     if (!sub) {
-      await logger.tracked('warn', 'stripe.webhook.no_subscription_found', { customerId })
+      await logger.tracked('warn', 'stripe.webhook.no_subscription_found', { customerId, ...tag })
       return
     }
     await updateProfile(customerId, {
@@ -95,7 +99,9 @@ export default defineEventHandler(async (event) => {
   switch (stripeEvent.type) {
     case 'customer.subscription.created':
     case 'customer.subscription.updated': {
-      await logger.tracked('info', `stripe.${stripeEvent.type.split('.').pop()}`, { customerId: obj.customer, status: obj.status })
+      await logger.tracked('info', `stripe.${stripeEvent.type.split('.').pop()}`, {
+        customerId: obj.customer, status: obj.status, ...tag,
+      })
       await updateProfile(obj.customer, {
         subscription_status:  mapStatus(obj.status),
         subscription_ends_at: toIso(periodEnd(obj)),
@@ -105,7 +111,7 @@ export default defineEventHandler(async (event) => {
     }
 
     case 'customer.subscription.deleted': {
-      await logger.tracked('info', 'stripe.subscription_deleted', { customerId: obj.customer })
+      await logger.tracked('info', 'stripe.subscription_deleted', { customerId: obj.customer, ...tag })
       await updateProfile(obj.customer, {
         subscription_status:  'canceled',
         subscription_ends_at: toIso(periodEnd(obj)),
@@ -114,36 +120,35 @@ export default defineEventHandler(async (event) => {
     }
 
     case 'invoice.payment_failed': {
-      await logger.tracked('warn', 'stripe.payment_failed', { customerId: obj.customer })
+      await logger.tracked('warn', 'stripe.payment_failed', { customerId: obj.customer, ...tag })
       await updateProfile(obj.customer, { subscription_status: 'past_due' }, ts)
       break
     }
 
     // RECOVERY: a past_due customer fixed their card and the renewal invoice
-    // was paid. Don't wait for a possible subscription.updated — sync now from
-    // the live subscription so access is restored immediately.
+    // was paid. Sync now from the live subscription so access is restored.
     case 'invoice.paid': {
-      // Only relevant for subscription invoices; one-off invoices have no sub.
       if (obj.subscription || obj.customer) {
         await syncFromSubscription(obj.customer, ts)
       }
       break
     }
 
-    // No state change (subscription.created carries the real status) — log for
+    // No state change (subscription.created carries the real status). Log for
     // support traceability, then ack.
     case 'checkout.session.completed': {
       await logger.tracked('info', 'stripe.webhook.checkout_completed', {
         customerId: obj.customer,
         sessionId:  obj.id,
         mode:       obj.mode,
+        ...tag,
       })
       break
     }
 
     default: {
-      // Unhandled event type — ack with 200 so Stripe stops retrying.
-      logger.info('stripe.webhook.unhandled', { type: stripeEvent.type })  // console-only: can be chatty
+      // Unhandled event type. Ack with 200 so Stripe stops retrying.
+      logger.info('stripe.webhook.unhandled', tag)  // console-only: can be chatty
       break
     }
   }

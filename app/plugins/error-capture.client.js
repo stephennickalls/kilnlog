@@ -1,8 +1,6 @@
 // app/plugins/error-capture.client.js
 //
-// CLIENT ERROR CAPTURE (Aug 2026): the /api/logs POST ingest existed but
-// nothing called it — browser errors were invisible unless a tester reported
-// them, which beta testers don't. This plugin ships every uncaught problem to
+// CLIENT ERROR CAPTURE (Aug 2026): ships every uncaught browser problem to
 // the logs table:
 //   - Vue render/lifecycle errors  (nuxtApp vue:error hook)
 //   - uncaught window errors       (window 'error')
@@ -11,9 +9,19 @@
 // Safety rails: per-session cap + short dedupe window so an error loop can't
 // hammer the API (the server also rate-limits per user), and the reporter
 // itself can never throw. Uses the patched global $fetch, so the Bearer token
-// is attached automatically; unauthenticated visitors' errors are skipped
-// (the ingest requires a session — acceptable: signed-in testers are who we
-// are watching).
+// is attached automatically; unauthenticated visitors' errors are skipped.
+//
+// NOISE FILTER (Sep 2026): benign browser chatter is dropped before it costs
+// a rate-limit slot. ResizeObserver loop warnings alone were 60% of all rows.
+
+const IGNORED = [
+  /ResizeObserver loop/i,
+  /ResizeObserver loop limit exceeded/i,
+  /Script error\.?$/i,
+  /Load failed/i,
+  /NetworkError when attempting to fetch resource/i,
+  /Failed to fetch dynamically imported module/i,
+]
 
 export default defineNuxtPlugin((nuxtApp) => {
   const MAX_PER_SESSION = 25
@@ -21,6 +29,10 @@ export default defineNuxtPlugin((nuxtApp) => {
 
   let sent = 0
   const recent = new Map()   // message -> last sent ts
+
+  function isNoise(message) {
+    return IGNORED.some(re => re.test(message))
+  }
 
   function shouldSend(message) {
     if (sent >= MAX_PER_SESSION) return false
@@ -35,6 +47,7 @@ export default defineNuxtPlugin((nuxtApp) => {
   function report(evt, message, context = {}) {
     try {
       const msg = String(message ?? 'Unknown error').slice(0, 500)
+      if (isNoise(msg)) return
       if (!shouldSend(`${evt}:${msg}`)) return
       sent++
       globalThis.$fetch('/api/logs', {
@@ -49,13 +62,11 @@ export default defineNuxtPlugin((nuxtApp) => {
             ua: navigator.userAgent.slice(0, 200),
           },
         },
-        // Failures here must be silent — no retry storm, no console spam loop.
         retry: 0,
       }).catch(() => {})
     } catch { /* never throw from the reporter */ }
   }
 
-  // Vue errors (render, lifecycle, handlers)
   nuxtApp.hook('vue:error', (err, _instance, info) => {
     report('client.vue_error', err?.message ?? err, {
       info,
@@ -63,7 +74,6 @@ export default defineNuxtPlugin((nuxtApp) => {
     })
   })
 
-  // Uncaught window errors
   window.addEventListener('error', (e) => {
     report('client.uncaught', e.message, {
       file: e.filename ? `${e.filename}:${e.lineno}:${e.colno}` : null,
@@ -71,7 +81,6 @@ export default defineNuxtPlugin((nuxtApp) => {
     })
   })
 
-  // Unhandled promise rejections
   window.addEventListener('unhandledrejection', (e) => {
     const r = e.reason
     report('client.unhandled_rejection', r?.message ?? String(r), {

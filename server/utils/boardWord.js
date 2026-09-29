@@ -17,7 +17,7 @@ export async function addBoardWord(event, word) {
     throw createError({ statusCode: 400, statusMessage: 'id must be a positive whole number, e.g. ?id=1' })
   }
 
-  const { data, error } = await boardClient()
+  const { data, error } = await boardClient(event)
     .rpc('add_board_word', { p_group_id: groupId, p_word: word })
 
   if (error) throw await serverError('board.add_word_failed', error, { groupId, word })

@@ -4,13 +4,13 @@ definePageMeta({ auth: false })
 
 useHead({ meta: [{ name: 'robots', content: 'noindex, nofollow' }] })
 
-const words = ['hello', 'world']
 const { data: messages, pending, error, refresh } = await useFetch('/api/board')
 
-async function append(word, id) {
-  await $fetch(`/api/board/${word}?id=${id}`)
-  await refresh()
-}
+const errorText = computed(() => {
+  const e = error.value
+  if (!e) return ''
+  return e.data?.statusMessage || e.data?.message || e.statusMessage || e.message || 'Unknown error'
+})
 </script>
 
 <template>
@@ -33,31 +33,22 @@ async function append(word, id) {
     </p>
 
     <p v-if="pending" class="text-gray-500">Loading...</p>
-    <p v-else-if="error" class="text-red-600">Could not load messages.</p>
+    <div v-else-if="error" class="text-red-600">
+      <p>Could not load messages.</p>
+      <pre class="mt-2 p-2 bg-red-50 rounded text-xs whitespace-pre-wrap">{{ errorText }}</pre>
+    </div>
     <p v-else-if="!messages?.length" class="text-gray-500">No messages yet.</p>
 
     <ul v-else class="space-y-3">
       <li
         v-for="m in messages"
         :key="m.group_id"
-        class="p-4 rounded border border-gray-200 bg-white"
+        class="flex items-center gap-4 p-4 rounded border border-gray-200 bg-white"
       >
-        <div class="flex items-center gap-4">
-          <span class="shrink-0 px-2 py-1 rounded bg-gray-100 font-mono text-sm">
-            #{{ m.group_id }}
-          </span>
-          <span class="text-lg">{{ m.message }}</span>
-        </div>
-        <div class="mt-2 flex gap-2">
-          <button
-            v-for="w in words"
-            :key="w"
-            class="px-2 py-1 rounded border border-gray-300 text-xs hover:bg-gray-50"
-            @click="append(w, m.group_id)"
-          >
-            + {{ w }}
-          </button>
-        </div>
+        <span class="shrink-0 px-2 py-1 rounded bg-gray-100 font-mono text-sm">
+          #{{ m.group_id }}
+        </span>
+        <span class="text-lg">{{ m.message }}</span>
       </li>
     </ul>
   </div>

@@ -18,14 +18,9 @@ export async function addBoardWord(event, word) {
   }
 
   const { data, error } = await boardClient()
-    .from('board_words')
-    .insert({ group_id: groupId, word })
-    .select('id, group_id, word, created_at')
-    .single()
+    .rpc('add_board_word', { p_group_id: groupId, p_word: word })
 
-  if (error) {
-    throw createError({ statusCode: 500, statusMessage: error.message })
-  }
+  if (error) throw await serverError('board.add_word_failed', error, { groupId, word })
 
   setResponseHeader(event, 'Cache-Control', 'no-store')
   setResponseHeader(event, 'X-Robots-Tag', 'noindex, nofollow')

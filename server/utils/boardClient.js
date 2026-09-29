@@ -8,10 +8,11 @@ export function boardClient() {
 
   const config = useRuntimeConfig()
   const url = config.public.SUPABASE_URL
-  const key = config.supabaseServiceKey
+  const key = config.public.SUPABASE_KEY
 
   if (!url || !key) {
-    throw createError({ statusCode: 500, statusMessage: 'Supabase URL or service key missing' })
+    const missing = [!url && 'URL', !key && 'publishable key'].filter(Boolean).join(' and ')
+    throw createError({ statusCode: 500, statusMessage: `Supabase ${missing} missing` })
   }
 
   client = createClient(url, key, {

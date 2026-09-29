@@ -15,8 +15,6 @@
 // /early-access (redirect lives in app.vue's 402 handler). /subscribe
 // still exists and self-redirects, so it stays in publicRoutes to avoid an
 // auth bounce. Grep "BETA-TEMP" to revert.
-//
-// /board: public message board, no auth required.
 
 export default defineNuxtRouteMiddleware(async (to) => {
   if (import.meta.server) return
@@ -29,8 +27,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
     '/reset-password',
     '/subscribe',
     '/early-access', // BETA-TEMP
-    '/confirm',
-    '/board'
+    '/confirm'
   ]
   const isPublic = publicRoutes.some(r => to.path.startsWith(r))
 

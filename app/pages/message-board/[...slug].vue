@@ -1,4 +1,4 @@
-<!-- app/pages/board.vue -->
+<!-- app/pages/message-board/[...slug].vue -->
 <script setup>
 definePageMeta({ auth: false })
 
@@ -14,8 +14,15 @@ function firstParam(v) {
   return Array.isArray(v) ? v[0] : v
 }
 
-const rawText = firstParam(route.query.text) ?? firstParam(route.query.word)
-const rawId = firstParam(route.query.id)
+// Path style: /message-board/<id>/<text...>
+const slug = route.params.slug
+const parts = Array.isArray(slug) ? slug.filter(Boolean) : (slug ? [slug] : [])
+const pathId = parts[0]
+const pathText = parts.length > 1 ? parts.slice(1).join('/').replace(/\+/g, ' ') : undefined
+
+// Query style: /message-board?id=<id>&text=<text>
+const rawId = firstParam(route.query.id) ?? pathId
+const rawText = firstParam(route.query.text) ?? firstParam(route.query.word) ?? pathText
 
 const text = String(rawText ?? '').trim()
 const groupId = Number(rawId)
@@ -50,9 +57,9 @@ const errorText = computed(() => {
   return e.data?.statusMessage || e.statusMessage || e.message || 'Unknown error'
 })
 
-// Clear the query so a reload does not add the text again
+// Clear id/text from the address bar so a reload does not add it again
 onMounted(() => {
-  if (wantsWrite) router.replace({ path: '/board' })
+  if (wantsWrite) router.replace({ path: '/message-board' })
 })
 </script>
 
@@ -70,7 +77,7 @@ onMounted(() => {
 
     <p class="mb-6 text-sm text-gray-600">
       Add text by visiting
-      <code class="px-1 bg-gray-100 rounded">/board?id=1&amp;text=your+text+here</code>
+      <code class="px-1 bg-gray-100 rounded">/message-board/1/your text here</code>
     </p>
 
     <p

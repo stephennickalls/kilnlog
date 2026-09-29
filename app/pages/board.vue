@@ -4,12 +4,47 @@ definePageMeta({ auth: false })
 
 useHead({ meta: [{ name: 'robots', content: 'noindex, nofollow' }] })
 
-const { data: messages, pending, error, refresh } = await useFetch('/api/board')
+const WORDS = ['hello', 'world']
+
+const route = useRoute()
+const router = useRouter()
+const supabase = useSupabaseClient()
+
+const word = String(route.query.word || '').toLowerCase()
+const groupId = Number(route.query.id)
+const wantsWrite = route.query.word !== undefined || route.query.id !== undefined
+
+// Write first (runs once, during server render on a direct visit)
+const { data: writeResult } = await useAsyncData(`board-write-${word}-${groupId}`, async () => {
+  if (!wantsWrite) return null
+  if (!WORDS.includes(word)) return { error: `word must be one of: ${WORDS.join(', ')}` }
+  if (!Number.isInteger(groupId) || groupId < 1) return { error: 'id must be a positive whole number' }
+
+  const { data, error } = await supabase.rpc('add_board_word', { p_group_id: groupId, p_word: word })
+  if (error) return { error: error.message }
+  return { row: data }
+})
+
+// Then read the board
+const { data: messages, pending, error, refresh } = await useAsyncData('board-messages', async () => {
+  const { data, error } = await supabase
+    .from('board_messages')
+    .select('group_id, message, word_count, started_at, updated_at')
+    .order('group_id', { ascending: true })
+
+  if (error) throw createError({ statusCode: 500, statusMessage: error.message })
+  return data ?? []
+})
 
 const errorText = computed(() => {
   const e = error.value
   if (!e) return ''
-  return e.data?.statusMessage || e.data?.message || e.statusMessage || e.message || 'Unknown error'
+  return e.data?.statusMessage || e.statusMessage || e.message || 'Unknown error'
+})
+
+// Clear the query so a reload does not add the word again
+onMounted(() => {
+  if (wantsWrite) router.replace({ path: '/board' })
 })
 </script>
 
@@ -27,9 +62,22 @@ const errorText = computed(() => {
 
     <p class="mb-6 text-sm text-gray-600">
       Add a word by visiting
-      <code class="px-1 bg-gray-100 rounded">/api/board/hello?id=1</code>
+      <code class="px-1 bg-gray-100 rounded">/board?word=hello&amp;id=1</code>
       or
-      <code class="px-1 bg-gray-100 rounded">/api/board/world?id=1</code>
+      <code class="px-1 bg-gray-100 rounded">/board?word=world&amp;id=1</code>
+    </p>
+
+    <p
+      v-if="writeResult?.row"
+      class="mb-4 p-2 rounded bg-green-50 text-green-800 text-sm"
+    >
+      Added "{{ writeResult.row.word }}" to #{{ writeResult.row.group_id }}
+    </p>
+    <p
+      v-else-if="writeResult?.error"
+      class="mb-4 p-2 rounded bg-red-50 text-red-700 text-sm"
+    >
+      Not added: {{ writeResult.error }}
     </p>
 
     <p v-if="pending" class="text-gray-500">Loading...</p>

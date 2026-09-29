@@ -4,23 +4,31 @@ definePageMeta({ auth: false })
 
 useHead({ meta: [{ name: 'robots', content: 'noindex, nofollow' }] })
 
-const WORDS = ['hello', 'world']
+const MAX_LEN = 500
 
 const route = useRoute()
 const router = useRouter()
 const supabase = useSupabaseClient()
 
-const word = String(route.query.word || '').toLowerCase()
-const groupId = Number(route.query.id)
-const wantsWrite = route.query.word !== undefined || route.query.id !== undefined
+function firstParam(v) {
+  return Array.isArray(v) ? v[0] : v
+}
+
+const rawText = firstParam(route.query.text) ?? firstParam(route.query.word)
+const rawId = firstParam(route.query.id)
+
+const text = String(rawText ?? '').trim()
+const groupId = Number(rawId)
+const wantsWrite = rawText !== undefined || rawId !== undefined
 
 // Write first (runs once, during server render on a direct visit)
-const { data: writeResult } = await useAsyncData(`board-write-${word}-${groupId}`, async () => {
+const { data: writeResult } = await useAsyncData(`board-write-${groupId}-${text}`, async () => {
   if (!wantsWrite) return null
-  if (!WORDS.includes(word)) return { error: `word must be one of: ${WORDS.join(', ')}` }
   if (!Number.isInteger(groupId) || groupId < 1) return { error: 'id must be a positive whole number' }
+  if (!text) return { error: 'text is empty' }
+  if (text.length > MAX_LEN) return { error: `text is longer than ${MAX_LEN} characters` }
 
-  const { data, error } = await supabase.rpc('add_board_word', { p_group_id: groupId, p_word: word })
+  const { data, error } = await supabase.rpc('add_board_word', { p_group_id: groupId, p_word: text })
   if (error) return { error: error.message }
   return { row: data }
 })
@@ -42,7 +50,7 @@ const errorText = computed(() => {
   return e.data?.statusMessage || e.statusMessage || e.message || 'Unknown error'
 })
 
-// Clear the query so a reload does not add the word again
+// Clear the query so a reload does not add the text again
 onMounted(() => {
   if (wantsWrite) router.replace({ path: '/board' })
 })
@@ -61,15 +69,13 @@ onMounted(() => {
     </div>
 
     <p class="mb-6 text-sm text-gray-600">
-      Add a word by visiting
-      <code class="px-1 bg-gray-100 rounded">/board?word=hello&amp;id=1</code>
-      or
-      <code class="px-1 bg-gray-100 rounded">/board?word=world&amp;id=1</code>
+      Add text by visiting
+      <code class="px-1 bg-gray-100 rounded">/board?id=1&amp;text=your+text+here</code>
     </p>
 
     <p
       v-if="writeResult?.row"
-      class="mb-4 p-2 rounded bg-green-50 text-green-800 text-sm"
+      class="mb-4 p-2 rounded bg-green-50 text-green-800 text-sm break-words"
     >
       Added "{{ writeResult.row.word }}" to #{{ writeResult.row.group_id }}
     </p>
@@ -91,12 +97,12 @@ onMounted(() => {
       <li
         v-for="m in messages"
         :key="m.group_id"
-        class="flex items-center gap-4 p-4 rounded border border-gray-200 bg-white"
+        class="flex items-start gap-4 p-4 rounded border border-gray-200 bg-white"
       >
         <span class="shrink-0 px-2 py-1 rounded bg-gray-100 font-mono text-sm">
           #{{ m.group_id }}
         </span>
-        <span class="text-lg">{{ m.message }}</span>
+        <span class="text-lg break-words min-w-0">{{ m.message }}</span>
       </li>
     </ul>
   </div>
